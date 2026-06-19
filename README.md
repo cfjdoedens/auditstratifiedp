@@ -1,11 +1,11 @@
-📊 auditstratified (Python Editie)
+# 📊 auditstratified (Python Editie)
 Een Python-pakket voor het plannen en evalueren van gestratificeerde
 steekproeven, conform de HARo-methodiek van de Rijksoverheid.
 Oorspronkelijk ontwikkeld als R-pakket en interactieve Shiny-applicatie, is deze
 krachtige wiskundige rekenmotor nu volledig gemigreerd naar Python. Dit maakt
 het algoritme direct toegankelijk voor data science teams, analytics-afdelingen
 (zoals de ADR) en cloud-omgevingen zoals Google Colab.
-✨ Kenmerken
+## ✨ Kenmerken
 🎯 Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, wiskundig
 optimale steekproefverdeling over meerdere strata (Stap 1).
 📈 Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
@@ -14,7 +14,7 @@ samen via pijlsnelle FFT-convolutie of Monte Carlo simulaties.
 Rijksoverheid (IHR, IBR, CAR).
 🚀 Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
 performance.
-💻 Installatie
+## 💻 Installatie
 Je kunt dit pakket eenvoudig lokaal installeren of direct inlezen in een
 cloud-omgeving (zoals Jupyter of Colab).
 1. Clone deze repository:
@@ -26,7 +26,7 @@ cd auditstratified
 ```bash
 pip install -r requirements.txt
 ```
-🚀 Snel aan de slag (Quick Start)
+## 🚀 Snel aan de slag (Quick Start)
 1. Een steekproef plannen
 Het klimalgoritme zoekt automatisch de optimale verdeling om onder de gestelde
 materialiteit te blijven.
@@ -64,7 +64,7 @@ samen")
 print(f"Maximale fout (convolutie): {resultaat['max_fout_convolutie']:.4f}")
 print(f"In euro's: € {resultaat['max_fout_convolutie_geld']:,.2f}")
 ```
-🧪 Testen van het algoritme
+## 🧪 Testen van het algoritme
 Het pakket bevat een uitgebreide en rigoureuze test-suite die de
 Python-uitkomsten (tot ver achter de komma) bewijst ten opzichte van het
 originele R-pakket. Praktijkcases zoals het LNV 2023 dossier en Paul van
@@ -73,7 +73,7 @@ Om de tests (30+ stuks) uit te voeren:
 ```bash
 python -m pytest
 ```
-☁️ Google Colab (Demo)
+## ☁️ Google Colab (Demo)
 Werken in de cloud zonder installatie? Maak een leeg Colab notebook aan en plak
 dit in de eerste cel:
 !git clone https://github.com/cfjdoedens/auditstratifiedp.git !pip install -r
