@@ -6,27 +6,31 @@ krachtige wiskundige rekenmotor nu volledig gemigreerd naar Python. Dit maakt
 het algoritme direct toegankelijk voor data science teams, analytics-afdelingen
 (zoals de ADR) en cloud-omgevingen zoals Google Colab.
 ## ✨ Kenmerken
-🎯 Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, wiskundig
+
+- 🎯 Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, wiskundig
 optimale steekproefverdeling over meerdere strata (Stap 1).
-📈 Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
+- 📈 Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
 samen via pijlsnelle FFT-convolutie of Monte Carlo simulaties.
-🏛️ HARo-integratie: Ingebouwde rekenregels voor het Handboek Auditing
+- 🏛️ HARo-integratie: Ingebouwde rekenregels voor het Handboek Auditing
 Rijksoverheid (IHR, IBR, CAR).
-🚀 Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
+- 🚀 Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
 performance.
 ## 💻 Installatie
 Je kunt dit pakket eenvoudig lokaal installeren of direct inlezen in een
 cloud-omgeving (zoals Jupyter of Colab).
+
 1. Clone deze repository:
 ```bash
 git clone https://github.com/cfjdoedens/auditstratifiedp.git 
 cd auditstratified
 ```
+
 2. Installeer de afhankelijkheden:
 ```bash
 pip install -r requirements.txt
 ```
 ## 🚀 Snel aan de slag (Quick Start)
+
 1. Een steekproef plannen
 Het klimalgoritme zoekt automatisch de optimale verdeling om onder de gestelde
 materialiteit te blijven.
@@ -51,6 +55,7 @@ print(plan[['naam', 'n_basis', 'n_definitief']])
 print(f"Verwachte eindfout:
 {plan.attrs['geplande_max_fout_totaal']:.4f}")
 ```
+
 2. Een getrokken steekproef evalueren
 Na de uitvoering van de controle kun je de gevonden fouten (k_laag of bedragen
 in het hoogstratum) evalueren.
@@ -76,7 +81,9 @@ python -m pytest
 ## ☁️ Google Colab (Demo)
 Werken in de cloud zonder installatie? Maak een leeg Colab notebook aan en plak
 dit in de eerste cel:
-!git clone https://github.com/cfjdoedens/auditstratifiedp.git !pip install -r
-auditstratified/requirements.txt import sys;
-sys.path.append('/content/auditstratified')
+```bash
+!git clone https://github.com/cfjdoedens/auditstratifiedp.git 
+!pip install -r auditstratified/requirements.txt import sys; sys.path.append('/content/auditstratified')
+```
+
 Vervolgens kun je de functies direct gebruiken.
