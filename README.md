@@ -20,7 +20,7 @@ Je kunt dit pakket eenvoudig lokaal installeren of direct inlezen in een cloud-o
 
 1. Clone deze repository:
 
-git clone [https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git](https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git)
+git clone https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git
 cd auditstratified
 
 
@@ -85,7 +85,7 @@ python -m pytest
 
 Werken in de cloud zonder installatie? Maak een leeg Colab notebook aan en plak dit in de eerste cel:
 
-!git clone [https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git](https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git)
+!git clone https://github.com/JOUW-GEBRUIKERSNAAM/auditstratified.git
 !pip install -r auditstratified/requirements.txt
 import sys; sys.path.append('/content/auditstratified')
 
