@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auditstratified"
+version = "0.1.0"
+description = "Gestratificeerde steekproefplanning en -evaluatie conform HARo (Handboek Auditing Rijksoverheid)"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "streamlit>=1.30.0",
+    "matplotlib>=3.5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["auditstratified*"]

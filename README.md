@@ -1,19 +1,25 @@
-# 📊 auditstratified (Python Editie)
+# auditstratified (Python Editie)
 Een Python-pakket voor het plannen en evalueren van gestratificeerde
 steekproeven, conform HARo (Handboek Auditing Rijksoverheid).
 Oorspronkelijk ontwikkeld als R-pakket en interactieve Shiny-applicatie, is dit
  nu gemigreerd naar Python. 
-## ✨ Kenmerken
 
-- 🎯 Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, 
-optimale steekproefverdeling over meerdere strata (Stap 1).
-- 📈 Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
-samen via pijlsnelle FFT-convolutie of Monte Carlo simulaties.
-- 🏛️ HARo-integratie: Ingebouwde rekenregels voor het Handboek Auditing
-Rijksoverheid (IHR, IBR, CAR).
-- 🚀 Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
+ ## Live Demo
+Wil je de kosten-bewuste allocatie in actie zien? 
+[**Probeer de live auditstratified applicatie hier**](https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/)
+
+## Kenmerken
+- Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, 
+optimale steekproefverdeling over meerdere strata.
+- Kosten-geoptimaliseerd Plannen: Berekent automatisch de meest efficiënte steekproefverdeling. Het algoritme weegt de verwachte foutreductie af tegen de uitvoeringskosten per steekproef, waardoor schaarse controletijd optimaal kan worden ingezet.
+- Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
+samen via FFT-convolutie of Monte Carlo simulaties.
+- HARo-gebaseerd: Zekerheid afgeleid van IHR, IBR en CAR volgens het Handboek Auditing
+Rijksoverheid.
+- Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
 performance.
-## 💻 Installatie
+
+## Installatie
 Je kunt dit pakket eenvoudig lokaal installeren of direct inlezen in een
 cloud-omgeving (zoals Jupyter of Colab).
 
@@ -27,7 +33,7 @@ cd auditstratifiedp
 ```bash
 pip install -r requirements.txt
 ```
-## 🚀 Aan de slag 
+## Aan de slag 
 
 1. Een steekproef plannen
 Het klimalgoritme zoekt automatisch de optimale verdeling om onder de gestelde
@@ -71,7 +77,7 @@ resultaat = eval_stratified(steekproeven=data, zekerheid=0.95, methode="FFT same
 print(f"Maximale fout (convolutie): {resultaat['max_fout_convolutie']:.4f}")
 print(f"In euro's: € {resultaat['max_fout_convolutie_geld']:,.2f}")
 ```
-## 🧪 Testen van het algoritme
+## Testen van het algoritme
 Het pakket bevat tests om het pakket te valideren:
 
 - Functionele tests, met onder meer praktijkgevallen.
@@ -98,14 +104,14 @@ sys.path.append('/content/auditstratifiedp')
 
 Vervolgens kun je de functies direct gebruiken.
 
-## 📄 Licentie
+## Licentie
 
 Dit pakket is vrijgegeven onder de
 [European Union Public Licence v1.2 (EUPL-1.2)](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
 Je mag het pakket vrij gebruiken, aanpassen en verspreiden, mits afgeleide werken
 onder dezelfde licentie worden gepubliceerd.
 
-## 🤝 Bijdragen
+## Bijdragen
 
 Bijdragen zijn welkom. Open een [issue](https://github.com/cfjdoedens/auditstratifiedp/issues)
 voor een bugreport of idee, of dien een pull request in. Zorg er bij een pull
