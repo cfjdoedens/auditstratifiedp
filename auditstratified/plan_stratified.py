@@ -20,6 +20,10 @@ def plan_stratified_basis(steekproeven: pd.DataFrame, model: str = "binomiaal") 
     # Maak een kopie om waarschuwingen (SettingWithCopyWarning) van Pandas te voorkomen.
     strata = steekproeven.copy()
 
+    # Controleer of uitvoeringskosten zijn meegegeven; zo niet, hanteer een neutrale waarde van 1.0.
+    if 'kosten' not in strata.columns:
+        strata['kosten'] = 1.0
+
     # Bereken per stratum de HARo-zekerheid en de daaruit voortvloeiende minimale n_basis.
     strata['cert'] = strata.apply(
         lambda row: haro_nog_nodige_zekerheid(row['ihr'], row['ibr'], row['car']), axis=1
@@ -44,13 +48,13 @@ def plan_stratified_basis(steekproeven: pd.DataFrame, model: str = "binomiaal") 
     
     return strata
 
+
 def vind_beste_strata_groep(huidige_strata: pd.DataFrame, model: str, klim_granulariteit: int = 1000000, totale_zekerheid: float = 0.95) -> list:
     """
     Evalueer en selecteer de optimale strata voor de volgende parallelle klimstap.
     
     Deze functie berekent via exacte convolutie welke strata bij een ophoging van
-    exact 1 post de grootste foutreductie opleveren. Omdat max_fout continu is,
-    geeft de kleinste ophoogstap direct het optimale sturingssignaal.
+    exact 1 post de grootste foutreductie PER KOSTENEENHEID opleveren.
     """
     # Definieer de interne functie voor de gelijktijdige FFT convolutie-evaluatie.
     def calc_max_fout_klim(s_data):
@@ -68,48 +72,51 @@ def vind_beste_strata_groep(huidige_strata: pd.DataFrame, model: str, klim_granu
     huidige_fout_klim = calc_max_fout_klim(huidige_strata)
     n_strata = len(huidige_strata)
 
-    # Bereken voor een ophoog van exact 1 de verbetering van de maximale fout per stratum.
+    # Bereken voor een ophoog van exact 1 de kosten-gecorrigeerde verbetering.
     verbetering = np.zeros(n_strata)
     for i in range(n_strata):
         test_strata = huidige_strata.copy()
         
-        # In Pandas gebruiken we .at voor veilige aanpassing van individuele cellen.
-        test_strata.at[i, 'n_laag'] += 1
-        test_strata.at[i, 'k_laag'] = test_strata.at[i, 'n_laag'] * test_strata.at[i, 'verwachte_foutfractie']
+        # Haal het juiste rij-label op om veilig te indexeren met .at.
+        rij_label = test_strata.index[i]
+        
+        test_strata.at[rij_label, 'n_laag'] += 1
+        test_strata.at[rij_label, 'k_laag'] = test_strata.at[rij_label, 'n_laag'] * test_strata.at[rij_label, 'verwachte_foutfractie']
         
         nieuwe_fout = calc_max_fout_klim(test_strata)
         foutreductie = huidige_fout_klim - nieuwe_fout
         
-        # Vang numerieke artefacten af die ontstaan door zwevendekommagetallen of interpolatie op grove grids.
+        # Vang numerieke artefacten af die ontstaan door zwevendekommagetallen of interpolatie.
         if foutreductie < 0:
             foutreductie = 0
             
-        verbetering[i] = foutreductie
+        # Deel de absolute foutreductie door de uitvoeringskosten van deze steek.
+        kosten_steek = test_strata.at[rij_label, 'kosten']
+        verbetering[i] = foutreductie / kosten_steek
 
-    # Bepaal wiskundig welke strata het maximale rendement opleveren voor deze ene stap.
+    # Bepaal wiskundig welke strata het maximale rendement opleveren.
     max_verbetering = np.max(verbetering)
     if max_verbetering > 0:
-        # We gebruiken een minieme tolerantie om afrondingsverschillen bij exact gelijk presterende strata op te vangen.
+        # Gebruik een minieme tolerantie om afrondingsverschillen op te vangen.
         beste_strata = np.where(verbetering >= max_verbetering - 1e-12)[0].tolist()
     else:
-        # Vang het fenomeen af waarbij een extreem grof grid blind is voor kleine verbeteringen.
-        # Val terug op een analytische proxy: het stratum dat relatief de meeste onzekerheid toevoegt.
+        # Val terug op de analytische proxy (ook deze corrigeren we nu voor kosten).
         veilige_n = np.maximum(huidige_strata['n_laag'], 1)
-        proxy_onzekerheid = huidige_strata['waarde_laag'] / np.sqrt(veilige_n)
+        proxy_onzekerheid = (huidige_strata['waarde_laag'] / np.sqrt(veilige_n)) / huidige_strata['kosten']
         
-        # Selecteer het stratum met de hoogste proxy-waarde.
         max_proxy = np.max(proxy_onzekerheid)
         beste_strata = np.where(proxy_onzekerheid >= max_proxy - 1e-6)[0].tolist()
 
     return beste_strata
 
+
 def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materialiteit: float = None, zekerheid: float = 0.95, granulariteit: int = 10000, **kwargs) -> pd.DataFrame:
     """
     Plan de volledige optimale steekproefverdeling via parallelle convolutie-optimalisatie.
     
-    Deze functie voert de volledige planningscyclus uit: het start met de basisomvang
-    en verhoogt daarna stapsgewijs de omvang van de meest effectieve strata totdat
-    de gecombineerde convolutiefout onder de algehele materialiteit zakt.
+    Deze functie voert de volledige planningscyclus uit totdat de gecombineerde
+    convolutiefout onder de algehele materialiteit zakt, waarbij strata met de 
+    hoogste foutreductie per kosteneenheid voorrang krijgen.
     """
     # Vang variaties in argumentnamen op die door testscripts of wrappers gebruikt worden.
     if materialiteit is None and 'totale_materialiteit' in kwargs:
@@ -151,7 +158,7 @@ def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materi
         vergelijk=False
     )['max_fout_convolutie']
 
-    # Start de stapsgewijze klimloop totdat de fout onder de gestelde materialiteit zakt (met een ruime veiligheidsmarge tegen oneindige loops).
+    # Start de stapsgewijze klimloop totdat de fout onder de gestelde materialiteit zakt.
     iteratie = 0
     while huidige_fout > materialiteit and iteratie < 10000:
         iteratie += 1
@@ -164,8 +171,10 @@ def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materi
 
         # Hoog de geselecteerde strata parallel op met één post.
         for beste_stratum in beste_strata_indices:
-            strata.at[beste_stratum, 'n_laag'] += 1
-            strata.at[beste_stratum, 'k_laag'] = strata.at[beste_stratum, 'n_laag'] * strata.at[beste_stratum, 'verwachte_foutfractie']
+            # Vertaal positie-index naar het daadwerkelijke DataFrame-label
+            rij_label = strata.index[beste_stratum]
+            strata.at[rij_label, 'n_laag'] += 1
+            strata.at[rij_label, 'k_laag'] = strata.at[rij_label, 'n_laag'] * strata.at[rij_label, 'verwachte_foutfractie']
 
         # Evalueer de nieuwe algehele fout na de parallelle ophoogstap.
         huidige_fout = eval_stratified(

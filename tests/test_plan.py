@@ -14,16 +14,17 @@ def test_happy_flow_succesvolle_planning():
         "goed_hoog": [198000.0, 0.0]
     })
 
-    # Corrigeer de argumenten naar de exacte parameternamen van de hoofdfunctie.
     resultaat = plan_stratified(
         steekproeven=test_succes,
         materialiteit=0.05,
         zekerheid=0.95
     )
 
-    # Voer de basiscontroles uit op de structuur van de geretourneerde data.
     assert isinstance(resultaat, pd.DataFrame)
     assert "n_laag" in resultaat.columns
+    # Controleer of de standaardkosten netjes op 1.0 zijn gezet.
+    assert "kosten" in resultaat.columns
+    assert (resultaat["kosten"] == 1.0).all()
 
 def test_foutmelding_verwachte_foutfractie_te_hoog():
     """Foutmelding: Verwachte foutfractie is al te hoog voor planning."""
@@ -37,7 +38,6 @@ def test_foutmelding_verwachte_foutfractie_te_hoog():
         "goed_hoog": [0.0]
     })
 
-    # Controleer of de planningsmodule correct weigert wanneer de fout te hoog is.
     with pytest.raises(ValueError, match="Verwachte foutfractie groter dan of gelijk aan de totale materialiteit"):
         plan_stratified(test_fout_verwacht, materialiteit=0.05)
 
@@ -53,7 +53,6 @@ def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
         "goed_hoog": [140000.0]
     })
 
-    # Controleer of de fout in het hoogstratum een duidelijke stop-barriere triggert.
     with pytest.raises(ValueError, match="Reeds bekende fout in de hoogstrata"):
         plan_stratified(test_fout_hoog, materialiteit=0.05)
 
@@ -69,7 +68,6 @@ def test_foutmelding_inconsistentie_op_stratum_niveau():
         "goed_hoog": [0.0]
     })
 
-    # Verifieer of de inconsistentie tussen verwachte fout en materialiteit direct faalt.
     with pytest.raises(ValueError, match="Verwachte foutfractie groter dan of gelijk aan de stratum-materialiteit"):
         plan_stratified(test_inconsistent, materialiteit=0.05)
 
@@ -85,7 +83,6 @@ def test_attribuutverificatie_geretourneerde_dataset():
         "goed_hoog": [0.0]
     })
 
-    # Roep de herstelde planning aan om de data-attributen te valideren.
     resultaat = plan_stratified(test_data, materialiteit=0.05)
     assert isinstance(resultaat, pd.DataFrame)
     assert "geplande_max_fout_totaal" in resultaat.attrs
@@ -102,7 +99,6 @@ def test_foutmelding_dubbele_stratumnamen():
         "goed_hoog": [0.0, 0.0]
     })
 
-    # Controleer of dubbele stratumnamen correct worden afgevangen.
     with pytest.raises(ValueError, match="Namen komen vaker dan 1 keer voor"):
         plan_stratified(test_dubbel, materialiteit=0.05)
 
@@ -122,7 +118,6 @@ def test_plan_stratified_binomiaal_sluitend():
     """Verifieer of plan_stratified een exact sluitend steekproefplan genereert voor binomiaal."""
     steekproeven = get_test_steekproeven()
 
-    # Roep de validatiefunctie aan met een materialiteit van drie procent.
     resultaat = plan_stratified(
         steekproeven=steekproeven,
         materialiteit=0.03,
@@ -131,7 +126,6 @@ def test_plan_stratified_binomiaal_sluitend():
         granulariteit=10000
     )
 
-    # Voer de validatietesten uit op het verkregen resultaatsobject.
     assert isinstance(resultaat, pd.DataFrame)
     assert "n_definitief" in resultaat.columns
     assert resultaat.attrs["geplande_max_fout_totaal"] <= 0.03
@@ -139,11 +133,8 @@ def test_plan_stratified_binomiaal_sluitend():
 def test_plan_stratified_poisson_strakke_marges():
     """Verifieer of plan_stratified correct werkt met de poisson verdeling en strakke marges."""
     steekproeven = get_test_steekproeven()
-
-    # Verhoog de verwachte foutfractie om de planningsmodule extra werk te geven.
     steekproeven["verwachte_foutfractie"] = [0.02, 0.01]
 
-    # Voer de validatie uit specifiek voor de poisson verdeling.
     resultaat = plan_stratified(
         steekproeven=steekproeven,
         materialiteit=0.05,
@@ -152,7 +143,36 @@ def test_plan_stratified_poisson_strakke_marges():
         granulariteit=10000
     )
 
-    # Eis dat de samenvattende variabele de poisson-planning als positief markeert.
     assert isinstance(resultaat, pd.DataFrame)
     assert "n_definitief" in resultaat.columns
     assert resultaat.attrs["geplande_max_fout_totaal"] <= 0.05
+
+def test_kosten_invloed_op_allocatie():
+    """
+    Verifieer of het algoritme prioriteit geeft aan een goedkoop stratum, 
+    zelfs als de ruwe onzekerheid in beide strata gelijk is.
+    """
+    test_kosten = pd.DataFrame({
+        "naam": ["Duur_Stratum", "Goedkoop_Stratum"],
+        "waarde_laag": [500000.0, 500000.0],
+        "verwachte_foutfractie": [0.01, 0.01],
+        "ihr": ["H", "H"], "ibr": ["H", "H"], "car": ["H", "H"],
+        "materialiteit": [0.05, 0.05],
+        "fout_hoog": [0.0, 0.0],
+        "goed_hoog": [0.0, 0.0],
+        # Het ene stratum kost 100 keer zoveel om te controleren als het andere.
+        "kosten": [100.0, 1.0] 
+    })
+
+    resultaat = plan_stratified(
+        steekproeven=test_kosten, 
+        materialiteit=0.03, 
+        granulariteit=10000
+    )
+
+    n_duur = resultaat.loc[resultaat['naam'] == 'Duur_Stratum', 'n_definitief'].values[0]
+    n_goedkoop = resultaat.loc[resultaat['naam'] == 'Goedkoop_Stratum', 'n_definitief'].values[0]
+
+    # Omdat het ene stratum zoveel goedkoper is, zou het veel vaker gekozen moeten zijn
+    # om de vereiste foutreductie efficiënt te bereiken.
+    assert n_goedkoop > n_duur, "Het planningsalgoritme hield onvoldoende rekening met de stuurkracht van uitvoeringskosten!"

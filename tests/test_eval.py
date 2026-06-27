@@ -1,6 +1,5 @@
 import pytest
 import math
-import numpy as np
 import pandas as pd
 from auditstratified.eval_stratified import eval_stratified
 

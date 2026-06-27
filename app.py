@@ -46,6 +46,7 @@ LEGE_PLAN_DF = pd.DataFrame(
         "ibr": ["H"] * 8,
         "car": ["H"] * 8,
         "materialiteit": ["0,01"] * 8,
+        "kosten": ["1,0"] * 8,  
         "n_laag": [None] * 8,
         "n_laag_extra": [None] * 8,
         "n_laag_tot": [None] * 8,
@@ -606,19 +607,23 @@ with tab_plan:
             column_config={
                 "naam": st.column_config.TextColumn("naam", help="Unieke naam van het stratum."),
                 "waarde_laag": st.column_config.TextColumn(
-                    "waarde_laag (€)",
+                    "waarde laag (€)",
                     help="Totale geldswaarde van het laagstratum.",
                 ),
                 "verwachte_foutfractie": st.column_config.TextColumn(
-                    "verwacht_fout%",
+                    "verwachte foutfractie",
                     help="De verwachte foutfractie binnen dit stratum.",
                 ),
+                "kosten": st.column_config.TextColumn(
+                    "kosten per steek",
+                    help="Relatieve kosten per steek (bijv. 1,0 voor standaard, 10,0 voor duur).",
+                ),
                 "fout_hoog": st.column_config.TextColumn(
-                    "fout_hoog (€)",
+                    "fout hoog (€)",
                     help="Totaal foutbedrag van het hoogstratum.",
                 ),
                 "goed_hoog": st.column_config.TextColumn(
-                    "goed_hoog (€)",
+                    "goed hoog (€)",
                     help="Totaal goedbedrag van het hoogstratum.",
                 ),
                 "ihr": st.column_config.SelectboxColumn(
@@ -669,10 +674,13 @@ with tab_plan:
             st.stop()
 
         # Parseer Nederlandstalige tekstkolommen naar float voor berekeningen.
-        _NL_KOLOMMEN = ["waarde_laag", "verwachte_foutfractie", "fout_hoog", "goed_hoog", "materialiteit"]
+        _NL_KOLOMMEN = ["waarde_laag", "verwachte_foutfractie", "fout_hoog", "goed_hoog", "materialiteit", "kosten"]
         invoer_num = invoer_df.copy()
         for _kol in _NL_KOLOMMEN:
             invoer_num[_kol] = _parse_nl_kolom(invoer_num[_kol])
+            
+        # Zorg dat de kostenkolom gevuld is (fallback naar 1.0 als leeg):
+        invoer_num["kosten"] = invoer_num["kosten"].fillna(1.0)
 
         df_clean = (
             invoer_num
@@ -686,6 +694,7 @@ with tab_plan:
                 ihr=lambda d: d["ihr"].str.upper(),
                 ibr=lambda d: d["ibr"].str.upper(),
                 car=lambda d: d["car"].str.upper(),
+                kosten=lambda d: d["kosten"].fillna(1.0) # <--- DEZE REGEL IS CRUCIAAL
             )
         )
 
