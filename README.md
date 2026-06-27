@@ -5,18 +5,18 @@ Oorspronkelijk ontwikkeld als R-pakket en interactieve Shiny-applicatie, is dit
  nu gemigreerd naar Python. 
 
  ## Live Demo
-Wil je de kosten-bewuste allocatie in actie zien? 
+Wil je de kostenbewuste allocatie in actie zien? 
 [**Probeer de live auditstratified applicatie hier**](https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/)
 
 ## Kenmerken
-- Gestratificeerd Plannen: Berekent automatisch de meest efficiënte, 
+- Gestratificeerd plannen: Berekent automatisch de meest efficiënte, 
 optimale steekproefverdeling over meerdere strata.
-- Kosten-geoptimaliseerd Plannen: Berekent automatisch de meest efficiënte steekproefverdeling. Het algoritme weegt de verwachte foutreductie af tegen de uitvoeringskosten per steekproef, waardoor schaarse controletijd optimaal kan worden ingezet.
-- Geavanceerde Evaluatie: Voegt foutkanskrommes van afzonderlijke steekproeven
+- Kostengeoptimaliseerd plannen: Berekent automatisch de meest efficiënte steekproefverdeling. Het algoritme weegt de verwachte foutreductie af tegen de uitvoeringskosten per steekproef, waardoor schaarse controletijd optimaal kan worden ingezet.
+- Meerdere convolutiemethoden: Voegt foutkanskrommes van afzonderlijke steekproeven
 samen via FFT-convolutie of Monte Carlo simulaties.
 - HARo-gebaseerd: Zekerheid afgeleid van IHR, IBR en CAR volgens het Handboek Auditing
 Rijksoverheid.
-- Vectorized & Snel: Gebouwd op Pandas, NumPy en SciPy voor optimale
+- Vectorized en nel: Gebouwd op Pandas, NumPy en SciPy voor optimale
 performance.
 
 ## Installatie
@@ -45,18 +45,19 @@ from auditstratified.plan_stratified import plan_stratified
 # Definieer de strata en de HARo-risico's
 data = pd.DataFrame({
     'naam': ['Subsidies', 'Inkoop'],
-    'waarde_laag': [1000000.0, 500000.0],    
-    'waarde_hoog': [0, 0],
+    'waarde_laag': [1000000.0, 500000.0],
     'verwachte_foutfractie': [0.01, 0.005],
     'ihr': ['M', 'L'], 'ibr': ['M', 'L'], 'car': ['M', 'L'],
     'materialiteit': [0.03, 0.03],
     'fout_hoog': [0.0, 0.0],
-    'goed_hoog': [100000.0, 50000.0]
+    'goed_hoog': [100000.0, 50000.0],
+    'kosten': [5.0, 1.0]   # Subsidies kost 5× zoveel per steek als Inkoop
 })
 
-# Bereken het optimale plan 
+# Bereken het optimale plan
+# Het algoritme weegt foutreductie af tegen kosten per steek.
 plan = plan_stratified(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
-print(plan[['naam', 'n_basis', 'n_definitief']]) 
+print(plan[['naam', 'kosten', 'n_basis', 'n_definitief']])
 print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}")
 ```
 
