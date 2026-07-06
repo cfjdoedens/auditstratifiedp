@@ -11,7 +11,7 @@ def test_happy_flow_succesvolle_planning():
         "ihr": ["H", "H"], "ibr": ["H", "H"], "car": ["H", "H"],
         "materialiteit": [0.05, 0.05],
         "fout_hoog": [2000.0, 0.0],
-        "goed_hoog": [198000.0, 0.0]
+        "waarde_hoog": [200000.0, 0.0]
     })
 
     resultaat = plan_stratified(
@@ -35,7 +35,7 @@ def test_foutmelding_verwachte_foutfractie_te_hoog():
         "ihr": ["H"], "ibr": ["H"], "car": ["H"],
         "materialiteit": [0.07],
         "fout_hoog": [0.0],
-        "goed_hoog": [0.0]
+        "waarde_hoog": [0.0]
     })
 
     with pytest.raises(ValueError, match="Verwachte foutfractie groter dan of gelijk aan de totale materialiteit"):
@@ -50,7 +50,7 @@ def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
         "ihr": ["H"], "ibr": ["H"], "car": ["H"],
         "materialiteit": [0.05],
         "fout_hoog": [60000.0],
-        "goed_hoog": [140000.0]
+        "waarde_hoog": [200000.0]
     })
 
     with pytest.raises(ValueError, match="Reeds bekende fout in de hoogstrata"):
@@ -65,7 +65,7 @@ def test_foutmelding_inconsistentie_op_stratum_niveau():
         "ihr": ["H"], "ibr": ["H"], "car": ["H"],
         "materialiteit": [0.02],
         "fout_hoog": [0.0],
-        "goed_hoog": [0.0]
+        "waarde_hoog": [0.0]
     })
 
     with pytest.raises(ValueError, match="Verwachte foutfractie groter dan of gelijk aan de stratum-materialiteit"):
@@ -80,7 +80,7 @@ def test_attribuutverificatie_geretourneerde_dataset():
         "ihr": ["H"], "ibr": ["H"], "car": ["H"],
         "materialiteit": [0.05],
         "fout_hoog": [0.0],
-        "goed_hoog": [0.0]
+        "waarde_hoog": [0.0]
     })
 
     resultaat = plan_stratified(test_data, materialiteit=0.05)
@@ -96,7 +96,7 @@ def test_foutmelding_dubbele_stratumnamen():
         "ihr": ["H", "H"], "ibr": ["H", "H"], "car": ["H", "H"],
         "materialiteit": [0.05, 0.05],
         "fout_hoog": [0.0, 0.0],
-        "goed_hoog": [0.0, 0.0]
+        "waarde_hoog": [0.0, 0.0]
     })
 
     with pytest.raises(ValueError, match="Namen komen vaker dan 1 keer voor"):
@@ -111,7 +111,7 @@ def get_test_steekproeven():
         "ihr": ["M", "L"], "ibr": ["M", "L"], "car": ["M", "L"],
         "materialiteit": [0.03, 0.03],
         "fout_hoog": [0.0, 0.0],
-        "goed_hoog": [100000.0, 50000.0]
+        "waarde_hoog": [100000.0, 50000.0]
     })
 
 def test_plan_stratified_binomiaal_sluitend():
@@ -159,7 +159,7 @@ def test_kosten_invloed_op_allocatie():
         "ihr": ["H", "H"], "ibr": ["H", "H"], "car": ["H", "H"],
         "materialiteit": [0.05, 0.05],
         "fout_hoog": [0.0, 0.0],
-        "goed_hoog": [0.0, 0.0],
+        "waarde_hoog": [0.0, 0.0],
         # Het ene stratum kost 100 keer zoveel om te controleren als het andere.
         "kosten": [100.0, 1.0] 
     })

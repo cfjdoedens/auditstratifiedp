@@ -17,7 +17,7 @@ def test_klimheuristiek_demo():
         "car": ["H", "H", "H"],
         "materialiteit": [0.05, 0.05, 0.05],
         "fout_hoog": [0.0, 0.0, 0.0],
-        "goed_hoog": [0.0, 0.0, 0.0]
+        "waarde_hoog": [0.0, 0.0, 0.0]
     })
 
     N_add = 4
@@ -44,7 +44,7 @@ def test_klimheuristiek_lage_zekerheid():
         "car": ["H", "H", "H"],
         "materialiteit": [0.05, 0.05, 0.05],
         "fout_hoog": [0.0, 0.0, 0.0],
-        "goed_hoog": [0.0, 0.0, 0.0]
+        "waarde_hoog": [0.0, 0.0, 0.0]
     })
 
     N_add = 32
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         "car": ["H", "H", "H"],
         "materialiteit": [0.05, 0.05, 0.05],
         "fout_hoog": [0.0, 0.0, 0.0],
-        "goed_hoog": [0.0, 0.0, 0.0]
+        "waarde_hoog": [0.0, 0.0, 0.0]
     })
 
     print("--- Start Heuristiek Validatietest ---")

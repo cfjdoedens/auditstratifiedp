@@ -40,7 +40,6 @@ def plan_stratified_basis(steekproeven: pd.DataFrame, model: str = "binomiaal") 
     # Initialiseer de startwaarden voor het klimalgoritme op basis van de basisomvang.
     strata['n_laag'] = strata['n_basis']
     strata['k_laag'] = strata['n_laag'] * strata['verwachte_foutfractie']
-    strata['waarde_hoog'] = strata['fout_hoog'] + strata['goed_hoog']
     strata['waarde_populatie'] = strata['waarde_laag'] + strata['waarde_hoog']
 
     # Schoon de tijdelijke zekerheidskolom op alvorens de tabel te retourneren.
@@ -110,7 +109,7 @@ def vind_beste_strata_groep(huidige_strata: pd.DataFrame, model: str, klim_granu
     return beste_strata
 
 
-def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materialiteit: float = None, zekerheid: float = 0.95, granulariteit: int = 10000, **kwargs) -> pd.DataFrame:
+def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materialiteit: float = None, zekerheid: float = 0.95, granulariteit: int = 10000) -> pd.DataFrame:
     """
     Plan de volledige optimale steekproefverdeling via parallelle convolutie-optimalisatie.
     
@@ -118,12 +117,6 @@ def plan_stratified(steekproeven: pd.DataFrame, model: str = "binomiaal", materi
     convolutiefout onder de algehele materialiteit zakt, waarbij strata met de 
     hoogste foutreductie per kosteneenheid voorrang krijgen.
     """
-    # Vang variaties in argumentnamen op die door testscripts of wrappers gebruikt worden.
-    if materialiteit is None and 'totale_materialiteit' in kwargs:
-        materialiteit = kwargs['totale_materialiteit']
-    if 'totale_zekerheid' in kwargs:
-        zekerheid = kwargs['totale_zekerheid']
-
     # Controleer vooraf op dubbele stratumnamen in de invoertabel.
     if steekproeven['naam'].duplicated().any():
         dubbele_naam = steekproeven[steekproeven['naam'].duplicated()]['naam'].iloc[0]

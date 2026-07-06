@@ -26,7 +26,7 @@ LEGE_EVAL_DF = pd.DataFrame(
         "n_laag": [""] * 8,
         "k_laag": [""] * 8,
         "fout_hoog": ["0"] * 8,
-        "goed_hoog": ["0"] * 8,
+        "waarde_hoog": ["0"] * 8,
         "ihr": ["H"] * 8,
         "ibr": ["H"] * 8,
         "car": ["H"] * 8,
@@ -41,7 +41,7 @@ LEGE_PLAN_DF = pd.DataFrame(
         "waarde_laag": [""] * 8,
         "verwachte_foutfractie": ["0,001"] * 8,
         "fout_hoog": ["0"] * 8,
-        "goed_hoog": ["0"] * 8,
+        "waarde_hoog": ["0"] * 8,
         "ihr": ["H"] * 8,
         "ibr": ["H"] * 8,
         "car": ["H"] * 8,
@@ -128,7 +128,7 @@ def on_eval_tabel_change():
             df = pd.concat([df, pd.DataFrame([{col: "" for col in df.columns}])], ignore_index=True)
             
         for col, val in changes.items():
-            if col in ["waarde_laag", "fout_hoog", "goed_hoog"]:
+            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
                 df.at[row_idx, col] = _format_nl_auto(val, 2)
             elif col in ["n_laag", "k_laag", "materialiteit"]:
                 min_dec = 0 if col == "n_laag" else 2
@@ -144,10 +144,10 @@ def on_eval_tabel_change():
         new_row["car"] = "H"
         new_row["materialiteit"] = "0,01"
         new_row["fout_hoog"] = "0"
-        new_row["goed_hoog"] = "0"
+        new_row["waarde_hoog"] = "0"
         
         for col, val in row.items():
-            if col in ["waarde_laag", "fout_hoog", "goed_hoog"]:
+            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
                 new_row[col] = _format_nl_auto(val, 2)
             elif col in ["n_laag", "k_laag", "materialiteit"]:
                 min_dec = 0 if col == "n_laag" else 2
@@ -194,7 +194,7 @@ def on_plan_tabel_change():
             df = pd.concat([df, pd.DataFrame([{col: "" for col in df.columns}])], ignore_index=True)
             
         for col, val in changes.items():
-            if col in ["waarde_laag", "fout_hoog", "goed_hoog"]:
+            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
                 df.at[row_idx, col] = _format_nl_auto(val, 2)
             elif col in ["verwachte_foutfractie", "materialiteit"]:
                 min_dec = 3 if col == "verwachte_foutfractie" else 2
@@ -211,10 +211,10 @@ def on_plan_tabel_change():
         new_row["materialiteit"] = "0,01"
         new_row["verwachte_foutfractie"] = "0,001"
         new_row["fout_hoog"] = "0"
-        new_row["goed_hoog"] = "0"
+        new_row["waarde_hoog"] = "0"
         
         for col, val in row.items():
-            if col in ["waarde_laag", "fout_hoog", "goed_hoog"]:
+            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
                 new_row[col] = _format_nl_auto(val, 2)
             elif col in ["verwachte_foutfractie", "materialiteit"]:
                 min_dec = 3 if col == "verwachte_foutfractie" else 2
@@ -385,8 +385,8 @@ with tab_eval:
                     "fout_hoog": st.column_config.TextColumn(
                         "fout_hoog (€)", help="Totaal foutbedrag van het hoogstratum."
                     ),
-                    "goed_hoog": st.column_config.TextColumn(
-                        "goed_hoog (€)", help="Totaal goedbedrag van het hoogstratum."
+                    "waarde_hoog": st.column_config.TextColumn(
+                        "waarde hoog (€)", help="Totale boekwaarde van het hoogstratum (fout_hoog + goedgekeurd bedrag)."
                     ),
                     "ihr": st.column_config.SelectboxColumn(
                         "ihr", help="Inherent risico (H/M/L).", options=RISK_OPTIES, required=True
@@ -465,7 +465,7 @@ with tab_eval:
             st.error("Voer een geldige granulariteit in van minimaal 100 (bijv. 10.000).")
         else:
             # Parseer de Nederlandse tekstkolommen naar numerieke waarden voor de berekening.
-            _EVAL_NL_KOLOMREN = ["waarde_laag", "n_laag", "k_laag", "fout_hoog", "goed_hoog", "materialiteit"]
+            _EVAL_NL_KOLOMREN = ["waarde_laag", "n_laag", "k_laag", "fout_hoog", "waarde_hoog", "materialiteit"]
             eval_num = st.session_state.eval_df_saved.copy()
             for _kol in _EVAL_NL_KOLOMREN:
                 eval_num[_kol] = _parse_nl_kolom(eval_num[_kol])
@@ -478,8 +478,8 @@ with tab_eval:
                 .dropna(subset=["waarde_laag", "n_laag", "k_laag"])
                 .reset_index(drop=True)
                 .assign(
-                    waarde_hoog=lambda d: d["fout_hoog"].fillna(0) + d["goed_hoog"].fillna(0),
-                    waarde_populatie=lambda d: d["waarde_laag"] + d["fout_hoog"].fillna(0) + d["goed_hoog"].fillna(0),
+                    waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
+                    waarde_populatie=lambda d: d["waarde_laag"] + d["waarde_hoog"].fillna(0),
                     ihr=lambda d: d["ihr"].str.upper(),
                     ibr=lambda d: d["ibr"].str.upper(),
                     car=lambda d: d["car"].str.upper(),
@@ -622,9 +622,9 @@ with tab_plan:
                     "fout hoog (€)",
                     help="Totaal foutbedrag van het hoogstratum.",
                 ),
-                "goed_hoog": st.column_config.TextColumn(
-                    "goed hoog (€)",
-                    help="Totaal goedbedrag van het hoogstratum.",
+                "waarde_hoog": st.column_config.TextColumn(
+                    "waarde hoog (€)",
+                    help="Totale boekwaarde van het hoogstratum (fout_hoog + goedgekeurd bedrag).",
                 ),
                 "ihr": st.column_config.SelectboxColumn(
                     "ihr", help="Inherent risico (H/M/L).", options=RISK_OPTIES, required=True
@@ -674,7 +674,7 @@ with tab_plan:
             st.stop()
 
         # Parseer Nederlandstalige tekstkolommen naar float voor berekeningen.
-        _NL_KOLOMMEN = ["waarde_laag", "verwachte_foutfractie", "fout_hoog", "goed_hoog", "materialiteit", "kosten"]
+        _NL_KOLOMMEN = ["waarde_laag", "verwachte_foutfractie", "fout_hoog", "waarde_hoog", "materialiteit", "kosten"]
         invoer_num = invoer_df.copy()
         for _kol in _NL_KOLOMMEN:
             invoer_num[_kol] = _parse_nl_kolom(invoer_num[_kol])
@@ -689,8 +689,8 @@ with tab_plan:
             .dropna(subset=["waarde_laag"])
             .reset_index(drop=True)
             .assign(
-                waarde_hoog=lambda d: d["fout_hoog"].fillna(0) + d["goed_hoog"].fillna(0),
-                waarde_populatie=lambda d: d["waarde_laag"] + d["fout_hoog"].fillna(0) + d["goed_hoog"].fillna(0),
+                waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
+                waarde_populatie=lambda d: d["waarde_laag"] + d["waarde_hoog"].fillna(0),
                 ihr=lambda d: d["ihr"].str.upper(),
                 ibr=lambda d: d["ibr"].str.upper(),
                 car=lambda d: d["car"].str.upper(),
