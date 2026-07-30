@@ -1,0 +1,38 @@
+# Ruff configuratie voor auditstratified
+# Zie: https://docs.astral.sh/ruff/configuration/
+
+target-version = "py310"
+line-length = 88
+
+[lint]
+select = [
+    "E",   # pycodestyle fouten
+    "F",   # pyflakes (ongebruikte imports, ongedefinieerde namen, e.d.)
+    "I",   # isort (import-volgorde)
+    "UP",  # pyupgrade (moderniseer Python-syntaxis naar 3.10+)
+    "W",   # pycodestyle waarschuwingen
+    "B",   # flake8-bugbear (veelvoorkomende fouten en slechte gewoonten)
+    "SIM", # flake8-simplify (versimpelingen)
+]
+
+ignore = [
+    "E501",   # Regellengte: formules en lange kommentaren staan we toe
+    "SIM108", # Ternaire operator: vermindert leesbaarheid bij wiskundige condities
+]
+
+# Sluit gegenereerde bestanden en omgevingsmap uit
+exclude = [
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[lint.isort]
+known-first-party = ["auditstratified"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+preview = true

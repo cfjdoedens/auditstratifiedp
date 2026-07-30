@@ -1,0 +1,27 @@
+.Rhistory
+VERANTWOORDING.html
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Editor
+.vscode/
+
+# Gegenereerde HTML
+README.html
+
+# Ongerelateerde bestanden in deze map
+door Python opgehaald bijlagen/
+email_boekje_basis.md
+

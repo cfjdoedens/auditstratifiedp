@@ -30,11 +30,11 @@ vanuit de evaluatiemethode.
 
 # Kenmerken
 
-- **Gestratificeerd plannen:** Berekent automatisch de meest efficiënte, optimale steekproefverdeling over meerdere strata.
+- **Gestratificeerd plannen:** Berekent de meest efficiënte steekproefverdeling over meerdere strata.
 - **Kostengeoptimaliseerd plannen:** Het algoritme weegt de verwachte foutreductie af tegen de uitvoeringskosten per steekproef, waardoor schaarse controletijd optimaal kan worden ingezet.
 - **Meerdere convolutierekenmethoden voor schatten:** Voegt foutkanskrommes van afzonderlijke steekproeven samen via vier verschillende methoden: directe convolutie, FFT paarsgewijs, FFT samen en Monte Carlo.
 - **HARo-gebaseerd:** Zekerheid afgeleid van IHR, IBR en CAR volgens het Handboek Auditing Rijksoverheid.
-- **Vectorized en snel:** Gebouwd op Pandas, NumPy en SciPy voor optimale performance.
+- **Vectorized en snel:** Gebouwd op Pandas, NumPy en SciPy voor optimale prestatie.
 
 # Demo
 
@@ -230,7 +230,7 @@ Anders gezegd, er vindt geen projectie van de foutfractie
 van de posten uit het hoogstratum plaats, de fouten in
 het hoogstratum tellen voor zichzelf.
 
-### Scenario 3: Volledige populatie integraal gecontroleerd; bestand wordt geheel beschouwd als hoogstratum
+### Scenario 3: Volledige populatie gecontroleerd; bestand wordt geheel beschouwd als hoogstratum
 
 Stel, er zijn meerdere strata. 1 van die strata wordt volledig gecontroleerd en bevat € 12.500 aan fouten.
 
@@ -366,7 +366,7 @@ proportioneel mee in de berekende maximale fout voor de gehele populatie.
 # `plan_stratified()`: Plannen van meerdere steekproeven
 
 `plan_stratified()` berekent de optimale — dat wil zeggen minimale —
-steekproefomvang per stratum, zodaneig dat bij gezamenlijke evaluatie de
+steekproefomvang per stratum, zodanig dat bij gezamenlijke evaluatie de
 maximale fout onder de algehele materialiteit blijft.
 
 ## Algoritme
@@ -421,7 +421,7 @@ De grafiek toont onder andere:
 * de meest waarschijnlijke fout;
 * de maximale fout;
 * de minimale fout;
-* de volledige kansverdeling.
+* de kansverdeling.
 
 # Aan de slag: een voorbeeld
 
@@ -452,20 +452,22 @@ from auditstratified.plan_stratified import plan_stratified
 
 # Definieer de strata en de HARo-risico's
 data = pd.DataFrame({
-    'naam': ['Subsidies', 'Inkoop'],
-    'waarde_laag': [1000000.0, 500000.0],
-    'verwachte_foutfractie': [0.01, 0.005],
-    'ihr': ['M', 'L'], 'ibr': ['M', 'L'], 'car': ['M', 'L'],
-    'materialiteit': [0.03, 0.03],
-    'fout_hoog': [0.0, 0.0],
-    'waarde_hoog': [100000.0, 50000.0],
-    'kosten': [5.0, 1.0]   # Subsidies kost 5× zoveel per steek als Inkoop.
+    "naam": ["Subsidies", "Inkoop"],
+    "waarde_laag": [1000000.0, 500000.0],
+    "verwachte_foutfractie": [0.01, 0.005],
+    "ihr": ["M", "L"],
+    "ibr": ["M", "L"],
+    "car": ["M", "L"],
+    "materialiteit": [0.03, 0.03],
+    "fout_hoog": [0.0, 0.0],
+    "waarde_hoog": [100000.0, 50000.0],
+    "kosten": [5.0, 1.0],  # Subsidies kost 5× zoveel per steek als Inkoop.
 })
 
 # Bereken het optimale plan
 # Het algoritme weegt foutreductie af tegen kosten per steek.
 plan = plan_stratified(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
-print(plan[['naam', 'kosten', 'n_basis', 'n_definitief']])
+print(plan[["naam", "kosten", "n_basis"]])
 print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}")
 ```
 
@@ -477,15 +479,15 @@ Na de uitvoering van de controle kun je de gevonden fouten evalueren.
 from auditstratified.eval_stratified import eval_stratified
 
 # Voeg de testresultaten toe aan je dataset
-data['n_laag'] = [60, 30]
-data['k_laag'] = [1, 0]
+data["n_laag"] = [60, 30]
+data["k_laag"] = [1, 0]
 
 # Voer de evaluatie uit met FFT-convolutie
 resultaat = eval_stratified(steekproeven=data, zekerheid=0.95, methode="FFT samen")
 
 # Rapporteer de resultaten
 print(f"Maximale fout (convolutie): {resultaat['max_fout_convolutie']:.4f}")
-geld = resultaat['max_fout_convolutie_geld']
+geld = resultaat["max_fout_convolutie_geld"]
 geld_nl = f"{geld:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 print(f"In euro's: € {geld_nl}")
 ```
@@ -496,7 +498,7 @@ print(f"In euro's: € {geld_nl}")
 import matplotlib.pyplot as plt
 from auditstratified.plot_kanskromme import plot_kanskromme
 
-fig = plot_kanskromme(resultaat) # resultaat is gemaakt in het vorige codeblok.
+fig = plot_kanskromme(resultaat)  # resultaat is gemaakt in het vorige codeblok.
 plt.show()
 ```
 
@@ -507,11 +509,7 @@ plt.show()
 ```python
 from auditstratified.utils import haro_nog_nodige_zekerheid
 
-zekerheid = haro_nog_nodige_zekerheid(
-    ihr="L",
-    ibr="M",
-    car="H"
-)
+zekerheid = haro_nog_nodige_zekerheid(ihr="L", ibr="M", car="H")
 
 print(zekerheid)
 ```
@@ -530,10 +528,7 @@ Output:
 from auditstratified.utils import foutloze_posten_equivalent
 
 virtuele_posten = foutloze_posten_equivalent(
-    ihr="L",
-    ibr="M",
-    car="H",
-    materialiteit=0.02
+    ihr="L", ibr="M", car="H", materialiteit=0.02
 )
 
 print(virtuele_posten)

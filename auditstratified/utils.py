@@ -1,16 +1,15 @@
-import sys
 import math
-import numpy as np
-import pandas as pd
+
 from scipy.stats import beta, gamma
+
 
 def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") -> float:
     """
     Bereken de nog benodigde zekerheid te verkrijgen uit detailcontrole.
-    
+
     In het Handboek Auditing Rijksoverheid (HARo), paragraaf B7.3.4 staat
-    beschreven welke zekerheid de auditor moet bereiken met detailcontroles, 
-    gegeven het inherente risico (ihr), interne beheersingsrisico (ibr) en 
+    beschreven welke zekerheid de auditor moet bereiken met detailcontroles,
+    gegeven het inherente risico (ihr), interne beheersingsrisico (ibr) en
     cijferanalyserisico (car).
     """
     # Controleer invoerparameters.
@@ -22,7 +21,7 @@ def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") ->
     ihr_map = {"H": 1.0, "M": 0.63, "L": 0.40}
     ibr_map = {"H": 1.0, "M": 0.52, "L": 0.34}
     car_map = {"H": 1.0, "M": 0.50, "L": 0.25}
-    
+
     ihr_als_getal = ihr_map[ihr]
     ibr_als_getal = ibr_map[ibr]
     car_als_getal = car_map[car]
@@ -31,22 +30,22 @@ def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") ->
     auditrisico = 0.05
     detectierisico = auditrisico / (ihr_als_getal * ibr_als_getal * car_als_getal)
     nog_nodige_zekerheid = max(0.0, 1.0 - detectierisico)
-    
+
     # Corrigeer voor de extreem lage risico-combinaties volgens het HARo-model.
     if nog_nodige_zekerheid <= 0.07:
         nog_nodige_zekerheid += 0.05
-        
+
     return nog_nodige_zekerheid
 
 def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", materialiteit: float = 0.01) -> float:
     """
     Geef equivalent in getrokken foutloze posten voor verlaagde risicoschattingen.
-    
-    Volgens het HARo is de benodigde zekerheid bij een gegevensgerichte 
+
+    Volgens het HARo is de benodigde zekerheid bij een gegevensgerichte
     controle 95%, namelijk 100% minus het accountantsrisico (5%).
-    Ook volgens het HARo definiëren ihr, ibr en car samen de nog benodigde 
+    Ook volgens het HARo definiëren ihr, ibr en car samen de nog benodigde
     zekerheid voor een gegevensgerichte controle.
-    Bereken het aantal foutloze posten dat daarmee overeenkomt, 
+    Bereken het aantal foutloze posten dat daarmee overeenkomt,
     rekening houdend met de materialiteit.
     """
     # Controleer de invoerparameters strak op de toegestane risicocategorieën.
@@ -57,7 +56,7 @@ def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", m
     # Bepaal de referentiewaarde en de specifiek benodigde zekerheid.
     hoogste_zekerheid = 0.95
     benodigde_zekerheid = haro_nog_nodige_zekerheid(ihr, ibr, car)
-    
+
     # Werp een fout op als de benodigde zekerheid onlogisch hoog is.
     if benodigde_zekerheid > hoogste_zekerheid:
         raise ValueError("Benodigde zekerheid mag niet groter zijn dan 0.95.")
@@ -65,7 +64,7 @@ def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", m
     # Bereken het verschil in benodigde posten.
     posten_alles_hoog = drawsneeded(0.0, materialiteit, cert=hoogste_zekerheid)
     posten_niet_alles_hoog = drawsneeded(0.0, materialiteit, cert=benodigde_zekerheid)
-    
+
     return posten_alles_hoog - posten_niet_alles_hoog
 
 def _is_iterable_num(val) -> bool:
@@ -75,20 +74,20 @@ def _is_iterable_num(val) -> bool:
 def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, distribution="binomial"):
     """
     Bereken het aantal benodigde steken om de maximale foutfractie met voldoende zekerheid vast te stellen.
-    
+
     Deze functie schat het aantal benodigde steken op basis van een vlakke prior.
     Het maakt gebruik van de binomiale verdeling of de Poissonverdeling.
     """
     # Handel de recursie af voor invoer met meerdere waarden (vectorisatie).
     if _is_iterable_num(posited_defect_rate):
         return {p: drawsneeded(p, allowed_defect_rate, cert, distribution) for p in posited_defect_rate}
-        
+
     if _is_iterable_num(allowed_defect_rate):
         return {a: drawsneeded(posited_defect_rate, a, cert, distribution) for a in allowed_defect_rate}
-        
+
     if _is_iterable_num(cert):
         return {c: drawsneeded(posited_defect_rate, allowed_defect_rate, c, distribution) for c in cert}
-        
+
     if _is_iterable_num(distribution):
         return {d: drawsneeded(posited_defect_rate, allowed_defect_rate, cert, d) for d in distribution}
 
@@ -119,7 +118,7 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
     max_n = 100000000
     begin_range = 1
     end_range = max_n
-    
+
     # Controleer of het antwoord zich überhaupt in onze extreme bandbreedte bevindt.
     if max_defect_rate(end_range, posited_defect_rate, cert, distribution) > allowed_defect_rate:
         return float('inf')
@@ -200,7 +199,7 @@ def max_defect_rate(n: int, posited_defect_rate: float, cert: float = 0.95, dist
     # Bereken de kwantielwaarde via de gespecificeerde verdeling.
     if distribution == "binomial":
         q = beta.ppf(cert, a=k + 1, b=n - k + 1)
-        
+
         # Voer een robuustheidscontrole uit via de inverse functie.
         controle_cert = beta.cdf(q, a=k + 1, b=n - k + 1)
         if not math.isclose(cert, controle_cert, rel_tol=1e-5):

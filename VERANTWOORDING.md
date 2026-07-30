@@ -27,16 +27,17 @@ De volgende symbolen worden doorlopend gebruikt in dit document.
 | $S$ | Totaal aantal strata |
 | $i$ | Stratumindex, $i \in \{1, \dots, S\}$ |
 | $j$ | Iteratie-index van het algoritme |
-| $n_i$ | Steekproefomvang (aantal waarnemingen) voor stratum $i$ |
-| $c_i$ | Uitvoeringskosten per waarneming in stratum $i$ (standaard $1$) |
+| $n_i$ | Aantal waarnemingen voor stratum $i$ |
+| $c_i$ | Controlekosten per waarneming in stratum $i$ (standaard $1$) |
 | $K$ | Totale controlekosten: $K = \sum_i n_i \cdot c_i$ |
 | $M$ | Materialiteitsgrens voor de gecombineerde maximale fout |
+| $d_i$ | Verwachte foutfractie van stratum $i$ (`verwachte_foutfractie`) |
+| $F_i$ | De maximale foutfractie van stratum $i$, te bepalen uit $n_i$ en $d_i$, en het gebruikte statistisch model (binomiaal of Poisson)|
 | $F$ | Gecombineerde maximale foutfractie (berekend via convolutie) |
 | $V_i$ | Geldswaarde van het laagstratum van stratum $i$ (`waarde_laag`) |
 | $V_{\text{totaal}}$ | Totale populatiewaarde: $V_{\text{totaal}} = \sum_i V_i$ |
 | $w_i$ | Relatief gewicht van stratum $i$: $w_i = V_i / V_{\text{totaal}}$ |
-| $d_i$ | Verwachte foutfractie van stratum $i$ (`verwachte_foutfractie`) |
-| $k_i$ | Verwacht aantal fouten: $k_i = n_i \cdot d_i$ |
+| $k_i$ | Verwacht aantal fouten van stratum $i$: $k_i = n_i \cdot d_i$ |
 | $\alpha$ | Vereist betrouwbaarheidsniveau, bijv. $0{,}95$ (`zekerheid`) |
 | $c$ | Zekerheidsterm: $c = -\ln(1-\alpha)$ — *niet* te verwarren met $c_i$ (kosten) |
 | $B_\alpha(a,\,b)$ | $\alpha$-kwantiel van de bètaverdeling met parameters $a$ en $b$ |
@@ -97,74 +98,137 @@ $$\Delta_i(n_{ij})  = \frac{F(\dots, n_{ij}, \dots) - F(\dots, n_{ij} + 1, \dots
 Het algoritme selecteert het stratum (of de strata) met $\max(\Delta_i(n_{ij}))$ en 
 hoogt $n_{ij}$ op met $1$. Bij een gelijkstand — wanneer meerdere strata 
 dezelfde maximale $\Delta_i$ hebben — worden alle gedeelde winnaars tegelijk 
-met 1 opgehoogd. Dit proces herhaalt zich totdat $F < M$ of totdat $j > MAX\_ITER$.
+met 1 opgehoogd. Dit proces herhaalt zich 
+totdat $F < M$ of totdat $j > MAX\_ITER$.
 
 ## 4. Bewijs van globale optimaliteit
 
-Om te bewijzen dat het algoritme het globale optimum vindt, beperken we ons tot de situatie waarbij de kosten per waarneming overal gelijk zijn ($c_i = 1$). Het algoritme probeert dan de vereiste zekerheid te halen met een zo klein mogelijk totaal aantal waarnemingen $N$. 
+### 4.1 Inperking
 
-Het bewijs rust op drie fundamentele wiskundige eigenschappen van onze steekproeven:
-1. **Onafhankelijkheid:** Fouten in het ene stratum geven geen 
-  informatie over het andere; informatie is additief.
-2. **Monotoonheid:** Elke extra waarneming, 
-   in welk stratum dan ook, verlaagt de maximale fout.
-3. **Convexiteit (afnemende meeropbrengsten):** 
-   Elke volgende waarneming in een specifiek stratum 
-   verlaagt de maximale fout mínder dan de vorige waarneming in 
-   datzelfde stratum deed. 
+Om te kunnen bewijzen dat het algoritme het globale optimum vindt, 
+beperken we ons:
 
-Dankzij deze drie eigenschappen kunnen we de optimaliteit van 
-het steilsteklimalgoritme bewijzen via volledige inductie en een 
-bewijs uit het ongerijmde. 
+1. $\forall i \in \{1, \dots, S\}, \; c_i = 1$ 
+   We beschouwen alleen de situatie waarbij de kosten per waarneming 
+   overal gelijk zijn. 
+   Het algoritme probeert dan de vereiste zekerheid te halen met een zo 
+   klein mogelijk totaal aantal waarnemingen $N$. 
+1. $\forall i \in \{1, \dots, S\}, \; d_i < M$ 
+   Voor elk stratum is de verwachte fout kleiner dan de toegestane
+   maximale fout over alle strata.
 
-Zij $G_n$ de verdeling van de waarnemingen over de strata zoals het 
-steilsteklimalgoritme die heeft bepaald na $n$ stappen 
-(waarbij in elke stap de maximale marginale foutreductie is gekozen). 
-Stel dat er een ander algoritme is, $O$, dat een optimalere 
-(en dus afwijkende) verdeling $O_n$ oplevert voor een gegeven aantal 
-waarnemingen $n$.
+We gebruiken de volgende hulpstellingen:
 
-**Basisstap ($n=1$):**
-Stel dat we slechts $n=1$ waarneming mogen verdelen. 
-Het steilsteklimalgoritme kiest het stratum met de 
-grootste foutreductie. Vanwege de monotoonheid kan geen 
-enkele andere verdeling $O_1$ een grotere reductie opleveren.
-Voor $n=1$ is een afwijkende, optimalere verdeling dus 
-onmogelijk. $G_1$ is optimaal.
+*  $(\frac{1}{S} \sum_{i=1}^S d_i) < M$ De gemiddelde verwachte fout over 
+   alle strata ligt onder de totale materialiteit.
+* Bij elke extra waarneming in een stratum $i$ zal de maximale fout 
+   in dat stratum zakken.
+* Bij elke extra waarneming in een stratum $i$ zal de totale
+   maximale fout zakken.
+* Bij voldoende waarnemingen in een stratum $i$ zal de maximale fout, $F_i$,
+   van dat stratum onder de totale materialiteit, $M$, zakken.
+* Bij voldoende waarnemingen in de strata zal de 
+  totale maximale fout, $F$, onder de materialiteitsgrens, $M$, zakken.
 
-**Inductiestap ($n=r+1$):**
-Neem nu aan dat het steilsteklimalgoritme de optimale 
-verdeling heeft gevonden voor $n=r$ waarnemingen (verdeling $G_r$). 
-We moeten bewijzen dat de volgende stap van het algoritme ook 
-leidt tot de optimale verdeling $G_{r+1}$.
 
-Stel dat dit *niet* zo is. Dat zou betekenen dat er een 
-alternatieve verdeling $O_{r+1}$ bestaat (bestaande uit $r+1$ waarnemingen) 
-die een lagere totale fout oplevert dan $G_{r+1}$.
-Omdat we weten dat $G_r$ de optimale basis was 
-voor $r$ stappen, moet de $(r+1)$-te stap in de 
-alternatieve verdeling $O$ een grotere foutreductie hebben 
-opgeleverd dan de $(r+1)$-te stap die ons algoritme koos. 
+* Hulp1: **Afnemende meeropbrengst** (voor de bètaverdeling )
 
-Maar hier grijpt de **convexiteit** in. O
-ns algoritme analyseert in stap $r+1$ álle resterende 
-mogelijkheden over álle strata, en kiest per definitie 
-de optie met de hoogste resterende marginale foutreductie. 
-Omdat door afnemende meeropbrengsten toekomstige stappen 
-nooit meer kunnen opleveren dan de huidige, is het wiskundig
-onmogelijk dat algoritme $O$ een nóg steilere helling (grotere foutreductie) 
-heeft gevonden voor die laatste waarneming. 
-De aanname dat $O_{r+1}$ een lagere fout oplevert, 
-leidt tot een tegenspraak.
+* Hulp2: **Stapsgewijze representatie is volledig**
+   Zonder verlies van algemeenheid kunnen we elk klimalgoritme representeren
+   alsof het stapje voor stapje keuzes maakt voor in welke
+   stratum nu weer een waarneming wordt toegevoegd.
+* Hulp3: **Ander algoritme betekent andere stratumkeuze**
+   Een algoritme dat in de praktijk verschilt van
+   het steilsteklimalgoritme zal op een bepaald moment in de opvolgende
+   sequentie van het kiezen welk stratum we een extra waarneming willen 
+   toekennen, een andere keuze moeten maken dan het steilsteklimalgoritme.
+* Hulp4: **Ander algoritme kiest in keuzeproces voor minder meeropbrengst**
+   Die keuze zal dus minder meeropbrengst opleveren dan
+   bij gebruik van het steilsteklimalgoritme.
+*  Hulp5: **Dominante meeropbrengst blijft dominant**
+   Zolang het alternatief algoritme niet alsnog een waarneming uit
+   het versmade stratum zal doen, zal elke volgende keus van het alternatief
+   algoritme een lagere meeropbrengst hebben dan die voor het
+   versmade stratum.
 
-**Conclusie:**
-Omdat de allocatie optimaal is voor $n=1$, en de 
-optimaliteit van stap $r$ garandeert dat stap $r+1$ 
-ook optimaal is, is hiermee via volledige inductie 
-bewezen dat het steilsteklimalgoritme voor elk willekeurig 
-aantal waarnemingen $N$ gegarandeerd de optimale verdeling vindt. 
-Het algoritme kan zich niet verliezen in een lokaal optimum.
+Stel dat er een allocatie $n^$ bestaat met $K^* < K_{\text{steilsteklim}}$ die
+eveneens $F < M$ bereikt. Beschouw de eerste stap waarop $n^$ en 
+het steilsteklimalgoritme divergeren: het steilsteklimalgoritme kiest 
+stratum $i$, $n^$ kiest stratum $j \neq i$, met 
+$\Delta_i \geq \Delta_j$ (Hulp4).
+Door Hulp5 (met Hulp1 als basis) levert elke volgende 
+keuze van $n^$ in stratum $j$ minder op dan de steilsteklimkeuze in 
+stratum $i$, totdat $n^$ alsnog een extra waarneming aan 
+stratum $i$ toevoegt — wat de totale kosten van $n^$ niet 
+vermindert. Inductief volgt dat $K^ \geq K_{\text{steilsteklim}}$. 
+Tegenspraak.
 
+### 4.1 Bewijs van hulp1
+
+#### Stap 1: Kwantiel-functie van de bètaverdeling is convex in parameters
+
+Voor de bètaverdeling $Beta(\alpha, \beta)$ en 
+vaste $p \in (0,1)$, is 
+de kwantielfunctie
+$Q(p; \alpha, \beta)$ 
+convex in $(\alpha, \beta)$.
+Hieruit volgt dat voor 
+$$\alpha(n) = n \cdot d + 1$$ en
+$$\beta(n)= n \cdot (1-d) + 1$$
+(met $d \in [0,1)$), de functie
+$$f(n)=B_p (\alpha(n),\beta(n))$$
+convex is in n.
+Daardoor is de marginale afname
+$$\Delta(n)=f(n)−f(n+1)$$
+dalend in n.
+Dit wil zeggen
+$$\Delta(n) > \Delta(n+1)$$
+De kansdichtheid van de bètaverdeling is gedefinieerd op het interval [0, 1] als
+
+$$f(p;\alpha,\beta) = \frac{1}{\mathrm{B}(\alpha,\beta)} p^{\alpha-1}(1-p)^{\beta-1}$$
+
+Daarin zijn $\alpha$ en $\beta$ beide positieve reële getallen en is 
+$$B(\alpha,\beta) = \frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha + \beta)}$$
+de bètafunctie.
+
+Voor een gegeven kans $p$ (waarbij $0 < p < 1$) is de 
+kwantielfunctie $Q(p; \alpha, \beta)$ 
+gedefinieerd als de unieke drempelwaarde waarvoor geldt:
+$$p = \frac{1}{B(\alpha, \beta)} \int_{0}^{Q(p, \alpha, \beta)} t^{\alpha-1}(1-t)^{\beta-1} \, dt$$ 
+
+Belangrijk resultaat uit de literatuur:
+De bètaverdeling is een natuurlijke exponentiële familie met natuurlijke parameters:
+θ1=ψ(α)−ψ(α+β),θ2=ψ(β)−ψ(α+β),\theta_1 = \psi(\alpha) - \psi(\alpha + \beta), \quad \theta_2 = \psi(\beta) - \psi(\alpha + \beta),θ1​=ψ(α)−ψ(α+β),θ2​=ψ(β)−ψ(α+β),
+waar ψ\psiψ de digamma-functie is.
+Voor natuurlijke exponentiële families is de kwantiel-functie convex in de natuurlijke 
+parameters (zie bijv. Barndorff-Nielsen, 1978, "Exponential Families").
+Omdat α\alphaα en β\betaβ stijgende functies zijn van θ1\theta_1θ1​ en 
+θ2\theta_2θ2​, volgt dat Q(p;α,β)Q(p; \alpha, \beta)Q(p;α,β) convex is 
+in (α,β)(\alpha, \beta)(α,β).
+
+#### Stap 2: Lineaire parameterisatie in n
+In ons geval zijn de parameters:
+α(n)=n⋅d+1,β(n)=n⋅(1−d)+1.\alpha(n) = n \cdot d + 1, \quad \beta(n) = n \cdot (1-d) + 1.α(n)=n⋅d+1,β(n)=n⋅(1−d)+1.
+Dit is een lineaire transformatie van n:
+(α(n)β(n))=(d1−d)n+(11).\begin{pmatrix} \alpha(n) \\ \beta(n) \end{pmatrix} = \begin{pmatrix} d \\ 1-d \end{pmatrix} n + \begin{pmatrix} 1 \\ 1 \end{pmatrix}.(α(n)β(n)​)=(d1−d​)n+(11​).
+
+#### Stap 3: Samenstelling van convexe functies
+
+Q(p;α,β)Q(p; \alpha, \beta)Q(p;α,β) is convex in (α,β)(\alpha, \beta)(α,β) (Stap 1).
+(α(n),β(n))(\alpha(n), \beta(n))(α(n),β(n)) is lineair (en dus convex) in nnn (Stap 2).
+De samenstelling van een convex functie met een lineaire functie is convex.
+Dus: f(n)=Q(p;α(n),β(n))f(n) = Q(p; \alpha(n), \beta(n))f(n)=Q(p;α(n),β(n)) is convex in nnn.
+
+#### Stap 4: Afnemende meeropbrengst
+Voor een convexe functie f geldt:
+f(n+1)−f(n)is stijgend in n.f(n+1) - f(n) \quad \text{is stijgend in } n.f(n+1)−f(n)is stijgend in n.
+Dus:
+f(n)−f(n+1)>f(n+1)−f(n+2).f(n) - f(n+1) > f(n+1) - f(n+2).f(n)−f(n+1)>f(n+1)−f(n+2).
+Maar Δ(n)=f(n)−f(n+1)\Delta(n) = f(n) - f(n+1)Δ(n)=f(n)−f(n+1), dus:
+Δ(n)>Δ(n+1).\Delta(n) > \Delta(n+1).Δ(n)>Δ(n+1).
+QED: De marginale opbrengst (foutreductie per extra waarneming) is dalend in nnn.
+
+  
 ## 5. Numerieke aspecten en praktische implementatie
 
 Het algoritme in §3 is theoretisch exact, maar de praktische

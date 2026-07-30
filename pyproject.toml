@@ -24,7 +24,7 @@ classifiers = [
 ]
 keywords = ["audit", "sampling", "stratified", "HARo", "government"]
 dependencies = [
-    "numpy>=1.20, <2.0",
+    "numpy>=1.21",
     "pandas>=1.3",
     "scipy>=1.7",
     "matplotlib>=3.4",
