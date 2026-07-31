@@ -1,0 +1,39 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*' # Start de workflow wanneer een tag die begint met 'v' wordt gepusht.
+
+jobs:
+  deploy:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    
+    # Vereist voor de beveiligde OIDC-koppeling met PyPI.
+    permissions:
+      id-token: write
+
+    steps:
+    # Haal de code op van de repository.
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Installeer Python en de benodigde hulpprogramma's.
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Upgrade pip and install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+
+    # Bouw de distributiepakketten (wheel en sdist).
+    - name: Build package
+      run: python -m build
+
+    # Publiceer het pakket automatisch naar PyPI via Trusted Publishing.
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
