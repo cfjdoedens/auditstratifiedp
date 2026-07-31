@@ -16,6 +16,7 @@ def test_happy_flow_succesvolle_planning():
         "materialiteit": [0.05, 0.05],
         "fout_hoog": [2000.0, 0.0],
         "waarde_hoog": [200000.0, 0.0],
+        "kosten": [1.0, 1.0],
     })
 
     resultaat = plan_stratified(
@@ -24,7 +25,6 @@ def test_happy_flow_succesvolle_planning():
 
     assert isinstance(resultaat, pd.DataFrame)
     assert "n_laag" in resultaat.columns
-    # Controleer of de standaardkosten netjes op 1.0 zijn gezet.
     assert "kosten" in resultaat.columns
     assert (resultaat["kosten"] == 1.0).all()
 
@@ -41,6 +41,7 @@ def test_foutmelding_verwachte_foutfractie_te_hoog():
         "materialiteit": [0.07],
         "fout_hoog": [0.0],
         "waarde_hoog": [0.0],
+        "kosten": [1.0],
     })
 
     with pytest.raises(ValueError, match="Totale verwachte fout in de laagstrata"):
@@ -59,6 +60,7 @@ def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
         "materialiteit": [0.05],
         "fout_hoog": [60000.0],
         "waarde_hoog": [200000.0],
+        "kosten": [1.0],
     })
 
     with pytest.raises(ValueError, match="Bekende fout in de hoogstrata"):
@@ -77,6 +79,7 @@ def test_foutmelding_inconsistentie_op_stratum_niveau():
         "materialiteit": [0.02],
         "fout_hoog": [0.0],
         "waarde_hoog": [0.0],
+        "kosten": [1.0],
     })
 
     with pytest.raises(
@@ -97,6 +100,7 @@ def test_attribuutverificatie_geretourneerde_dataset():
         "materialiteit": [0.05],
         "fout_hoog": [0.0],
         "waarde_hoog": [0.0],
+        "kosten": [1.0],
     })
 
     resultaat = plan_stratified(test_data, materialiteit=0.05)
@@ -116,9 +120,10 @@ def test_foutmelding_dubbele_stratumnamen():
         "materialiteit": [0.05, 0.05],
         "fout_hoog": [0.0, 0.0],
         "waarde_hoog": [0.0, 0.0],
+        "kosten": [1.0, 1.0],
     })
 
-    with pytest.raises(ValueError, match="Namen komen vaker dan 1 keer voor"):
+    with pytest.raises(ValueError, match="stratumnamen komen vaker dan"):
         plan_stratified(test_dubbel, materialiteit=0.05)
 
 
@@ -136,6 +141,7 @@ def basis_plan_invoer():
         "materialiteit": [0.05],
         "fout_hoog": [0.0],
         "waarde_hoog": [0.0],
+        "kosten": [1.0],
     })
 
 
@@ -212,6 +218,7 @@ def test_plan_verwachte_fout_laagstrata_alleen_te_groot():
         ],  # stratummaterialiteit hoger: geen stratum-inconsistentie
         "fout_hoog": [0.0],  # geen bekende fout: check 1 valt niet
         "waarde_hoog": [0.0],
+        "kosten": [1.0],
     })
     with pytest.raises(ValueError, match="laagstrata alleen al"):
         plan_stratified(data, materialiteit=0.05)
@@ -231,6 +238,7 @@ def basis_steekproeven():
         "materialiteit": [0.03, 0.03],
         "fout_hoog": [0.0, 0.0],
         "waarde_hoog": [100000.0, 50000.0],
+        "kosten": [1.0, 1.0],
     })
 
 

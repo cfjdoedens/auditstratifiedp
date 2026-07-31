@@ -77,6 +77,35 @@ def plan_stratified(
 
     # Controleer de waarden van de parameters van de functie.
     if INVOER_CONTROLE:
+        # Valideer steekproeven.
+        assert isinstance(steekproeven, pd.DataFrame), (
+            "steekproeven moet een pandas DataFrame zijn."
+        )
+        if len(steekproeven) == 0:
+            raise ValueError("steekproeven is leeg: moet tenminste 1 stratum bevatten.")
+
+        # Controle op vereiste kolommen in steekproeven.
+        vereiste_kolommen = {
+            "naam",
+            "waarde_laag",
+            "verwachte_foutfractie",
+            "ibr",
+            "car",
+            "kosten",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        }
+        ontbrekend = vereiste_kolommen - set(steekproeven.columns)
+        assert not ontbrekend, f"Ontbrekende kolommen: {', '.join(sorted(ontbrekend))}"
+
+        # Controle op dubbele stratumnamen.
+        if steekproeven["naam"].duplicated().any():
+            dubbele = steekproeven[steekproeven["naam"].duplicated()]["naam"].unique()
+            raise ValueError(
+                f"Evaluatiefout: De volgende stratumnamen komen vaker dan één keer voor: {', '.join(dubbele)}"
+            )
+
         # Valideer het model.
         assert model in ["binomiaal", "poisson"], (
             "Model moet 'binomiaal' of 'poisson' zijn."

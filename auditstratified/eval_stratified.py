@@ -1,3 +1,10 @@
+"""
+Evaluatiefuncties van auditstratified.
+Hoofdfunctie is eval_stratified().
+"""
+
+__all__ = ["eval_stratified"]
+
 import numpy as np
 import pandas as pd
 from scipy.fft import fft, ifft, next_fast_len

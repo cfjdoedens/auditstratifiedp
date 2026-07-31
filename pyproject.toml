@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Gestratificeerde steekproefaudits voor de Rijksoverheid (HARo-compatibel)"
 readme = "README.md"
-license = "EUPL-1.2"  # ✅ Nu een string (geen TOML-table)
+license = "EUPL-1.2"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -18,6 +18,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Office/Business :: Financial :: Accounting",
 ]
 keywords = ["audit", "sampling", "stratified", "HARo", "government"]
@@ -26,6 +28,14 @@ dependencies = [
     "pandas>=1.3",
     "scipy>=1.7",
     "matplotlib>=3.4",
+    "streamlit>=1.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.4",
 ]
 
 [project.urls]

@@ -84,7 +84,7 @@ Het pakket bevat tests om het pakket te valideren:
 - Tests of de verschillende convolutiealgoritmen dezelfde uitkomst geven.
 - Tests of de uitkomsten zijn zoals eerder berekend.
 
-Om de tests (30+ stuks) uit te voeren:
+Om de tests (70+ stuks) uit te voeren:
 ```bash
 python -m pytest
 ```
@@ -359,9 +359,9 @@ proportioneel mee in de berekende maximale fout voor de gehele populatie.
 | `ihr`           | Inherent risico (`H`, `M`, `L`)               | Risico      |
 | `ibr`           | Intern beheersingsrisico (`H`, `M`, `L`)      | Risico      |
 | `car`           | Cijferanalyserisico (`H`, `M`, `L`)           | Risico      |
-| `materialiteit` | Materialiteit als fractie                     | Risico      |
 | `waarde_hoog`   | Totale waarde integraal gecontroleerde posten | Hoogstratum |
 | `fout_hoog`     | Geconstateerde fout in euro's                 | Hoogstratum |
+| `materialiteit` | Materialiteit als fractie laag- + hoogstratum | Risico      |
 
 # `plan_stratified()`: Plannen van meerdere steekproeven
 
@@ -458,10 +458,13 @@ data = pd.DataFrame({
     "ihr": ["M", "L"],
     "ibr": ["M", "L"],
     "car": ["M", "L"],
-    "materialiteit": [0.03, 0.03],
-    "fout_hoog": [0.0, 0.0],
+    "kosten": [
+        5.0,
+        1.0,
+    ],  # Subsidies kost 5× zoveel per waarneming (= steek) als Inkoop.
     "waarde_hoog": [100000.0, 50000.0],
-    "kosten": [5.0, 1.0],  # Subsidies kost 5× zoveel per steek als Inkoop.
+    "fout_hoog": [0.0, 0.0],
+    "materialiteit": [0.03, 0.03],
 })
 
 # Bereken het optimale plan
