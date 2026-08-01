@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from auditstratified.plan_stratified import plan_stratified
+from auditstratified.plan_stratified import plan_stratified, plan_stratified_basis
 
 
 def test_happy_flow_succesvolle_planning():
@@ -275,6 +275,69 @@ def test_plan_stratified_poisson_strakke_marges(basis_steekproeven):
     assert isinstance(resultaat, pd.DataFrame)
     assert "n_laag" in resultaat.columns
     assert resultaat.attrs["geplande_max_fout_totaal"] <= 0.05
+
+
+def test_materialiteit_kolom_stuurt_laagstratum_n_basis():
+    """De kolom 'materialiteit' stuurt uitsluitend de steekproefomvang van het laagstratum.
+
+    Een strakkere stratummaterialiteit vereist meer steken in het laagstratum.
+    Dit bewijst dat de kolom exclusief op het laagstratum werkt via drawsneeded().
+    """
+    gemeenschappelijk = dict(
+        naam=["Stratum_A"],
+        waarde_laag=[500000.0],
+        verwachte_foutfractie=[0.01],
+        ihr=["H"],
+        ibr=["H"],
+        car=["H"],
+        fout_hoog=[0.0],
+        waarde_hoog=[0.0],
+        kosten=[1.0],
+    )
+
+    strak = plan_stratified_basis(
+        pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.03]})
+    )
+    ruim = plan_stratified_basis(
+        pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.10]})
+    )
+
+    assert strak["n_basis"].iloc[0] > ruim["n_basis"].iloc[0], (
+        "Een strakkere stratummaterialiteit moet meer steken vereisen in het laagstratum."
+    )
+
+
+def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum():
+    """De kolom 'materialiteit' heeft geen invloed op de verwerking van het hoogstratum.
+
+    fout_hoog en waarde_hoog worden ongewijzigd doorgegeven ongeacht de waarde
+    van de 'materialiteit'-kolom. Dit bewijst dat de kolom exclusief op het
+    laagstratum van toepassing is.
+    """
+    basis = dict(
+        naam=["Stratum_A"],
+        waarde_laag=[400000.0],
+        verwachte_foutfractie=[0.01],
+        ihr=["H"],
+        ibr=["H"],
+        car=["H"],
+        fout_hoog=[8000.0],
+        waarde_hoog=[100000.0],
+        kosten=[1.0],
+    )
+
+    for mat_kolom in [0.04, 0.10]:
+        resultaat = plan_stratified(
+            pd.DataFrame({**basis, "materialiteit": [mat_kolom]}),
+            materialiteit=0.05,
+            zekerheid=0.95,
+        )
+        assert resultaat["fout_hoog"].iloc[0] == 8000.0, (
+            f"fout_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
+        )
+        assert resultaat["waarde_hoog"].iloc[0] == 100000.0, (
+            f"waarde_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
+        )
 
 
 def test_kosten_invloed_op_allocatie():

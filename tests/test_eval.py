@@ -450,3 +450,77 @@ def test_invoercontrole_lege_dataframe():
     leeg = get_geldige_steekproef().iloc[0:0]
     with pytest.raises(ValueError, match="is leeg"):
         eval_stratified(leeg)
+
+
+def test_materialiteit_kolom_stuurt_extra_foutloze_posten():
+    """De kolom 'materialiteit' stuurt de extra foutloze posten voor het laagstratum.
+
+    Voor strata met niet-maximaal risico (hier: ihr=ibr=car='L') worden extra
+    foutloze posten berekend via foutloze_posten_equivalent(). Een strakkere
+    stratummaterialiteit levert meer extra posten op — en daarmee een lagere
+    maximale foutschatting. Dit bewijst dat de kolom exclusief het laagstratum raakt.
+    """
+    gemeenschappelijk = dict(
+        naam=["Stratum_A"],
+        waarde_laag=[100000.0],
+        n_laag=[50],
+        k_laag=[0.0],
+        ihr=["L"],  # Niet-H risico: extra_foutloze_posten > 0
+        ibr=["L"],
+        car=["L"],
+        waarde_hoog=[0.0],
+        fout_hoog=[0.0],
+    )
+
+    strak = eval_stratified(
+        pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.02]}),
+        vergelijk=False,
+    )
+    ruim = eval_stratified(
+        pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.10]}),
+        vergelijk=False,
+    )
+
+    extra_strak = strak["steekproeven"]["extra_foutloze_posten"].iloc[0]
+    extra_ruim = ruim["steekproeven"]["extra_foutloze_posten"].iloc[0]
+
+    # Strakkere materialiteit → meer extra foutloze posten.
+    assert extra_strak > extra_ruim, (
+        "Een strakkere stratummaterialiteit moet meer extra foutloze posten opleveren."
+    )
+    # Meer extra posten → lagere maximale foutschatting.
+    assert strak["max_fout_convolutie"] < ruim["max_fout_convolutie"], (
+        "Meer extra foutloze posten moeten de maximale foutschatting verlagen."
+    )
+
+
+def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
+    """De kolom 'materialiteit' heeft geen invloed op de verwerking van het hoogstratum.
+
+    fout_hoog en waarde_hoog worden ongewijzigd doorgegeven ongeacht de waarde
+    van de 'materialiteit'-kolom. Dit bewijst dat de kolom exclusief op het
+    laagstratum van toepassing is.
+    """
+    basis = dict(
+        naam=["Stratum_A"],
+        waarde_laag=[100000.0],
+        n_laag=[50],
+        k_laag=[0.0],
+        ihr=["H"],
+        ibr=["H"],
+        car=["H"],
+        fout_hoog=[5000.0],
+        waarde_hoog=[50000.0],
+    )
+
+    for mat_kolom in [0.02, 0.10]:
+        resultaat = eval_stratified(
+            pd.DataFrame({**basis, "materialiteit": [mat_kolom]}),
+            vergelijk=False,
+        )
+        assert resultaat["steekproeven"]["fout_hoog"].iloc[0] == 5000.0, (
+            f"fout_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
+        )
+        assert resultaat["steekproeven"]["waarde_hoog"].iloc[0] == 50000.0, (
+            f"waarde_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
+        )

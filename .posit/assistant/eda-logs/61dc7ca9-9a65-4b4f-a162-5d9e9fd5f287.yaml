@@ -1,0 +1,78 @@
+title: auditstratified pakket
+conversationId: "61dc7ca9-9a65-4b4f-a162-5d9e9fd5f287"
+directions:
+  - area: Ruff lint fouten
+    status: Explored
+    notes:
+      - "app.py: I001 importvolgorde (stdlib/third-party/first-party scheiding)"
+      - "plan_stratified.py: I001 importvolgorde, F821 undefined name rij_Standaardlabel"
+      - "eval_stratified.py: E402 door _all__ typefout (ontbrekende leading underscore)"
+      - Alle lint-fouten opgelost; ruff check geeft nu geen klachten meer
+    ref: "47a1ec4e-4f86-4250-bdfd-cad8b9bfe61a"
+  - area: pytest foutmeldingen
+    status: Explored
+    notes:
+      - "4 falende tests: AssertionError ipv ValueError voor kolom- en DataFrame-checks"
+      - Foutmelding plan_stratified regex mismatch op 'Bekende fout in de hoogstrata'
+      - Opgelost door assert-statements om te zetten naar raise ValueError
+    ref: "10be2504-3f20-40fa-8fd0-2e4f82fdc940"
+  - area: "assert vs ValueError ontwerp"
+    status: Explored
+    notes:
+      - "API-contractchecks (model, zekerheid, methode, granulariteit, start, vergelijk): assert"
+      - "Gebruikersinvoer DataFrame-checks (leeg, dubbele namen, ontbrekende kolommen): ValueError"
+      - steekproeven-type en ontbrekende kolommen in eval_stratified later ook teruggezet naar assert
+    ref: "002cbc38-aba9-4eda-8304-9fbdf950fcb4"
+  - area: Validatiedekking en testuitbreiding
+    status: Explored
+    notes:
+      - 26 nieuwe tests toegevoegd voor alle validatiepaden in plan_stratified en eval_stratified
+      - "Dead-code bug gerepareerd: plan_stratified regel 157 gebruikte totale_fout_hoog ipv totale_verwachte_fout_laag"
+      - Totaal 70+ tests; alle groen
+    ref: "4c157b28-3a43-41f4-bc71-794b5a2bdb33"
+  - area: Docstring correctheid
+    status: Explored
+    notes:
+      - "eval_stratified Returns: verkeerd type (pd.DataFrame ipv dict) gecorrigeerd"
+      - "Raises-secties in beide functies aangevuld met ontbrekende gevallen"
+      - Returns van plan_stratified aangevuld met n_basis, kosten, waarde_populatie en geplande_max_fout_totaal attr
+    ref: "8480e14c-ce26-487b-bba9-151cd33c4a55"
+  - area: Testreview en refactoring
+    status: Explored
+    notes:
+      - "test_utils.py: losse HARo-test vervangen door parametrize over alle 27 combinaties; correct bevonden"
+      - "test_plan.py: helpers omgezet naar pytest fixtures, losse parametertests samengevoegd"
+      - "Fout gevonden: binomiaal-test asserteerde <= 0.05 ipv <= 0.03; hersteld"
+    ref: "effc7be2-5958-417e-b163-cdb6025eabca"
+  - area: app.py SyntaxError
+    status: Explored
+    notes:
+      - "Regel 498: loshangende onafgesloten df_clean = ( als duplicaat van volledige versie verderop"
+      - Verwijderd; bestand parseert nu schoon
+    ref: "29a139aa-d33d-42e2-9f97-c0fb1296c160"
+  - area: Projectbeoordeling en pakketconfiguratie
+    status: Explored
+    notes:
+      - "pyproject.toml: streamlit toegevoegd als dependency, dev-extras aangemaakt"
+      - Python 3.12 en 3.13 classifiers toegevoegd
+      - "README verouderd: zei '30+ tests' terwijl het er 70+ zijn"
+    ref: "e8365c54-8686-4c79-903c-9fa6c086f406"
+  - area: CI/CD workflow
+    status: Explored
+    notes:
+      - ".github/workflows/test.yml aangemaakt met Python 3.10-3.13 matrix"
+      - Ruff linting-stap toegevoegd als aparte CI-stap
+      - Pakket-importtest toegevoegd als smoke test voor installatieproblemen
+      - Push zonder tag triggert alleen test-workflow, niet publish naar PyPI
+    ref: "1be34173-a678-4d53-9cfb-f79c9188e725"
+  - area: "kosten kolom verplicht in plan_stratified"
+    status: Explored
+    notes:
+      - Alle test-DataFrames aangevuld met kosten-kolom
+      - Nieuwe dubbele-namen-check in plan_stratified had andere foutmelding; match-string in test bijgewerkt
+    ref: "fa269c3b-425a-4fc1-ad65-42f43a1ceaaa"
+suggestions:
+  - README bijwerken met het actuele aantal tests (70+)
+  - Controleer of de CI-workflow slaagt na de push naar GitHub
+  - Voeg Python 3.12 toe aan de classifiers in pyproject.toml (staat nu alleen als classifier, niet getest lokaal)
+  - Overweeg validatie van de steekproeven-structuur ook in plan_stratified zelf toe te voegen

@@ -6,7 +6,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from auditstratified.valideer_granulariteit import valideer_granulariteit, _delta_i
+from auditstratified.valideer_granulariteit import _delta_i, valideer_granulariteit
 
 
 def _basis_strata():

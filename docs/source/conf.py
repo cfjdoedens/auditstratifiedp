@@ -8,6 +8,7 @@
 
 import os
 import sys
+
 # Laat Sphinx direct in de src-map kijken.
 sys.path.insert(0, os.path.abspath('../../src'))
 

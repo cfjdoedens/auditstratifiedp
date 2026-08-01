@@ -680,18 +680,6 @@ with tab_plan:
                     "verwachte foutfractie (laag)",
                     help="De verwachte foutfractie binnen het laagstratum.",
                 ),
-                "kosten": st.column_config.TextColumn(
-                    "kosten per steek",
-                    help="Relatieve kosten per steek (bijv. 1,0 voor standaard, 10,0 voor duur).",
-                ),
-                "waarde_hoog": st.column_config.TextColumn(
-                    "waarde hoog (€)",
-                    help="Totale boekwaarde van het hoogstratum (= foutbedrag + goedbedrag, beide van het hoogstratum).",
-                ),
-                "fout_hoog": st.column_config.TextColumn(
-                    "fout hoog (€)",
-                    help="Totaal foutbedrag van het hoogstratum.",
-                ),
                 "ihr": st.column_config.SelectboxColumn(
                     "ihr",
                     help="Inherent risico van het laagstratum (H/M/L).",
@@ -709,6 +697,18 @@ with tab_plan:
                     help="Cijferanalyserisico van het laagstratum (H/M/L).",
                     options=RISK_OPTIES,
                     required=True,
+                ),
+                "kosten": st.column_config.TextColumn(
+                    "kosten per steek",
+                    help="Relatieve kosten per steek (bijv. 1,0 voor standaard, 10,0 voor duur).",
+                ),
+                "waarde_hoog": st.column_config.TextColumn(
+                    "waarde hoog (€)",
+                    help="Totale boekwaarde van het hoogstratum (= foutbedrag + goedbedrag, beide van het hoogstratum).",
+                ),
+                "fout_hoog": st.column_config.TextColumn(
+                    "fout hoog (€)",
+                    help="Totaal foutbedrag van het hoogstratum.",
                 ),
                 "materialiteit": st.column_config.TextColumn(
                     "materialiteit",
