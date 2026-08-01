@@ -419,6 +419,54 @@ def test_invoercontrole_granulariteit_te_klein():
         eval_stratified(get_geldige_steekproef(), granulariteit=0)
 
 
+def _steekproef_met_extreem_gewichtsverschil():
+    """Twee strata met een gewichtsverhouding van 1000:1 (klein stratum = 1.000, groot = 1.000.000)."""
+    return pd.DataFrame({
+        "naam": ["Groot", "Klein"],
+        "waarde_laag": [1_000_000.0, 1_000.0],
+        "n_laag": [50, 50],
+        "k_laag": [1.0, 0.0],
+        "ihr": ["H", "H"],
+        "ibr": ["H", "H"],
+        "car": ["H", "H"],
+        "materialiteit": [0.05, 0.05],
+        "waarde_hoog": [0.0, 0.0],
+        "fout_hoog": [0.0, 0.0],
+    })
+
+
+def test_granulariteit_te_laag_voor_extreem_gewichtsverschil_fft():
+    """FFT-methoden werpen een ValueError als het kleinste stratum in het rooster verdwijnt.
+
+    Met waarde_laag = [1.000.000, 1.000] en granulariteit=100:
+    dx = 1.001.000 / 100 = 10.010 >= 1.000 → crash-voorwaarde is vervuld.
+    """
+    data = _steekproef_met_extreem_gewichtsverschil()
+    for methode in ["FFT samen", "FFT paarsgewijs", "direct"]:
+        with pytest.raises(ValueError, match="te laag"):
+            eval_stratified(data, methode=methode, granulariteit=100)
+
+
+def test_granulariteit_te_laag_voor_extreem_gewichtsverschil_monte_carlo_vrijgesteld():
+    """Monte Carlo gebruikt geen vast rooster en is vrijgesteld van de granulariteitscheck."""
+    data = _steekproef_met_extreem_gewichtsverschil()
+    # Mag niet gooien, ongeacht hoe laag de granulariteit is.
+    result = eval_stratified(
+        data, methode="Monte Carlo", granulariteit=100, vergelijk=False
+    )
+    assert "max_fout_convolutie" in result
+
+
+def test_granulariteit_voldoende_voor_extreem_gewichtsverschil():
+    """Bij een hoge genoeg granulariteit slaagt de evaluatie gewoon."""
+    data = _steekproef_met_extreem_gewichtsverschil()
+    # min_benodigde_gran = ceil(1.001.000 / 1.000 * 10) = 10.010 → 20.000 is ruim voldoende.
+    result = eval_stratified(
+        data, methode="FFT samen", granulariteit=20_000, vergelijk=False
+    )
+    assert "max_fout_convolutie" in result
+
+
 def test_invoercontrole_start_bool():
     with pytest.raises(AssertionError, match="bool"):
         eval_stratified(get_geldige_steekproef(), start=True)
@@ -492,6 +540,132 @@ def test_materialiteit_kolom_stuurt_extra_foutloze_posten():
     assert strak["max_fout_convolutie"] < ruim["max_fout_convolutie"], (
         "Meer extra foutloze posten moeten de maximale foutschatting verlagen."
     )
+
+
+def test_eval_kolominhoud_nan_in_numerieke_kolom_wordt_geweigerd():
+    """NaN (float) in een numerieke kolom wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_laag"] = float("nan")
+    with pytest.raises(ValueError, match="lege waarden"):
+        eval_stratified(data)
+
+
+@pytest.mark.parametrize("kolom", ["naam", "ihr", "ibr", "car"])
+def test_eval_kolominhoud_none_in_tekstkolom_wordt_geweigerd(kolom):
+    """None in een tekstkolom wordt als lege waarde herkend en geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, kolom] = None
+    with pytest.raises(ValueError, match="lege waarden"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_lege_string_naam_wordt_geweigerd():
+    """Een lege string in kolom 'naam' wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "naam"] = ""
+    with pytest.raises(ValueError, match="lege strings"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_whitespace_naam_wordt_geweigerd():
+    """Een naam die alleen spaties bevat wordt als leeg beschouwd en geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "naam"] = "   "
+    with pytest.raises(ValueError, match="lege strings"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_niet_numeriek_wordt_geweigerd():
+    """Een niet-numerieke waarde in een numerieke kolom wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data["n_laag"] = data["n_laag"].astype(str)
+    with pytest.raises(ValueError, match="numerieke waarden"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_negatieve_waarde_laag_wordt_geweigerd():
+    """Negatieve waarde_laag wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_laag"] = -1.0
+    with pytest.raises(ValueError, match="waarde_laag"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_negatieve_n_laag_wordt_geweigerd():
+    """Negatieve n_laag wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "n_laag"] = -1
+    with pytest.raises(ValueError, match="n_laag"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_gebroken_n_laag_wordt_geweigerd():
+    """Een niet-geheel getal in n_laag wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data["n_laag"] = data["n_laag"].astype(float)
+    data.loc[0, "n_laag"] = 30.5
+    with pytest.raises(ValueError, match="gehele getallen"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_negatieve_k_laag_wordt_geweigerd():
+    """Negatieve k_laag wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "k_laag"] = -0.5
+    with pytest.raises(ValueError, match="k_laag"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_k_laag_groter_dan_n_laag_wordt_geweigerd():
+    """k_laag groter dan n_laag wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "n_laag"] = 10
+    data.loc[0, "k_laag"] = 11.0
+    with pytest.raises(ValueError, match="k_laag"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_negatieve_waarde_hoog_wordt_geweigerd():
+    """Negatieve waarde_hoog wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_hoog"] = -100.0
+    with pytest.raises(ValueError, match="waarde_hoog"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_negatieve_fout_hoog_wordt_geweigerd():
+    """Negatieve fout_hoog wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "fout_hoog"] = -1.0
+    with pytest.raises(ValueError, match="fout_hoog"):
+        eval_stratified(data)
+
+
+def test_eval_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd():
+    """fout_hoog groter dan waarde_hoog wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_hoog"] = 500.0
+    data.loc[0, "fout_hoog"] = 600.0
+    with pytest.raises(ValueError, match="fout_hoog"):
+        eval_stratified(data)
+
+
+@pytest.mark.parametrize("waarde", [0.0, 1.0, -0.01, 1.5])
+def test_eval_kolominhoud_materialiteit_kolom_buiten_bereik(waarde):
+    """Materialiteit-kolom buiten (0, 1) wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, "materialiteit"] = waarde
+    with pytest.raises(ValueError, match="materialiteit"):
+        eval_stratified(data)
+
+
+@pytest.mark.parametrize("kolom", ["ihr", "ibr", "car"])
+def test_eval_kolominhoud_ongeldig_risico_wordt_geweigerd(kolom):
+    """Een ongeldige risicowaarde in ihr, ibr of car wordt geweigerd."""
+    data = get_geldige_steekproef()
+    data.loc[0, kolom] = "X"
+    with pytest.raises(ValueError, match=kolom):
+        eval_stratified(data)
 
 
 def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():

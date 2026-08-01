@@ -5,6 +5,8 @@ Hoofdfunctie is eval_stratified().
 
 __all__ = ["eval_stratified"]
 
+import math
+
 import numpy as np
 import pandas as pd
 from scipy.fft import fft, ifft, next_fast_len
@@ -120,6 +122,87 @@ def eval_stratified(
                 f"Evaluatiefout: De volgende stratumnamen komen vaker dan één keer voor: {', '.join(dubbele)}"
             )
 
+        # Controleer op NaN-waarden in alle vereiste kolommen.
+        kolommen_met_nan = [
+            k for k in sorted(vereiste_kolommen) if steekproeven[k].isna().any()
+        ]
+        if kolommen_met_nan:
+            raise ValueError(
+                f"De volgende kolommen bevatten lege waarden (NaN): {', '.join(kolommen_met_nan)}"
+            )
+
+        # Controleer kolom 'naam' op lege strings.
+        if (steekproeven["naam"].str.strip() == "").any():
+            raise ValueError("Kolom 'naam' mag geen lege strings bevatten.")
+
+        # Controleer de numerieke kolommen op geldig dtype.
+        numerieke_kolommen = [
+            "waarde_laag",
+            "n_laag",
+            "k_laag",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        ]
+        niet_numeriek = [
+            k
+            for k in numerieke_kolommen
+            if not pd.api.types.is_numeric_dtype(steekproeven[k])
+        ]
+        if niet_numeriek:
+            raise ValueError(
+                f"De volgende kolommen moeten numerieke waarden bevatten: {', '.join(niet_numeriek)}"
+            )
+
+        # Controleer waarde_laag: >= 0.
+        if (steekproeven["waarde_laag"] < 0).any():
+            raise ValueError("Kolom 'waarde_laag' mag geen negatieve waarden bevatten.")
+
+        # Controleer n_laag: >= 0 en geen gebroken waarden.
+        if (steekproeven["n_laag"] < 0).any():
+            raise ValueError("Kolom 'n_laag' mag geen negatieve waarden bevatten.")
+        if not (steekproeven["n_laag"] == steekproeven["n_laag"].round()).all():
+            raise ValueError("Kolom 'n_laag' mag alleen gehele getallen bevatten.")
+
+        # Controleer k_laag: >= 0 en niet groter dan n_laag.
+        if (steekproeven["k_laag"] < 0).any():
+            raise ValueError("Kolom 'k_laag' mag geen negatieve waarden bevatten.")
+        if (steekproeven["k_laag"] > steekproeven["n_laag"]).any():
+            raise ValueError(
+                "Kolom 'k_laag' mag de bijbehorende 'n_laag' niet overschrijden."
+            )
+
+        # Controleer waarde_hoog: >= 0.
+        if (steekproeven["waarde_hoog"] < 0).any():
+            raise ValueError("Kolom 'waarde_hoog' mag geen negatieve waarden bevatten.")
+
+        # Controleer fout_hoog: >= 0 én niet groter dan de bijbehorende waarde_hoog.
+        if (steekproeven["fout_hoog"] < 0).any():
+            raise ValueError("Kolom 'fout_hoog' mag geen negatieve waarden bevatten.")
+        if (steekproeven["fout_hoog"] > steekproeven["waarde_hoog"]).any():
+            raise ValueError(
+                "Kolom 'fout_hoog' mag de bijbehorende 'waarde_hoog' niet overschrijden."
+            )
+
+        # Controleer materialiteit (kolom): in het open interval (0, 1).
+        if (steekproeven["materialiteit"] <= 0).any() or (
+            steekproeven["materialiteit"] >= 1
+        ).any():
+            raise ValueError(
+                "Kolom 'materialiteit' moet waarden bevatten in het open interval (0, 1)."
+            )
+
+        # Controleer ihr, ibr, car: uitsluitend 'H', 'M' of 'L'.
+        geldige_risicos = {"H", "M", "L"}
+        for kolom in ["ihr", "ibr", "car"]:
+            ongeldig = ~steekproeven[kolom].isin(geldige_risicos)
+            if ongeldig.any():
+                ongeldige_waarden = steekproeven.loc[ongeldig, kolom].unique().tolist()
+                raise ValueError(
+                    f"Kolom '{kolom}' bevat ongeldige waarden: {ongeldige_waarden}. "
+                    "Toegestaan zijn uitsluitend 'H', 'M' en 'L'."
+                )
+
         # Valideer het model.
         assert model in ["binomiaal", "poisson"], (
             "Model moet 'binomiaal' of 'poisson' zijn."
@@ -156,6 +239,24 @@ def eval_stratified(
             "granulariteit moet een geheel getal zijn. En >= 1."
         )
         assert granulariteit >= 1, "granulariteit moet een geheel getal >= 1 zijn."
+
+        # Voorkom deling door nul bij extreme gewichtsverschillen tussen strata (FFT-methoden).
+        # Monte Carlo gebruikt geen vast dx-rooster en is hiervan vrijgesteld.
+        if methode != "Monte Carlo":
+            laag_strata = steekproeven[steekproeven["waarde_laag"] > 0]
+            if not laag_strata.empty:
+                min_waarde_laag = laag_strata["waarde_laag"].min()
+                totaal_waarde_laag = laag_strata["waarde_laag"].sum()
+                dx = totaal_waarde_laag / granulariteit
+                if dx >= min_waarde_laag:
+                    min_benodigde_gran = math.ceil(
+                        (totaal_waarde_laag / min_waarde_laag) * 10
+                    )
+                    raise ValueError(
+                        f"De granulariteit ({granulariteit}) is te laag ten opzichte van het kleinste "
+                        f"stratum (waarde: {min_waarde_laag}). De berekening zou hierdoor crashen. "
+                        f"Verhoog de granulariteit naar minimaal {min_benodigde_gran}."
+                    )
 
         # Valideer start.
         assert not isinstance(start, bool), (

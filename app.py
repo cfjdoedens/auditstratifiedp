@@ -27,9 +27,9 @@ LEGE_EVAL_DF = pd.DataFrame({
     "ihr": ["H"] * 8,
     "ibr": ["H"] * 8,
     "car": ["H"] * 8,
+    "materialiteit": ["0,01"] * 8,
     "waarde_hoog": ["0"] * 8,
     "fout_hoog": ["0"] * 8,
-    "materialiteit": ["0,01"] * 8,
 })
 
 # Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de planning te initialiseren.
@@ -40,10 +40,10 @@ LEGE_PLAN_DF = pd.DataFrame({
     "ihr": ["H"] * 8,
     "ibr": ["H"] * 8,
     "car": ["H"] * 8,
+    "materialiteit": ["0,01"] * 8,
     "kosten": ["1,0"] * 8,
     "waarde_hoog": ["0"] * 8,
     "fout_hoog": ["0"] * 8,
-    "materialiteit": ["0,01"] * 8,
     "n_laag": [None] * 8,
     "n_laag_extra": [None] * 8,
     "n_laag_tot": [None] * 8,
@@ -66,6 +66,9 @@ for key, standaard in {
     "eval_subtab_index": 0,
     "eval_res": None,
     "eval_error": None,
+    "eval_tabel_key": 0,
+    "plan_error": None,
+    "plan_tabel_key": 0,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
@@ -114,68 +117,126 @@ def _format_nl_auto(waarde, min_decimalen: int = 0) -> str:
 
 
 def on_eval_tabel_change():
-    """Verwerk wijzigingen in de evaluatietabel direct in de sessiestatus en formatteer deze naar de Nederlandse stijl."""
-    state = st.session_state["eval_tabel"]
+    """Verwerk wijzigingen in de evaluatietabel, inclusief harde rollback bij foute invoer."""
+    state = st.session_state[f"eval_tabel_{st.session_state.eval_tabel_key}"]
     df = st.session_state.eval_df_saved.copy()
+    oude_df = (
+        st.session_state.eval_df_saved.copy()
+    )  # De ongewijzigde staat als veilige haven
 
-    # Pas gewijzigde celwaarden direct en geformatteerd toe op het opgeslagen dataframe.
-    for row_idx, changes in state.get("edited_rows", {}).items():
-        while row_idx >= len(df):
-            df = pd.concat(
-                [df, pd.DataFrame([{col: "" for col in df.columns}])], ignore_index=True
-            )
+    weggepoetste_fouten = []
 
-        for col, val in changes.items():
-            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
-                df.at[row_idx, col] = _format_nl_auto(val, 2)
-            elif col in ["n_laag", "k_laag", "materialiteit"]:
-                min_dec = 0 if col == "n_laag" else 2
-                df.at[row_idx, col] = _format_nl_auto(val, min_dec)
-            else:
-                df.at[row_idx, col] = val
+    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst
+    for row_idx_raw, changes in state.get("edited_rows", {}).items():
+        row_idx = int(row_idx_raw)
+        if row_idx < len(df):
+            for col, val in changes.items():
+                if val is not None:
+                    df.at[row_idx, col] = str(val).strip()
 
-    # Initialiseer nieuw toegevoegde tabelrijen met logische standaardwaarden en formats.
+    # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df)
     for row in state.get("added_rows", []):
         new_row = {col: "" for col in df.columns}
-        new_row["ihr"] = "H"
-        new_row["ibr"] = "H"
-        new_row["car"] = "H"
-        new_row["materialiteit"] = "0,01"
-        new_row["verwachte_foutfractie"] = "0,001"
-        new_row["waarde_hoog"] = "0"
-        new_row["fout_hoog"] = "0"
-
+        new_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "waarde_hoog": "0",
+            "fout_hoog": "0",
+        })
         for col, val in row.items():
-            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
-                new_row[col] = _format_nl_auto(val, 2)
-            elif col in ["n_laag", "k_laag", "materialiteit"]:
-                min_dec = 0 if col == "n_laag" else 2
-                new_row[col] = _format_nl_auto(val, min_dec)
-            else:
-                new_row[col] = val
+            if val is not None:
+                new_row[col] = str(val).strip()
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    # Verwijder geselecteerde rijen en herindexeer het opgeslagen dataframe.
+        base_row = {col: "" for col in df.columns}
+        base_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "waarde_hoog": "0",
+            "fout_hoog": "0",
+        })
+        oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
+
+    # 3. Voer één uniforme, waterdichte validatielus uit over álle rijen
+    for idx in range(len(df)):
+        rij_data = df.iloc[idx]
+        naam_cel = str(rij_data.get("naam", "")).strip()
+        rij_naam = naam_cel if naam_cel else f"Stratum {idx + 1}"
+
+        # Helpertje om foute invoer direct terug te draaien naar de oude waarde
+        def revert_cel(kolom, foutmelding, current_idx, current_rij_naam):
+            weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
+            st.session_state.eval_tabel_key += 1
+            df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        # Veld-voor-veld validatie
+        for col in [
+            "waarde_laag",
+            "n_laag",
+            "k_laag",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        ]:
+            val_str = str(df.at[idx, col]).strip()
+            val_num = _parse_nl(val_str)
+
+            if val_str == "":
+                continue
+
+            if val_num is None:
+                revert_cel(
+                    col, f'"{val_str}" is geen geldig getal voor {col}', idx, rij_naam
+                )
+                continue
+
+            if col in ["waarde_laag", "n_laag", "k_laag", "waarde_hoog", "fout_hoog"]:
+                if val_num < 0:
+                    revert_cel(col, f"{col} mag niet negatief zijn", idx, rij_naam)
+                else:
+                    df.at[idx, col] = _format_nl_auto(
+                        val_str, 0 if col == "n_laag" else 2
+                    )
+            elif col == "materialiteit":
+                if not (0 < val_num < 1):
+                    revert_cel(
+                        col, "materialiteit moet in (0, 1) liggen", idx, rij_naam
+                    )
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 2)
+
+        # Relatieve controles ná correctie van individuele velden
+        n_val = _parse_nl(df.at[idx, "n_laag"])
+        k_val = _parse_nl(df.at[idx, "k_laag"])
+        if n_val is not None and k_val is not None and k_val > n_val:
+            edited_row_cols = state.get("edited_rows", {}).get(
+                idx, state.get("edited_rows", {}).get(str(idx), {})
+            )
+            col_weg = "k_laag" if "k_laag" in edited_row_cols else "n_laag"
+            revert_cel(col_weg, "k_laag mag niet groter zijn dan n_laag", idx, rij_naam)
+
+        wh_val = _parse_nl(df.at[idx, "waarde_hoog"])
+        fh_val = _parse_nl(df.at[idx, "fout_hoog"])
+        if wh_val is not None and fh_val is not None and fh_val > wh_val:
+            edited_row_cols = state.get("edited_rows", {}).get(
+                idx, state.get("edited_rows", {}).get(str(idx), {})
+            )
+            col_weg = "fout_hoog" if "fout_hoog" in edited_row_cols else "waarde_hoog"
+            revert_cel(
+                col_weg, "fout_hoog mag niet groter zijn dan waarde_hoog", idx, rij_naam
+            )
+
+    # 4. Verwijder rijen nu de index-afhankelijke lussen klaar zijn
     deleted_indices = state.get("deleted_rows", [])
     if deleted_indices:
         df = df.drop(index=deleted_indices).reset_index(drop=True)
 
-    # Controleer direct bij het invoeren of de fout k_laag de omvang n_laag overschrijdt binnen de actieve rijen.
-    te_veel_fouten = []
-    for idx, row in df.iterrows():
-        n_val = _parse_nl(row["n_laag"])
-        k_val = _parse_nl(row["k_laag"])
-        naam_cel = str(row["naam"]).strip()
-        rij_naam = naam_cel if naam_cel != "" else f"Stratum {idx + 1}"
-        if n_val is not None and k_val is not None and k_val > n_val:
-            te_veel_fouten.append(rij_naam)
-
-    # Toon direct een foutmelding op het scherm als er een foutieve invoer is gedetecteerd.
-    if te_veel_fouten:
-        st.session_state.eval_error = (
-            f"Invoerfout: de som van de foutfracties (k_laag) mag niet groter zijn "
-            f"dan de steekproefomvang (n_laag) bij: {', '.join(te_veel_fouten)}."
-        )
+    if weggepoetste_fouten:
+        st.session_state.eval_error = "Invoerfout: " + " ".join(weggepoetste_fouten)
     else:
         st.session_state.eval_error = None
 
@@ -183,51 +244,129 @@ def on_eval_tabel_change():
 
 
 def on_plan_tabel_change():
-    """Verwerk wijzigingen in de planningstabel direct in de sessiestatus en formatteer deze naar de Nederlandse stijl."""
-    state = st.session_state["plan_tabel_editor"]
+    """Verwerk wijzigingen in de planningstabel, inclusief harde rollback bij foute invoer."""
+    state = st.session_state[f"plan_tabel_{st.session_state.plan_tabel_key}"]
     df = st.session_state.plan_tabel.copy()
+    oude_df = (
+        st.session_state.plan_tabel.copy()
+    )  # De ongewijzigde staat als veilige haven
 
-    # Pas gewijzigde celwaarden in de planningstabel direct toe.
-    for row_idx, changes in state.get("edited_rows", {}).items():
-        while row_idx >= len(df):
-            df = pd.concat(
-                [df, pd.DataFrame([{col: "" for col in df.columns}])], ignore_index=True
-            )
+    weggepoetste_fouten = []
 
-        for col, val in changes.items():
-            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
-                df.at[row_idx, col] = _format_nl_auto(val, 2)
-            elif col in ["verwachte_foutfractie", "materialiteit"]:
-                min_dec = 3 if col == "verwachte_foutfractie" else 2
-                df.at[row_idx, col] = _format_nl_auto(val, min_dec)
-            else:
-                df.at[row_idx, col] = val
+    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst
+    for row_idx_raw, changes in state.get("edited_rows", {}).items():
+        row_idx = int(row_idx_raw)
+        if row_idx < len(df):
+            for col, val in changes.items():
+                if val is not None:
+                    df.at[row_idx, col] = str(val).strip()
 
-    # Initialiseer nieuw toegevoegde planningsrijen met logische standaardwaarden en formats.
+    # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df)
     for row in state.get("added_rows", []):
         new_row = {col: "" for col in df.columns}
-        new_row["ihr"] = "H"
-        new_row["ibr"] = "H"
-        new_row["car"] = "H"
-        new_row["materialiteit"] = "0,01"
-        new_row["verwachte_foutfractie"] = "0,001"
-        new_row["waarde_hoog"] = "0"
-        new_row["fout_hoog"] = "0"
-
+        new_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "verwachte_foutfractie": "0,001",
+            "kosten": "1,0",
+            "waarde_hoog": "0",
+            "fout_hoog": "0",
+        })
         for col, val in row.items():
-            if col in ["waarde_laag", "fout_hoog", "waarde_hoog"]:
-                new_row[col] = _format_nl_auto(val, 2)
-            elif col in ["verwachte_foutfractie", "materialiteit"]:
-                min_dec = 3 if col == "verwachte_foutfractie" else 2
-                new_row[col] = _format_nl_auto(val, min_dec)
-            else:
-                new_row[col] = val
+            if val is not None:
+                new_row[col] = str(val).strip()
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    # Verwijder geselecteerde rijen uit de planningsdata.
+        base_row = {col: "" for col in df.columns}
+        base_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "verwachte_foutfractie": "0,001",
+            "kosten": "1,0",
+            "waarde_hoog": "0",
+            "fout_hoog": "0",
+        })
+        oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
+
+    # 3. Voer één uniforme, waterdichte validatielus uit over álle rijen
+    for idx in range(len(df)):
+        rij_data = df.iloc[idx]
+        naam_cel = str(rij_data.get("naam", "")).strip()
+        rij_naam = naam_cel if naam_cel else f"Stratum {idx + 1}"
+
+        # Helpertje om foute invoer direct terug te draaien naar de oude waarde
+        def revert_cel(kolom, foutmelding, current_idx, current_rij_naam):
+            weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
+            st.session_state.plan_tabel_key += 1
+            df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        # Veld-voor-veld validatie
+        for col in [
+            "waarde_laag",
+            "verwachte_foutfractie",
+            "kosten",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        ]:
+            val_str = str(df.at[idx, col]).strip()
+            val_num = _parse_nl(val_str)
+
+            if val_str == "":
+                continue
+
+            if val_num is None:
+                revert_cel(
+                    col, f'"{val_str}" is geen geldig getal voor {col}', idx, rij_naam
+                )
+                continue
+
+            if col in ["waarde_laag", "waarde_hoog", "fout_hoog"]:
+                if val_num < 0:
+                    revert_cel(col, f"{col} mag niet negatief zijn", idx, rij_naam)
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 2)
+            elif col == "verwachte_foutfractie":
+                if not (0 <= val_num < 1):
+                    revert_cel(
+                        col,
+                        "verwachte_foutfractie moet in [0, 1) liggen",
+                        idx,
+                        rij_naam,
+                    )
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 3)
+            elif col in ["kosten", "materialiteit"]:
+                if val_num <= 0:
+                    revert_cel(col, f"{col} moet groter zijn dan 0", idx, rij_naam)
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 2)
+
+        # Relatieve controles ná correctie van individuele velden
+        wh_val = _parse_nl(df.at[idx, "waarde_hoog"])
+        fh_val = _parse_nl(df.at[idx, "fout_hoog"])
+        if wh_val is not None and fh_val is not None and fh_val > wh_val:
+            edited_row_cols = state.get("edited_rows", {}).get(
+                idx, state.get("edited_rows", {}).get(str(idx), {})
+            )
+            col_weg = "fout_hoog" if "fout_hoog" in edited_row_cols else "waarde_hoog"
+            revert_cel(
+                col_weg, "fout_hoog mag niet groter zijn dan waarde_hoog", idx, rij_naam
+            )
+
+    # 4. Verwijder rijen nu de index-afhankelijke lussen klaar zijn
     deleted_indices = state.get("deleted_rows", [])
     if deleted_indices:
         df = df.drop(index=deleted_indices).reset_index(drop=True)
+
+    if weggepoetste_fouten:
+        st.session_state.plan_error = "Invoerfout: " + " ".join(weggepoetste_fouten)
+    else:
+        st.session_state.plan_error = None
 
     st.session_state.plan_tabel = df
 
@@ -269,7 +408,7 @@ with tab_nnz:
 
     with col_rechts:
         st.subheader("Resultaat")
-        val = haro_nog_nodige_zekerheid(haro_ihr, haro_ibr, car_optie := haro_car)
+        val = haro_nog_nodige_zekerheid(haro_ihr, haro_ibr, haro_car)
         st.metric("nog nodige zekerheid", f"{_nl(val, 4)}")
 
 # Configureer het tweede tabblad voor de berekening van het foutlozepostenequivalent.
@@ -371,16 +510,16 @@ with tab_eval:
                 st.error(st.session_state.eval_error)
 
             st.caption(
-                "Vul de strata in. Lege rijen worden genegeerd. "
+                "Vul de strata in. Rijen zonder naam worden genegeerd. "
                 "Kolommen ihr, ibr, car: H = hoog, M = midden, L = laag."
             )
 
             # Toon de invoertabel gekoppeld aan de stabiele gespaarde sessiestructuur en de callback.
-            eval_df_invoer = st.data_editor(
+            st.data_editor(
                 st.session_state.eval_df_saved,
                 width="stretch",
                 num_rows="dynamic",
-                key="eval_tabel",
+                key=f"eval_tabel_{st.session_state.eval_tabel_key}",
                 on_change=on_eval_tabel_change,
                 column_config={
                     "naam": st.column_config.TextColumn(
@@ -424,8 +563,8 @@ with tab_eval:
                         required=True,
                     ),
                     "materialiteit": st.column_config.TextColumn(
-                        "materialiteit",
-                        help="Materialiteit voor dit stratum (laag + hoog samen).",
+                        "materialiteit laag",
+                        help="Materialiteit voor het laagstratum.",
                     ),
                 },
             )
@@ -532,14 +671,46 @@ with tab_eval:
                     "Vul minimaal één stratum met waarde_laag, n_laag en k_laag in."
                 )
             else:
-                # Valideer of de foutenomvang (k_laag) de getrokken steekproefomvang (n_laag) niet overschrijdt.
-                te_veel_fouten = df_clean[df_clean["k_laag"] > df_clean["n_laag"]]
-                if not te_veel_fouten.empty:
-                    namen = ", ".join(te_veel_fouten["naam"].tolist())
-                    st.session_state.eval_error = f"Aantal fouten (k_laag) mag niet groter zijn dan de steekproefomvang (n_laag) bij stratum: {namen}."
-
-                    # Schakel de actieve subtab-index over naar het resultatenvenster om de foutboodschap te tonen.
-                    st.session_state.eval_subtab_index = 1
+                # Valideer kolominvoer: negatieve waarden en andere grenzen.
+                if (df_clean["waarde_laag"] < 0).any():
+                    namen = ", ".join(df_clean.loc[df_clean["waarde_laag"] < 0, "naam"])
+                    st.error(f"waarde_laag is negatief bij: {namen}.")
+                    st.stop()
+                if (df_clean["n_laag"] < 0).any():
+                    namen = ", ".join(df_clean.loc[df_clean["n_laag"] < 0, "naam"])
+                    st.error(f"n_laag is negatief bij: {namen}.")
+                    st.stop()
+                if (df_clean["k_laag"] < 0).any():
+                    namen = ", ".join(df_clean.loc[df_clean["k_laag"] < 0, "naam"])
+                    st.error(f"k_laag is negatief bij: {namen}.")
+                    st.stop()
+                if (df_clean["k_laag"] > df_clean["n_laag"]).any():
+                    mask = df_clean["k_laag"] > df_clean["n_laag"]
+                    namen = ", ".join(df_clean.loc[mask, "naam"])
+                    st.error(f"k_laag mag niet groter zijn dan n_laag bij: {namen}.")
+                    st.stop()
+                if (df_clean["waarde_hoog"] < 0).any():
+                    namen = ", ".join(df_clean.loc[df_clean["waarde_hoog"] < 0, "naam"])
+                    st.error(f"waarde_hoog is negatief bij: {namen}.")
+                    st.stop()
+                _fout_hoog = df_clean["fout_hoog"].fillna(0)
+                if (_fout_hoog < 0).any():
+                    namen = ", ".join(df_clean.loc[_fout_hoog < 0, "naam"])
+                    st.error(f"fout_hoog is negatief bij: {namen}.")
+                    st.stop()
+                if (_fout_hoog > df_clean["waarde_hoog"]).any():
+                    mask = _fout_hoog > df_clean["waarde_hoog"]
+                    namen = ", ".join(df_clean.loc[mask, "naam"])
+                    st.error(f"fout_hoog is groter dan waarde_hoog bij: {namen}.")
+                    st.stop()
+                _mat = df_clean["materialiteit"].fillna(0)
+                if ((_mat <= 0) | (_mat >= 1)).any():
+                    mask = (_mat <= 0) | (_mat >= 1)
+                    namen = ", ".join(df_clean.loc[mask, "naam"])
+                    st.error(
+                        f"materialiteit moet een fractie in (0, 1) zijn bij: {namen}."
+                    )
+                    st.stop()
                 else:
                     try:
                         # Bereken de geconvolueerde resultaten via de rekenmotor.
@@ -561,7 +732,7 @@ with tab_eval:
         # Herstart de scriptuitvoering om de tab-wissel visueel door te voeren.
         st.rerun()
 
-# Configureer het fourth tabblad voor het plannen en live optimaliseren van gestratificeerde steekproeven.
+# Configureer het vierde tabblad voor het plannen en live optimaliseren van gestratificeerde steekproeven.
 with tab_plan:
     col_inst, col_hoofd = st.columns([1, 3])
 
@@ -660,12 +831,15 @@ with tab_plan:
             "De grijze velden (rechts) worden live ingevuld."
         )
 
+        if st.session_state.plan_error:
+            st.error(st.session_state.plan_error)
+
         # Toon de planningstabel gekoppeld aan de stabiele opgeslagen planningstructuur en de callback.
-        plan_tabel_weergave = st.data_editor(
+        st.data_editor(
             st.session_state.plan_tabel,
             width="stretch",
             num_rows="dynamic",
-            key="plan_tabel_editor",
+            key=f"plan_tabel_{st.session_state.plan_tabel_key}",
             on_change=on_plan_tabel_change,
             disabled=["n_laag", "n_laag_extra", "n_laag_tot"],
             column_config={
@@ -677,7 +851,7 @@ with tab_plan:
                     help="Totale geldswaarde van het laagstratum.",
                 ),
                 "verwachte_foutfractie": st.column_config.TextColumn(
-                    "verwachte foutfractie (laag)",
+                    "verwachte foutfractie laag",
                     help="De verwachte foutfractie binnen het laagstratum.",
                 ),
                 "ihr": st.column_config.SelectboxColumn(
@@ -711,8 +885,8 @@ with tab_plan:
                     help="Totaal foutbedrag van het hoogstratum.",
                 ),
                 "materialiteit": st.column_config.TextColumn(
-                    "materialiteit",
-                    help="Materialiteit voor dit stratum (laag + hoog samen). Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro\u2019s (bijv. 736.000.000).",
+                    "materialiteit laag",
+                    help="Materialiteit voor het laagstratum. Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro\u2019s (bijv. 736.000.000).",
                 ),
                 "n_laag": st.column_config.NumberColumn(
                     "n_laag",
@@ -783,6 +957,14 @@ with tab_plan:
                 ibr=lambda d: d["ibr"].str.upper(),
                 car=lambda d: d["car"].str.upper(),
                 kosten=lambda d: d["kosten"].fillna(1.0),  # <--- DEZE REGEL IS CRUCIAAL
+                materialiteit=lambda d: d.apply(
+                    lambda row: (
+                        row["materialiteit"] / row["waarde_populatie"]
+                        if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
+                        else row["materialiteit"]
+                    ),
+                    axis=1,
+                ),
             )
         )
 
@@ -809,6 +991,51 @@ with tab_plan:
             )
             st.stop()
 
+        # Valideer kolominvoer: negatieve waarden en andere grenzen.
+        _mask_neg_wl = df_clean["waarde_laag"] < 0
+        if _mask_neg_wl.any():
+            st.error(
+                f"waarde_laag is negatief bij: {', '.join(df_clean.loc[_mask_neg_wl, 'naam'])}."
+            )
+            st.stop()
+        _mask_vff = (df_clean["verwachte_foutfractie"] < 0) | (
+            df_clean["verwachte_foutfractie"] >= 1
+        )
+        if _mask_vff.any():
+            st.error(
+                f"verwachte_foutfractie moet in [0, 1) liggen bij: {', '.join(df_clean.loc[_mask_vff, 'naam'])}."
+            )
+            st.stop()
+        _mask_kosten = df_clean["kosten"] <= 0
+        if _mask_kosten.any():
+            st.error(
+                f"kosten moet groter zijn dan 0 bij: {', '.join(df_clean.loc[_mask_kosten, 'naam'])}."
+            )
+            st.stop()
+        _mask_neg_wh = df_clean["waarde_hoog"] < 0
+        if _mask_neg_wh.any():
+            st.error(
+                f"waarde_hoog is negatief bij: {', '.join(df_clean.loc[_mask_neg_wh, 'naam'])}."
+            )
+            st.stop()
+        _fout_hoog_plan = df_clean["fout_hoog"].fillna(0)
+        if (_fout_hoog_plan < 0).any():
+            st.error(
+                f"fout_hoog is negatief bij: {', '.join(df_clean.loc[_fout_hoog_plan < 0, 'naam'])}."
+            )
+            st.stop()
+        if (_fout_hoog_plan > df_clean["waarde_hoog"]).any():
+            st.error(
+                f"fout_hoog is groter dan waarde_hoog bij: {', '.join(df_clean.loc[_fout_hoog_plan > df_clean['waarde_hoog'], 'naam'])}."
+            )
+            st.stop()
+        _mask_mat = (df_clean["materialiteit"] <= 0) | (df_clean["materialiteit"] >= 1)
+        if _mask_mat.any():
+            st.error(
+                f"materialiteit moet na omrekening een fractie in (0, 1) zijn bij: {', '.join(df_clean.loc[_mask_mat, 'naam'])}."
+            )
+            st.stop()
+
         # Bereken de basisplanning op basis van de risico's en de invoerparameters.
         try:
             strata_init = plan_stratified_basis(df_clean, model=plan_model)
@@ -816,14 +1043,18 @@ with tab_plan:
             st.error(f"Fout bij basisplanning: {e}")
             st.stop()
 
-        init_fout = eval_stratified(
-            strata_init,
-            model=plan_model,
-            zekerheid=plan_conf,
-            methode="FFT samen",
-            granulariteit=int(plan_gran),
-            vergelijk=False,
-        )["max_fout_convolutie"]
+        try:
+            init_fout = eval_stratified(
+                strata_init,
+                model=plan_model,
+                zekerheid=plan_conf,
+                methode="FFT samen",
+                granulariteit=int(plan_gran),
+                vergelijk=False,
+            )["max_fout_convolutie"]
+        except ValueError as e:
+            st.error(f"Fout bij initiële evaluatie: {e}")
+            st.stop()
 
         # Vul de weergavetabel met de berekende basiswaarden.
         tabel_update = invoer_df.copy()

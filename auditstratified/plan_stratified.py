@@ -5,6 +5,9 @@ Hoofdfunctie is plan_stratified().
 
 __all__ = ["plan_stratified", "plan_stratified_basis", "vind_beste_strata_groep"]
 
+import math
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -89,6 +92,7 @@ def plan_stratified(
             "naam",
             "waarde_laag",
             "verwachte_foutfractie",
+            "ihr",
             "ibr",
             "car",
             "kosten",
@@ -105,6 +109,87 @@ def plan_stratified(
             raise ValueError(
                 f"Evaluatiefout: De volgende stratumnamen komen vaker dan één keer voor: {', '.join(dubbele)}"
             )
+
+        # Controleer op NaN/None-waarden in alle vereiste kolommen.
+        kolommen_met_nan = [
+            k for k in sorted(vereiste_kolommen) if steekproeven[k].isna().any()
+        ]
+        if kolommen_met_nan:
+            raise ValueError(
+                f"De volgende kolommen bevatten lege waarden (NaN): {', '.join(kolommen_met_nan)}"
+            )
+
+        # Controleer kolom 'naam' op lege strings.
+        if (steekproeven["naam"].str.strip() == "").any():
+            raise ValueError("Kolom 'naam' mag geen lege strings bevatten.")
+
+        # Controleer de numerieke kolommen op geldig dtype.
+        numerieke_kolommen = [
+            "waarde_laag",
+            "verwachte_foutfractie",
+            "kosten",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        ]
+        niet_numeriek = [
+            k
+            for k in numerieke_kolommen
+            if not pd.api.types.is_numeric_dtype(steekproeven[k])
+        ]
+        if niet_numeriek:
+            raise ValueError(
+                f"De volgende kolommen moeten numerieke waarden bevatten: {', '.join(niet_numeriek)}"
+            )
+
+        # Controleer waarde_laag: >= 0.
+        if (steekproeven["waarde_laag"] < 0).any():
+            raise ValueError("Kolom 'waarde_laag' mag geen negatieve waarden bevatten.")
+
+        # Controleer verwachte_foutfractie: in [0, 1).
+        if (steekproeven["verwachte_foutfractie"] < 0).any() or (
+            steekproeven["verwachte_foutfractie"] >= 1
+        ).any():
+            raise ValueError(
+                "Kolom 'verwachte_foutfractie' moet waarden bevatten in het interval [0, 1)."
+            )
+
+        # Controleer kosten: strikt positief (> 0).
+        if (steekproeven["kosten"] <= 0).any():
+            raise ValueError(
+                "Kolom 'kosten' moet strikt positieve waarden bevatten (groter dan 0)."
+            )
+
+        # Controleer waarde_hoog: >= 0.
+        if (steekproeven["waarde_hoog"] < 0).any():
+            raise ValueError("Kolom 'waarde_hoog' mag geen negatieve waarden bevatten.")
+
+        # Controleer fout_hoog: >= 0 én niet groter dan de bijbehorende waarde_hoog.
+        if (steekproeven["fout_hoog"] < 0).any():
+            raise ValueError("Kolom 'fout_hoog' mag geen negatieve waarden bevatten.")
+        if (steekproeven["fout_hoog"] > steekproeven["waarde_hoog"]).any():
+            raise ValueError(
+                "Kolom 'fout_hoog' mag de bijbehorende 'waarde_hoog' niet overschrijden."
+            )
+
+        # Controleer materialiteit (kolom): in het open interval (0, 1).
+        if (steekproeven["materialiteit"] <= 0).any() or (
+            steekproeven["materialiteit"] >= 1
+        ).any():
+            raise ValueError(
+                "Kolom 'materialiteit' moet waarden bevatten in het open interval (0, 1)."
+            )
+
+        # Controleer ihr, ibr, car: uitsluitend 'H', 'M' of 'L'.
+        geldige_risicos = {"H", "M", "L"}
+        for kolom in ["ihr", "ibr", "car"]:
+            ongeldig = ~steekproeven[kolom].isin(geldige_risicos)
+            if ongeldig.any():
+                ongeldige_waarden = steekproeven.loc[ongeldig, kolom].unique().tolist()
+                raise ValueError(
+                    f"Kolom '{kolom}' bevat ongeldige waarden: {ongeldige_waarden}. "
+                    "Toegestaan zijn uitsluitend 'H', 'M' en 'L'."
+                )
 
         # Valideer het model.
         assert model in ["binomiaal", "poisson"], (
@@ -146,14 +231,7 @@ def plan_stratified(
         assert isinstance(granulariteit, int), (
             "Granulariteit moet een geheel getal zijn. En positief bovendien."
         )
-        assert granulariteit >= 0, "Granulariteit moet >= 0 zijn. En geheel bovendien."
-
-        # Controleer op dubbele stratumnamen in de invoertabel.
-        if steekproeven["naam"].duplicated().any():
-            dubbele_naam = steekproeven[steekproeven["naam"].duplicated()]["naam"].iloc[
-                0
-            ]
-            raise ValueError(f"Namen komen vaker dan 1 keer voor: {dubbele_naam}")
+        assert granulariteit > 0, "Granulariteit moet > 0 zijn. En geheel bovendien."
 
         # Controleer op stratuminconsistentie waarbij de verwachte foutfractie
         # in een laagstratum >= de stratummaterialiteit.
@@ -203,6 +281,29 @@ def plan_stratified(
                 "Totale verwachte fout in de laagstrata plus fout in de hoogstrata "
                 "overschrijdt de algehele materialiteit."
             )
+
+        # Voorkom deling door nul bij extreme gewichtsverschillen tussen strata.
+        # Voer de granulariteitscontrole uit als er ten minste één geldig laagstratum is.
+        laag_strata = steekproeven[steekproeven["waarde_laag"] > 0]
+        if not laag_strata.empty:
+            min_waarde_laag = laag_strata["waarde_laag"].min()
+            totaal_waarde_laag = laag_strata["waarde_laag"].sum()
+
+            # Bereken de theoretische rasterstap van de FFT.
+            dx = totaal_waarde_laag / granulariteit
+
+            # Werp een fout op als de rasterstap groter is dan of gelijk is aan het kleinste stratum.
+            if dx >= min_waarde_laag:
+                # Bereken de minimaal benodigde granulariteit door naar boven af te ronden.
+                min_benodigde_gran = math.ceil(
+                    (totaal_waarde_laag / min_waarde_laag) * 10
+                )
+
+                raise ValueError(
+                    f"De granulariteit ({granulariteit}) is te laag ten opzichte van het kleinste "
+                    f"stratum (waarde: {min_waarde_laag}). De berekening zou hierdoor crashen. "
+                    f"Verhoog de granulariteit naar minimaal {min_benodigde_gran}."
+                )
 
     # Bereken de initiële basissteekproefomvang op basis van de invoerdata.
     strata = plan_stratified_basis(steekproeven, model=model)
@@ -363,7 +464,9 @@ def vind_beste_strata_groep(
         # Dit kan eigenlijk niet voorkomen.
         # Maar veiligheidshalve:
         # val terug op de analytische proxy (ook deze corrigeren we voor kosten).
-        print("We vallen terug op de analytische proxy.")
+        warnings.warn(
+            "We vallen terug op de analytische proxy.", RuntimeWarning, stacklevel=2
+        )
         veilige_n = np.maximum(huidige_strata["n_laag"], 1)
         proxy_onzekerheid = (
             huidige_strata["waarde_laag"] / np.sqrt(veilige_n)

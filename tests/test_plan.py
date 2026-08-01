@@ -192,7 +192,7 @@ def test_plan_zekerheid_invoer(basis_plan_invoer, foute_waarde, match_tekst):
     [
         (True, "boolean"),
         (100.5, "geheel getal"),
-        (-1, "Granulariteit moet >= 0"),
+        (-1, "Granulariteit moet > 0"),
     ],
 )
 def test_plan_granulariteit_invoer(basis_plan_invoer, foute_waarde, match_tekst):
@@ -338,6 +338,137 @@ def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum():
         assert resultaat["waarde_hoog"].iloc[0] == 100000.0, (
             f"waarde_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
         )
+
+
+@pytest.fixture
+def geldige_invoer():
+    """Minimale geldige invoer voor kolominhoudstests."""
+    return pd.DataFrame({
+        "naam": ["Stratum_A"],
+        "waarde_laag": [100000.0],
+        "verwachte_foutfractie": [0.01],
+        "ihr": ["H"],
+        "ibr": ["H"],
+        "car": ["H"],
+        "materialiteit": [0.05],
+        "fout_hoog": [0.0],
+        "waarde_hoog": [0.0],
+        "kosten": [1.0],
+    })
+
+
+def test_kolominhoud_nan_in_numerieke_kolom_wordt_geweigerd(geldige_invoer):
+    """NaN (float) in een numerieke kolom wordt geweigerd."""
+    geldige_invoer.loc[0, "waarde_laag"] = float("nan")
+    with pytest.raises(ValueError, match="lege waarden"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+@pytest.mark.parametrize("kolom", ["naam", "ihr", "ibr", "car"])
+def test_kolominhoud_none_in_tekstkolom_wordt_geweigerd(geldige_invoer, kolom):
+    """None in een tekstkolom wordt als lege waarde herkend en geweigerd."""
+    geldige_invoer.loc[0, kolom] = None
+    with pytest.raises(ValueError, match="lege waarden"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_lege_string_naam_wordt_geweigerd(geldige_invoer):
+    """Een lege string in kolom 'naam' wordt geweigerd."""
+    geldige_invoer.loc[0, "naam"] = ""
+    with pytest.raises(ValueError, match="lege strings"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_whitespace_naam_wordt_geweigerd(geldige_invoer):
+    """Een naam die alleen spaties bevat wordt als leeg beschouwd en geweigerd."""
+    geldige_invoer.loc[0, "naam"] = "   "
+    with pytest.raises(ValueError, match="lege strings"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_niet_numeriek_wordt_geweigerd(geldige_invoer):
+    """Een niet-numerieke waarde in een numerieke kolom wordt geweigerd."""
+    geldige_invoer["waarde_laag"] = geldige_invoer["waarde_laag"].astype(str)
+    with pytest.raises(ValueError, match="numerieke waarden"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_negatieve_waarde_laag_wordt_geweigerd(geldige_invoer):
+    """Negatieve waarde_laag wordt geweigerd."""
+    geldige_invoer.loc[0, "waarde_laag"] = -1.0
+    with pytest.raises(ValueError, match="waarde_laag"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+@pytest.mark.parametrize("waarde", [-0.01, 1.0, 1.5])
+def test_kolominhoud_verwachte_foutfractie_buiten_bereik(geldige_invoer, waarde):
+    """verwachte_foutfractie buiten [0, 1) wordt geweigerd."""
+    geldige_invoer.loc[0, "verwachte_foutfractie"] = waarde
+    with pytest.raises(ValueError, match="verwachte_foutfractie"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+@pytest.mark.parametrize("waarde", [0.0, -1.0])
+def test_kolominhoud_kosten_niet_positief_wordt_geweigerd(geldige_invoer, waarde):
+    """Kosten <= 0 wordt geweigerd."""
+    geldige_invoer.loc[0, "kosten"] = waarde
+    with pytest.raises(ValueError, match="kosten"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_negatieve_waarde_hoog_wordt_geweigerd(geldige_invoer):
+    """Negatieve waarde_hoog wordt geweigerd."""
+    geldige_invoer.loc[0, "waarde_hoog"] = -100.0
+    with pytest.raises(ValueError, match="waarde_hoog"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_negatieve_fout_hoog_wordt_geweigerd(geldige_invoer):
+    """Negatieve fout_hoog wordt geweigerd."""
+    geldige_invoer.loc[0, "fout_hoog"] = -1.0
+    with pytest.raises(ValueError, match="fout_hoog"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd(geldige_invoer):
+    """fout_hoog groter dan waarde_hoog wordt geweigerd."""
+    geldige_invoer.loc[0, "waarde_hoog"] = 1000.0
+    geldige_invoer.loc[0, "fout_hoog"] = 2000.0
+    with pytest.raises(ValueError, match="fout_hoog"):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+@pytest.mark.parametrize("waarde", [0.0, 1.0, -0.01, 1.5])
+def test_kolominhoud_materialiteit_kolom_buiten_bereik(geldige_invoer, waarde):
+    """Materialiteit-kolom buiten (0, 1) wordt geweigerd."""
+    geldige_invoer.loc[0, "materialiteit"] = waarde
+    with pytest.raises(ValueError, match="materialiteit"):
+        plan_stratified(geldige_invoer, materialiteit=0.5)
+
+
+@pytest.mark.parametrize("kolom", ["ihr", "ibr", "car"])
+def test_kolominhoud_ongeldig_risico_wordt_geweigerd(geldige_invoer, kolom):
+    """Een ongeldige risicowaarde in ihr, ibr of car wordt geweigerd."""
+    geldige_invoer.loc[0, kolom] = "X"
+    with pytest.raises(ValueError, match=kolom):
+        plan_stratified(geldige_invoer, materialiteit=0.05)
+
+
+def test_kolominhoud_ihr_ontbreekt_in_vereiste_kolommen():
+    """ihr moet als vereiste kolom worden herkend (voorheen ontbrekend in vereiste_kolommen)."""
+    zonder_ihr = pd.DataFrame({
+        "naam": ["Stratum_A"],
+        "waarde_laag": [100000.0],
+        "verwachte_foutfractie": [0.01],
+        "ibr": ["H"],
+        "car": ["H"],
+        "materialiteit": [0.05],
+        "fout_hoog": [0.0],
+        "waarde_hoog": [0.0],
+        "kosten": [1.0],
+    })
+    with pytest.raises(AssertionError, match="ihr"):
+        plan_stratified(zonder_ihr, materialiteit=0.05)
 
 
 def test_kosten_invloed_op_allocatie():
