@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from auditstratified.utils import (
+from auditstratified.utils import (  # pyrefly: ignore[missing-import]
     drawsneeded,
     foutloze_posten_equivalent,
     haro_nog_nodige_zekerheid,

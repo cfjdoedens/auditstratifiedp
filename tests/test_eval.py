@@ -3,7 +3,9 @@ import math
 import pandas as pd
 import pytest
 
-from auditstratified.eval_stratified import eval_stratified
+from auditstratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+    eval_stratified,
+)
 
 
 def test_eval_stratified_basis():
@@ -45,8 +47,8 @@ def test_eval_stratified_foutieve_invoer():
     # Maak een DataFrame met ontbrekende verplichte kolommen, zoals de naam en risico's.
     foute_data = pd.DataFrame({"waarde_laag": [100000.0], "n_laag": [60]})
 
-    # Controleer of de functie een AssertionError opwerpt zodra er kolommen missen.
-    with pytest.raises(AssertionError):
+    # Controleer of de functie een ValueError opwerpt zodra er kolommen missen.
+    with pytest.raises(ValueError):
         eval_stratified(foute_data)
 
 
@@ -279,7 +281,12 @@ def test_lnv_2023_wim_slot():
 
 
 def test_evaluatie_met_hoogstratum():
-    """Evaluatie met een 100%-getoetst topstratum inclusief redundantie."""
+    """Evaluatie met een 100%-getoetst topstratum inclusief redundantie.
+
+    materialiteit=0.05 betekent: 5% van de totale populatie (600.000) = 30.000 is
+    toegestane fout. Na aftrek van fout_hoog=10.000 resteert 20.000 voor het
+    laagstratum, dus materialiteit_laag = 20.000 / 500.000 = 0,04.
+    """
     test_top = pd.DataFrame({
         "naam": ["stratum_met_top"],
         "waarde_laag": [500000.0],
@@ -288,7 +295,7 @@ def test_evaluatie_met_hoogstratum():
         "ihr": ["H"],
         "ibr": ["H"],
         "car": ["H"],
-        "materialiteit": [0.01],
+        "materialiteit": [0.05],
         "waarde_hoog": [100000.0],
         "fout_hoog": [10000.0],
     })
@@ -326,16 +333,26 @@ def test_fft_vs_monte_carlo():
 
 
 def test_effect_hoogstratum_toevoeging():
-    """Controleer effect van toevoegen van posten uit het hoogstratum."""
+    """Controleer effect van toevoegen van posten uit het hoogstratum.
+
+    waarde_laag is bewust veel groter dan waarde_hoog zodat er bij beide scenario's
+    (fout_hoog=0 en fout_hoog=waarde_hoog) een positief materialiteitsbudget
+    overblijft voor het laagstratum.
+
+    materialiteit=0.2 van populatie 11.000 = 2.200.
+    Scenario a: materialiteit_laag = 2.200 / 10.000 = 0,22.
+    Scenario b: materialiteit_laag = (2.200 - 1.000) / 10.000 = 0,12.
+    Het verschil in max_fout_convolutie = fout_hoog_verschil / totaalgeld = 1.000 / 11.000.
+    """
     a = pd.DataFrame({
         "naam": ["x"],
-        "waarde_laag": [1000.0],
+        "waarde_laag": [10000.0],
         "n_laag": [300],
         "k_laag": [0.0],
         "ihr": ["H"],
         "ibr": ["H"],
         "car": ["H"],
-        "materialiteit": [0.01],
+        "materialiteit": [0.2],
         "waarde_hoog": [1000.0],
         "fout_hoog": [0.0],
     })
@@ -347,7 +364,7 @@ def test_effect_hoogstratum_toevoeging():
 
     assert ra["max_fout_convolutie"] < rb["max_fout_convolutie"]
 
-    verwacht_verschil = (1000.0 - 0.0) / (1000.0 + 1000.0)
+    verwacht_verschil = (1000.0 - 0.0) / (10000.0 + 1000.0)
     werkelijk_verschil = rb["max_fout_convolutie"] - ra["max_fout_convolutie"]
     assert math.isclose(werkelijk_verschil, verwacht_verschil, abs_tol=1e-3)
 
@@ -370,52 +387,52 @@ def get_geldige_steekproef():
 
 
 def test_invoercontrole_geen_dataframe():
-    with pytest.raises(AssertionError, match="DataFrame"):
+    with pytest.raises(TypeError, match="DataFrame"):
         eval_stratified("geen dataframe")
 
 
 def test_invoercontrole_ongeldig_model():
-    with pytest.raises(AssertionError, match="Model moet"):
+    with pytest.raises(ValueError, match="Model moet"):
         eval_stratified(get_geldige_steekproef(), model="frequentist")
 
 
 def test_invoercontrole_zekerheid_bool():
-    with pytest.raises(AssertionError, match="boolean"):
+    with pytest.raises(TypeError, match="boolean"):
         eval_stratified(get_geldige_steekproef(), zekerheid=True)
 
 
 def test_invoercontrole_zekerheid_geen_getal():
-    with pytest.raises(AssertionError, match="getal"):
+    with pytest.raises(TypeError, match="getal"):
         eval_stratified(get_geldige_steekproef(), zekerheid="0.95")
 
 
 def test_invoercontrole_zekerheid_negatief():
-    with pytest.raises(AssertionError, match="zekerheid moet >= 0"):
+    with pytest.raises(ValueError, match="segment"):
         eval_stratified(get_geldige_steekproef(), zekerheid=-0.1)
 
 
 def test_invoercontrole_zekerheid_te_groot():
-    with pytest.raises(AssertionError, match="zekerheid moet <= 1"):
+    with pytest.raises(ValueError, match="segment"):
         eval_stratified(get_geldige_steekproef(), zekerheid=1.5)
 
 
 def test_invoercontrole_ongeldige_methode():
-    with pytest.raises(AssertionError, match="ongeldige methode"):
+    with pytest.raises(ValueError, match="Ongeldige methode"):
         eval_stratified(get_geldige_steekproef(), methode="onbekende_methode")
 
 
 def test_invoercontrole_granulariteit_bool():
-    with pytest.raises(AssertionError, match="bool"):
+    with pytest.raises(TypeError, match="bool"):
         eval_stratified(get_geldige_steekproef(), granulariteit=True)
 
 
 def test_invoercontrole_granulariteit_geen_int():
-    with pytest.raises(AssertionError, match="geheel getal"):
+    with pytest.raises(TypeError, match="geheel getal"):
         eval_stratified(get_geldige_steekproef(), granulariteit=100.5)
 
 
 def test_invoercontrole_granulariteit_te_klein():
-    with pytest.raises(AssertionError, match=">= 1"):
+    with pytest.raises(ValueError, match=">= 1"):
         eval_stratified(get_geldige_steekproef(), granulariteit=0)
 
 
@@ -468,23 +485,23 @@ def test_granulariteit_voldoende_voor_extreem_gewichtsverschil():
 
 
 def test_invoercontrole_start_bool():
-    with pytest.raises(AssertionError, match="bool"):
+    with pytest.raises(TypeError, match="bool"):
         eval_stratified(get_geldige_steekproef(), start=True)
 
 
 def test_invoercontrole_start_geen_getal():
-    with pytest.raises(AssertionError, match="int of een float"):
+    with pytest.raises(TypeError, match="int of een float"):
         eval_stratified(get_geldige_steekproef(), start="1")
 
 
 def test_invoercontrole_vergelijk_geen_bool():
-    with pytest.raises(AssertionError, match="boolean"):
+    with pytest.raises(TypeError, match="boolean"):
         eval_stratified(get_geldige_steekproef(), vergelijk="ja")
 
 
 def test_invoercontrole_ontbrekende_kolom():
     slecht = get_geldige_steekproef().drop(columns=["k_laag"])
-    with pytest.raises(AssertionError, match="Ontbrekende kolommen"):
+    with pytest.raises(ValueError, match="Ontbrekende kolommen"):
         eval_stratified(slecht)
 
 
@@ -659,6 +676,51 @@ def test_eval_kolominhoud_materialiteit_kolom_buiten_bereik(waarde):
         eval_stratified(data)
 
 
+def test_eval_cross_constraint_materialiteit_te_laag_voor_fout_hoog():
+    """materialiteit * waarde_populatie <= fout_hoog geeft een ValueError.
+
+    waarde_laag=1000, waarde_hoog=1000, fout_hoog=100, materialiteit=0.05:
+    0.05 * 2000 - 100 = 100 - 100 = 0 → budget is nul, wordt geweigerd.
+    """
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_hoog"] = 1000.0
+    data.loc[0, "fout_hoog"] = 100.0
+    data.loc[0, "materialiteit"] = 0.05
+    with pytest.raises(ValueError, match="geen foutmarge"):
+        eval_stratified(data)
+
+
+def test_eval_cross_constraint_materialiteit_strikt_kleiner_dan_fout_hoog_gedeeld_door_populatie():
+    """materialiteit < fout_hoog / waarde_populatie geeft een ValueError.
+
+    waarde_laag=500, waarde_hoog=500, fout_hoog=100:
+    fout_hoog / waarde_populatie = 100 / 1000 = 0,10.
+    materialiteit=0.05 < 0,10 → materialiteit_in_geld = 0.05 * 1000 - 100 = -50 < 0 → ValueError.
+    """
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_laag"] = 500.0
+    data.loc[0, "waarde_hoog"] = 500.0
+    data.loc[0, "fout_hoog"] = 100.0
+    data.loc[0, "materialiteit"] = 0.05  # < 100/1000 = 0.10
+    with pytest.raises(ValueError, match="geen foutmarge"):
+        eval_stratified(data)
+
+
+def test_eval_cross_constraint_materialiteit_laag_groter_dan_1():
+    """Materialiteit zo hoog dat materialiteit_laag >= 1 geeft een ValueError (geen AssertionError).
+
+    waarde_laag=1000, waarde_hoog=10000, fout_hoog=0, materialiteit=0.9:
+    materialiteit_in_geld = 0.9 * 11000 = 9900 > 0 (passeert cross-constraint),
+    maar materialiteit_laag = 9900 / 1000 = 9.9 >= 1 → ValueError.
+    """
+    data = get_geldige_steekproef()
+    data.loc[0, "waarde_hoog"] = 10000.0
+    data.loc[0, "fout_hoog"] = 0.0
+    data.loc[0, "materialiteit"] = 0.9
+    with pytest.raises(ValueError, match="laagstratum"):
+        eval_stratified(data)
+
+
 @pytest.mark.parametrize("kolom", ["ihr", "ibr", "car"])
 def test_eval_kolominhoud_ongeldig_risico_wordt_geweigerd(kolom):
     """Een ongeldige risicowaarde in ihr, ibr of car wordt geweigerd."""
@@ -669,11 +731,14 @@ def test_eval_kolominhoud_ongeldig_risico_wordt_geweigerd(kolom):
 
 
 def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
-    """De kolom 'materialiteit' heeft geen invloed op de verwerking van het hoogstratum.
+    """De kolom 'materialiteit' beïnvloedt fout_hoog en waarde_hoog in de uitvoer niet.
 
-    fout_hoog en waarde_hoog worden ongewijzigd doorgegeven ongeacht de waarde
-    van de 'materialiteit'-kolom. Dit bewijst dat de kolom exclusief op het
-    laagstratum van toepassing is.
+    Hoewel 'materialiteit' nu op laag+hoog samen slaat, worden fout_hoog en
+    waarde_hoog als invoerkolommen ongewijzigd doorgegeven in het uitvoer-DataFrame,
+    ongeacht de waarde van 'materialiteit'.
+
+    Beide materialiteit-waarden (0,05 en 0,10) zijn geldig:
+    fout_hoog/waarde_populatie = 5.000/150.000 ≈ 0,033, dus de grens is 0,05.
     """
     basis = dict(
         naam=["Stratum_A"],
@@ -687,7 +752,7 @@ def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
         waarde_hoog=[50000.0],
     )
 
-    for mat_kolom in [0.02, 0.10]:
+    for mat_kolom in [0.05, 0.10]:
         resultaat = eval_stratified(
             pd.DataFrame({**basis, "materialiteit": [mat_kolom]}),
             vergelijk=False,

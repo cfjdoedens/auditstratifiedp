@@ -33,9 +33,14 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 
 ## Ontwerpkeuzes
 
-**assert vs. ValueError:**
-- `assert` voor API-contractchecks (verkeerde aanroep door programmeur): `model`, `zekerheid`, `methode`, `granulariteit`, `start`, `vergelijk`, type van `steekproeven`, aanwezigheid van vereiste kolommen
-- `raise ValueError` voor gebruikersinvoerfouten: leeg DataFrame, dubbele stratumnamen, verwachte fout te hoog, bekende fout te hoog, ongeldige kolominhoud
+**assert vs. TypeError/ValueError:**
+
+`eval_stratified` gebruikt **geen asserts meer** voor invoervalidatie — alle checks gooien nu `TypeError` of `ValueError`. Dit is bewust: `app.py` vangt `ValueError` op in `try/except`-blokken, en `assert` kan worden uitgeschakeld met `python -O`. Voorkeur voor nieuwe code: gebruik altijd expliciete exceptions.
+
+- `raise TypeError` voor verkeerd type argument: `steekproeven` geen DataFrame, `zekerheid`/`granulariteit`/`start`/`vergelijk` verkeerd type
+- `raise ValueError` voor verkeerde waarden — zowel API-parameters (`model`, `zekerheid`, `methode`, `granulariteit`) als gebruikersinvoer (leeg DataFrame, ontbrekende kolommen, dubbele stratumnamen, ongeldige kolominhoud)
+
+`plan_stratified` gebruikt **nog wel asserts** voor API-contractchecks (`model`, `zekerheid`, `granulariteit`, type van `steekproeven`, aanwezigheid van vereiste kolommen) en `raise ValueError` voor gebruikersinvoerfouten. Dit is historisch en verdient migratie naar het patroon van `eval_stratified`.
 
 **plan_stratified invoer:** De kolom `kosten` is verplicht (relatieve uitvoeringskosten per steek). Wordt echter in `plan_stratified_basis` automatisch op 1.0 gezet als hij ontbreekt — dit is bedoeld voor aanroep vanuit `analyseer_klimheuristiek`.
 
@@ -48,14 +53,14 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 - In `plan_stratified`: gebruikt als `allowed_defect_rate` in `drawsneeded()` voor de basissteekproefomvang.
 - In `eval_stratified`: gebruikt in `foutloze_posten_equivalent()` om `extra_foutloze_posten` te berekenen (HARo-risico-correctie op `n_calc`).
 - Het hoogstratum wordt volledig bepaald door `fout_hoog` en `waarde_hoog`, onafhankelijk van de `materialiteit`-kolom.
-- In `app.py`: de helptekst zegt "Materialiteit voor het laagstratum." (was eerder foutief "laag + hoog samen").
+- In `app.py`: de helptekst zegt "Totale materialiteit voor dit stratum. Opgevat als fractie als ≤ 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000)." — geldt voor zowel de plannings- als evaluatietab.
 
 ## Kolominhoudvalidatie in plan_stratified en eval_stratified
 
 Beide functies bevatten nu een uitgebreid validatieblok (in `INVOER_CONTROLE`), dat na de structuurchecks (kolomaanwezigheid, dubbele namen) wordt uitgevoerd:
 
 **Gedeeld (beide functies):**
-- NaN in alle vereiste kolommen → `ValueError`
+- NaN/None in alle vereiste kolommen (inclusief tekstkolommen `naam`, `ihr`, `ibr`, `car`) → `ValueError`
 - Lege of whitespace-only `naam` → `ValueError`
 - Niet-numeriek dtype voor numerieke kolommen → `ValueError`
 - `waarde_laag` < 0 → `ValueError`
@@ -64,10 +69,12 @@ Beide functies bevatten nu een uitgebreid validatieblok (in `INVOER_CONTROLE`), 
 - `fout_hoog` > `waarde_hoog` → `ValueError`
 - `materialiteit`-kolom niet in (0, 1) → `ValueError`
 - `ihr`, `ibr`, `car` niet in {"H", "M", "L"} → `ValueError`
+- Granulariteit te laag voor kleinste stratum (FFT-methoden): `dx = totaal_waarde_laag / granulariteit >= min_waarde_laag` → `ValueError` met minimaal benodigde granulariteit. Monte Carlo is vrijgesteld (gebruikt geen vast rooster).
 
 **Alleen plan_stratified:**
 - `verwachte_foutfractie` niet in [0, 1) → `ValueError`
 - `kosten` ≤ 0 → `ValueError`
+- `granulariteit` moet strikt positief zijn (`> 0`, niet `>= 0`)
 
 **Alleen eval_stratified:**
 - `n_laag` < 0 → `ValueError`
@@ -82,6 +89,24 @@ Beide functies bevatten nu een uitgebreid validatieblok (in `INVOER_CONTROLE`), 
 **Bugfixes bij implementatie:**
 - `ihr` ontbrak in `vereiste_kolommen` van `plan_stratified` — hersteld.
 - De `kosten`-defaultregel (`if "kosten" not in strata.columns: strata["kosten"] = 1.0`) was per ongeluk verwijderd uit `plan_stratified_basis` — hersteld.
+- NaN/None-check voor tekstkolommen ontbrak in `plan_stratified` — toegevoegd.
+- `assert granulariteit >= 0` was fout in `plan_stratified` (zou 0 doorlaten); gecorrigeerd naar `> 0`.
+- `print()` in `vind_beste_strata_groep` vervangen door `warnings.warn(..., RuntimeWarning, stacklevel=2)`.
+
+## Granulariteitscheck (FFT-crashpreventie)
+
+Zowel `plan_stratified` als `eval_stratified` bevatten een check die voorkomt dat het kleinste stratum "tussen wal en schip valt" in het FFT-rooster:
+
+```python
+dx = totaal_waarde_laag / granulariteit
+if dx >= min_waarde_laag:
+    min_benodigde_gran = math.ceil((totaal_waarde_laag / min_waarde_laag) * 10)
+    raise ValueError(...)
+```
+
+- Geldt alleen voor FFT-methoden (`"FFT samen"`, `"FFT paarsgewijs"`, `"direct"`).
+- Monte Carlo is vrijgesteld.
+- Verschilt van `valideer_granulariteit.py`: die checkt statistische fijnheid (Beta-verdeling); de crashcheck checkt roosterresolutie.
 
 ## Kolomvolgorde in de DataFrames (app.py)
 
@@ -93,22 +118,23 @@ De volgorde weerspiegelt de scope: laagstratum-kolommen links, hoogstratum recht
 **plan (LEGE_PLAN_DF):**
 `naam · waarde_laag · verwachte_foutfractie · ihr · ibr · car · materialiteit · kosten ‖ waarde_hoog · fout_hoog · n_laag · n_laag_extra · n_laag_tot`
 
-## Monetaire materialiteit in de planningstab
+## Monetaire materialiteit in de plannings- en evaluatietab
 
-De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldbedragen (> 1), conform dezelfde conventie als de globale materialiteitsparameter. Omrekening naar fractie vindt plaats in `df_clean` via `.assign(materialiteit=...)` door te delen door `waarde_populatie` als de waarde > 1 is.
-
-Voor de **evaluatietab** zijn alleen fracties bedoeld — geen monetaire omrekening.
+De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldbedragen (> 1) in **beide** tabs. Omrekening naar fractie vindt plaats in `df_clean` via `.assign(materialiteit=...)` door te delen door `waarde_populatie` als de waarde > 1 is. Dit geldt zowel voor de planningstab als de evaluatietab.
 
 ## Invoervalidatie in app.py (UX-niveau)
 
 **Evaluatietab — `on_eval_tabel_change` callback:**
-- Ongeldige waarden worden direct **weggepoetst** (cel teruggezet naar `""`) en `eval_error` wordt gezet.
-- Gevalideerde kolommen: `waarde_laag`, `n_laag`, `k_laag`, `waarde_hoog`, `fout_hoog` (negatief); `materialiteit` (buiten (0, 1)); `k_laag > n_laag`; `fout_hoog > waarde_hoog`.
-- Om de Streamlit data-editor te dwingen de gecorrigeerde data te tonen, wordt een **sleutel-teller** gebruikt: `eval_tabel_key` in `session_state`. Bij elke wegpoets wordt deze verhoogd; de data-editor gebruikt `key=f"eval_tabel_{st.session_state.eval_tabel_key}"` en de callback leest `st.session_state[f"eval_tabel_{st.session_state.eval_tabel_key}"]`.
+- Ongeldige waarden worden direct **weggepoetst** (cel terugzetten naar vorige geldige waarde) en `eval_error` wordt gezet met een beschrijvende foutmelding.
+- Gevalideerde kolommen: `waarde_laag`, `n_laag`, `k_laag`, `waarde_hoog`, `fout_hoog` (niet-parseerbaar of negatief); `materialiteit` (≤ 0, monetary values > 1 worden doorgelaten en pas bij submit omgerekend); cross-constraints `k_laag > n_laag` en `fout_hoog > waarde_hoog` (last-entered wordt weggepoetst).
+- Bij wegpoetsen wordt **de vorige geldige waarde hersteld** (niet leeggemaakt): `df` is al een kopie van de vorige opgeslagen staat, dus niet overschrijven = herstellen.
+- Sleutel-teller `eval_tabel_key` dwingt Streamlit de data-editor te herladen: `key=f"eval_tabel_{st.session_state.eval_tabel_key}"`.
 
-**Planningstab — `if start_knop:` block:**
-- Inline `st.error()` + `st.stop()` na het bouwen van `df_clean` (niet via geneste helperfunctie, want `st.stop()` propageert niet betrouwbaar vanuit geneste functies).
-- Gevalideerde kolommen: `waarde_laag`, `verwachte_foutfractie`, `kosten`, `waarde_hoog`, `fout_hoog`, `materialiteit` (na omrekening).
+**Planningstab — `on_plan_tabel_change` callback:**
+- Zelfde wegpoets-logica als evaluatietab, met `plan_tabel_key` en `plan_error`.
+- Gevalideerde kolommen: `waarde_laag`, `waarde_hoog`, `fout_hoog` (niet-parseerbaar of negatief); `verwachte_foutfractie` (niet in [0, 1)); `kosten` (≤ 0); `materialiteit` (≤ 0); cross-constraint `fout_hoog > waarde_hoog`.
+- Submit-validatie (`if start_knop:`) blijft als vangnet (bijv. voor geplakte data die de callback omzeilt).
+- Directe aanroepen van `eval_stratified` vanuit `app.py` (buiten `plan_stratified`) zijn afgevangen met `try/except ValueError` + `st.error()` + `st.stop()`.
 
 ## Tests draaien
 
@@ -116,7 +142,9 @@ Voor de **evaluatietab** zijn alleen fracties bedoeld — geen monetaire omreken
 .venv/bin/python -m pytest
 ```
 
-153 tests; alle groen. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+156 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+
+**Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
 
 ## App starten
 

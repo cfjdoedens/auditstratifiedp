@@ -113,22 +113,26 @@ def plot_kanskromme(res: dict) -> plt.Figure:
     ax.xaxis.set_major_formatter(plt.FuncFormatter(nl_format))
     ax.set_xlabel("fout in euro\u2019s", fontsize=12)
     ax.set_ylabel("relatieve kansdichtheid", fontsize=12)
-    ax.set_title(
-        "kanskromme van de geprojecteerde fout", fontweight="bold", fontsize=13
-    )
     ax.set_yticks([])
+
+    # --- NIEUW: Opmaak Titels ---
+    fig.suptitle(
+        "kanskromme van de geprojecteerde fout", fontweight="bold", fontsize=14
+    )
 
     subtitle = (
         f"blauwe lijn = meest waarschijnlijke fout  |  "
         f"rode lijn = maximale fout ({zekerheid_pct:.0f}% zekerheid)"
     )
-    ax.set_title(subtitle, fontsize=10, loc="left", pad=0)
-    ax.set_title(
-        "kanskromme van de geprojecteerde fout",
-        fontweight="bold",
-        fontsize=13,
-        loc="center",
-    )
+    ax.set_title(subtitle, fontsize=10, loc="center", pad=10)
+
+    # --- NIEUW: Schaal X-as ---
+    # Zoom in zodat de grafiek geen 'naald' wordt.
+    # We pakken de maximale fout * 2.5, maar we maximeren dit op de omvang van de totale populatie.
+    x_lim_max = min(max_val * 2.5, totaal_geld)
+    if x_lim_max <= 0:
+        x_lim_max = totaal_geld if totaal_geld > 0 else 1.0
+    ax.set_xlim(0, x_lim_max)
 
     ax.grid(axis="x", linestyle=":", alpha=0.4)
     ax.spines[["top", "right", "left"]].set_visible(False)

@@ -10,10 +10,11 @@ import math
 import numpy as np
 import pandas as pd
 from scipy.fft import fft, ifft, next_fast_len
+from scipy.signal import fftconvolve
 from scipy.stats import beta, gamma, gaussian_kde
 
 # Zorg ervoor dat de helperfunctie beschikbaar is.
-from auditstratified.utils import foutloze_posten_equivalent
+from .utils import foutloze_posten_equivalent
 
 
 def eval_stratified(
@@ -77,14 +78,33 @@ def eval_stratified(
     Returns
     -------
     dict
-        Dictionary met onder andere de sleutels ``kanskromme``,
-        ``max_fout_convolutie``, ``populatie_totaal`` en ``steekproeven``.
+        Dictionary met onder andere de sleutels `kanskromme`,
+        `max_fout_convolutie`, `populatie_totaal` en `steekproeven`.
 
     Raises
     ------
+    TypeError
+        Als `steekproeven` geen pandas DataFrame is.
+        Als `zekerheid`, `granulariteit` of `start` niet van het vereiste type is,
+        of als `vergelijk` geen boolean is.
     ValueError
-        Als ``steekproeven`` leeg is (nul rijen).
-        Als er dubbele stratumnamen worden opgegeven.
+        Als `steekproeven`
+        - leeg is,
+        - vereiste kolommen mist,
+        - dubbele stratumnamen bevat,
+        - NaN-waarden heeft
+        - ongeldige kolominhoud heeft
+          . negatieve waarden
+          . `k_laag` > `n_laag`
+          . `fout_hoog` > `waarde_hoog`
+          . `materialiteit` buiten (0, 1),
+          . `ihr`/`ibr`/`car` niet in {'H', 'M', 'L'}
+          . fout_hoog >= materialiteit × waarde_populatie
+        Als `model` niet `'binomiaal'` of `'poisson'` is.
+        Als `zekerheid` buiten [0, 1] ligt.
+        Als `methode` geen geldige methode is.
+        Als `granulariteit` kleiner is dan 1, of te laag voor het kleinste laagstratum
+        (alleen FFT-methoden).
     """
     INVOER_CONTROLE = True  # Niet op False zetten, tenzij je de controles,
     # met name de controle op dubbele stratumnamen,
@@ -93,9 +113,8 @@ def eval_stratified(
     # Controleer de waarden van de parameters van de functie.
     if INVOER_CONTROLE:
         # Valideer steekproeven.
-        assert isinstance(steekproeven, pd.DataFrame), (
-            "steekproeven moet een pandas DataFrame zijn."
-        )
+        if not isinstance(steekproeven, pd.DataFrame):
+            raise TypeError("steekproeven moet een pandas DataFrame zijn.")
         if len(steekproeven) == 0:
             raise ValueError("steekproeven is leeg: moet tenminste 1 stratum bevatten.")
 
@@ -108,12 +127,13 @@ def eval_stratified(
             "ihr",
             "ibr",
             "car",
-            "materialiteit",
             "waarde_hoog",
             "fout_hoog",
+            "materialiteit",
         }
         ontbrekend = vereiste_kolommen - set(steekproeven.columns)
-        assert not ontbrekend, f"Ontbrekende kolommen: {', '.join(sorted(ontbrekend))}"
+        if ontbrekend:
+            raise ValueError(f"Ontbrekende kolommen: {', '.join(sorted(ontbrekend))}")
 
         # Controle op dubbele stratumnamen.
         if steekproeven["naam"].duplicated().any():
@@ -203,45 +223,49 @@ def eval_stratified(
                     "Toegestaan zijn uitsluitend 'H', 'M' en 'L'."
                 )
 
-        # Valideer het model.
-        assert model in ["binomiaal", "poisson"], (
-            "Model moet 'binomiaal' of 'poisson' zijn."
+        # Controleer cross-constraint: materialiteit * (waarde_laag + waarde_hoog) > fout_hoog.
+        waarde_populatie_check = (
+            steekproeven["waarde_laag"] + steekproeven["waarde_hoog"]
         )
+        afgekeurde_strata_check = steekproeven.loc[
+            steekproeven["materialiteit"] * waarde_populatie_check
+            <= steekproeven["fout_hoog"],
+            "naam",
+        ].tolist()
+        if afgekeurde_strata_check:
+            raise ValueError(
+                f"De reeds gevonden fout in het hoogstratum overschrijdt (of evenaart) de toegestane "
+                f"totale materialiteit. Er is geen foutmarge meer over voor het laagstratum. "
+                f"Fout bij: {', '.join(afgekeurde_strata_check)}."
+            )
+
+        # Valideer het model.
+        if model not in ["binomiaal", "poisson"]:
+            raise ValueError("Model moet 'binomiaal' of 'poisson' zijn.")
 
         # Valideer de zekerheid.
-        assert not isinstance(zekerheid, bool), (
-            "zekerheid mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
-        )
-        assert isinstance(zekerheid, (int, float)), (
-            "zekerheid moet een getal zijn. (Namelijk, een element van het segment [0, 1].)"
-        )
-        assert zekerheid >= 0, (
-            "zekerheid moet >= 0 zijn. (En liggen op het segment [0, 1].)"
-        )
-        assert zekerheid <= 1, (
-            "zekerheid moet <= 1 zijn. (En liggen op het segment [0, 1].)"
-        )
+        if isinstance(zekerheid, bool) or not isinstance(zekerheid, (int, float)):
+            raise TypeError(
+                "zekerheid mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
+            )
+        if not (0 <= zekerheid <= 1):
+            raise ValueError("zekerheid moet op het segment [0, 1] liggen.")
 
         # Valideer de methode.
-        assert methode in ["FFT paarsgewijs", "FFT samen", "direct", "Monte Carlo"], (
-            f"ongeldige methode: {methode!r}"
-        )
+        if methode not in ["FFT paarsgewijs", "FFT samen", "direct", "Monte Carlo"]:
+            raise ValueError(f"Ongeldige methode: {methode!r}")
 
         # Bepaal dynamische verstekwaarde voor granulariteit.
         if granulariteit is None:
             granulariteit = int(1e7) if methode == "Monte Carlo" else int(1e5)
 
         # Valideer de granulariteit.
-        assert not isinstance(granulariteit, bool), (
-            "granulariteit mag geen bool zijn, maar moet een geheel getal >= 1 zijn."
-        )
-        assert isinstance(granulariteit, int), (
-            "granulariteit moet een geheel getal zijn. En >= 1."
-        )
-        assert granulariteit >= 1, "granulariteit moet een geheel getal >= 1 zijn."
+        if isinstance(granulariteit, bool) or not isinstance(granulariteit, int):
+            raise TypeError("granulariteit moet een geheel getal zijn (geen boolean).")
+        if granulariteit < 1:
+            raise ValueError("granulariteit moet een geheel getal >= 1 zijn.")
 
         # Voorkom deling door nul bij extreme gewichtsverschillen tussen strata (FFT-methoden).
-        # Monte Carlo gebruikt geen vast dx-rooster en is hiervan vrijgesteld.
         if methode != "Monte Carlo":
             laag_strata = steekproeven[steekproeven["waarde_laag"] > 0]
             if not laag_strata.empty:
@@ -259,13 +283,12 @@ def eval_stratified(
                     )
 
         # Valideer start.
-        assert not isinstance(start, bool), (
-            "start mag geen bool zijn, maar moet een getal zijn."
-        )
-        assert isinstance(start, (int, float)), "start moet een int of een float zijn."
+        if isinstance(start, bool) or not isinstance(start, (int, float)):
+            raise TypeError("start moet een int of een float zijn (geen boolean).")
 
         # Valideer vergelijk.
-        assert isinstance(vergelijk, bool), "vergelijk moet een boolean zijn."
+        if not isinstance(vergelijk, bool):
+            raise TypeError("vergelijk moet een boolean zijn.")
 
     # Bepaal totaal geldswaarde, inclusief het 100%-getoetste deel.
     totaalgeld_laag = steekproeven["waarde_laag"].sum()
@@ -280,13 +303,46 @@ def eval_stratified(
     t_uit["goed_hoog"] = t_uit["waarde_hoog"] - t_uit["fout_hoog"]
     t_uit["waarde_populatie"] = t_uit["waarde_laag"] + t_uit["waarde_hoog"]
 
-    # Bepaal het foutlozepostenequivalent (Noot: vereist de helper-functie).
-    t_uit["extra_foutloze_posten"] = t_uit.apply(
-        lambda row: foutloze_posten_equivalent(
-            row["ihr"], row["ibr"], row["car"], row["materialiteit"]
-        ),
-        axis=1,
-    )
+    # Wiskundig zuiver: haal de bekende fout_hoog van het totale materialiteitsbudget af.
+    t_uit["materialiteit_in_geld"] = (
+        t_uit["materialiteit"] * t_uit["waarde_populatie"]
+    ) - t_uit["fout_hoog"]
+
+    # Zet eerst de standaardwaarden voor alle rijen.
+    t_uit["materialiteit_laag"] = None
+    t_uit["extra_foutloze_posten"] = 0
+
+    # Maak een masker voor uitsluitend de rijen waar het laagstratum groter is dan 0.
+    masker = t_uit["waarde_laag"] > 0
+
+    # Voer de berekeningen alléén uit voor de rijen in het masker.
+    if masker.any():
+        t_uit.loc[masker, "materialiteit_laag"] = (
+            t_uit.loc[masker, "materialiteit_in_geld"]
+            / t_uit.loc[masker, "waarde_laag"]
+        )
+
+        # Controleer dat materialiteit_laag strikt kleiner is dan 1.
+        # Dit is een gebruikersfout (te hoge materialiteit t.o.v. de waarde_laag/waarde_hoog-verhouding),
+        # dus ValueError en geen AssertionError.
+        foute_strata = t_uit.loc[
+            masker & (t_uit["materialiteit_laag"] >= 1), "naam"
+        ].tolist()
+        if foute_strata:
+            raise ValueError(
+                f"Materialiteit voor het laagstratum mag niet >= 1 zijn. Fout bij: {', '.join(foute_strata)}."
+            )
+
+        # Apply de helperfunctie uitsluitend op de juiste rijen.
+        t_uit.loc[masker, "extra_foutloze_posten"] = t_uit.loc[masker].apply(
+            lambda row: foutloze_posten_equivalent(
+                row["ihr"],
+                row["ibr"],
+                row["car"],
+                row["materialiteit_laag"],
+            ),
+            axis=1,
+        )
 
     t_uit["toch_fouten"] = ~(
         (t_uit["ihr"] == "H") & (t_uit["ibr"] == "H") & (t_uit["car"] == "H")
@@ -557,8 +613,6 @@ def convolutie_fft(
 ):
     """Convolutie via paarsgewijze Fast Fourier Transformatie."""
     # Noot: de rekenstappen voor de assen zijn identiek aan de gelijktijdige methode.
-    # We vallen voor de schoonheid van code hier terug op Numpy's native convolve die dit regelt.
-
     if totaalgeld_laag < 0.01:
         frac = totaalgeld_fout_hoog / totaalgeld_algeheel
         return {
@@ -600,7 +654,7 @@ def convolutie_fft(
     if len(p_strata) > 0:
         p_totaal = p_strata[0]
         for p_next in p_strata[1:]:
-            p_totaal = np.convolve(p_totaal, p_next, mode="full")
+            p_totaal = fftconvolve(p_totaal, p_next, mode="full")
             p_totaal[(p_totaal < 0) & (np.abs(p_totaal) < 1e-12)] = 0
             p_totaal = p_totaal / np.sum(p_totaal)
 
@@ -639,7 +693,7 @@ def convolutie_direct(
     """
     Convolutie via directe, "naïeve" berekening, stap-voor-stap volgens
     de formele wiskundige definitie: P(Z=z) = Som(P(X=x) * P(Y=z-x)).
-    Hierbij wordt geen gebruik gemaakt van FFT of geoptimaliseerde convolutie-functies
+    Hierbij wordt geen gebruik gemaakt van FFT of geoptimaliseerde convolutiefuncties
     zoals numpy.convolve.
     """
     # Randgeval: geen statistische controle, alles integraal.

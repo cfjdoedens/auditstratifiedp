@@ -6,10 +6,42 @@ on:
       - 'v*' # Start de workflow wanneer een tag die begint met 'v' wordt gepusht.
 
 jobs:
+  # Eerst testen.
+  test:
+    name: Run tests before publishing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies and dev extras (includes pytest)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run pytest
+      run: python -m pytest
+
+
+  # Publish.
   deploy:
     name: Build and publish to PyPI
+    needs: test  # Wacht tot test groen is.
     runs-on: ubuntu-latest
-    
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/auditstratified
+
     # Vereist voor de beveiligde OIDC-koppeling met PyPI.
     permissions:
       id-token: write
@@ -23,7 +55,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.12"
 
     - name: Upgrade pip and install build tools
       run: |

@@ -11,17 +11,17 @@ import warnings
 import numpy as np
 import pandas as pd
 
-# Importeer de benodigde wiskundige rekenmotoren uit de andere pakket-bestanden.
-from auditstratified.eval_stratified import eval_stratified
-from auditstratified.utils import drawsneeded, haro_nog_nodige_zekerheid
+# Importeer de benodigde wiskundige rekenmotoren uit de andere pakketbestanden.
+from .eval_stratified import eval_stratified
+from .utils import drawsneeded, haro_nog_nodige_zekerheid
 
 
 def plan_stratified(
     steekproeven: pd.DataFrame,
     model: str = "binomiaal",
-    materialiteit: float = None,
     zekerheid: float = 0.95,
     granulariteit: int = 10000,
+    materialiteit: float = None,
 ) -> pd.DataFrame:
     """
     Plan de optimale steekproefverdeling.
@@ -57,22 +57,34 @@ def plan_stratified(
     Returns
     -------
     pd.DataFrame
-        Het invoer-DataFrame aangevuld met kolommen ``n_laag``, ``k_laag``,
-        ``n_basis``, ``kosten`` en ``waarde_populatie``.
-        Het attribuut ``geplande_max_fout_totaal`` bevat de bereikte convolutiefout.
+        Het invoer-DataFrame aangevuld met kolommen `n_laag`, `k_laag`,
+        `n_basis`, `kosten` en `waarde_populatie`.
+        Het attribuut `geplande_max_fout_totaal` bevat de bereikte convolutiefout.
 
     Raises
     ------
+    TypeError
+        Als `steekproeven` geen pandas DataFrame is.
+        Als `materialiteit`, `zekerheid` of `granulariteit` niet van het vereiste type is.
     ValueError
-
-        Als er dubbele stratumnamen worden opgegeven.
-        Als er strata zijn waar de verwachte foutfractie >= de materialiteit van dat stratum.
-        Als de totale bekende fout in de hoogstrata de algehele materialiteit overschrijdt.
-        Als de totale verwachte fout in de laagstrata de algehele materialiteit overschrijdt.
-        Als de totale bekende fout in de hoogstrata plus de verwachte fout
-        in de laagstrata samen de algehele materialiteit overschrijdt.
-
-
+        Als `steekproeven`
+        - leeg is,
+        - vereiste kolommen mist,
+        - dubbele stratumnamen bevat,
+        - NaN-waarden heeft
+        - ongeldige kolominhoud heeft:
+          . negatieve waarden
+          . `verwachte_foutfractie` buiten [0, 1)
+          . `kosten` ≤ 0
+          . `fout_hoog` > `waarde_hoog`
+          . `materialiteit` buiten (0, 1)
+          . `ihr`/`ibr`/`car` niet in {'H', 'M', 'L'}
+        Als `model` niet `'binomiaal'` of `'poisson'` is.
+        Als `materialiteit` of `zekerheid` buiten [0, 1] ligt, of `granulariteit` ≤ 0.
+        Als `granulariteit` te laag is voor het kleinste laagstratum (FFT-crash-preventie).
+        Als de bekende fout in een hoogstratum de stratum-materialiteit overschrijdt.
+        Als de verwachte foutfractie ≥ de omgerekende materialiteit van het laagstratum.
+        Als de totale bekende of verwachte fout de algehele materialiteit overschrijdt.
     """
     INVOER_CONTROLE = True  # Niet op False zetten, tenzij je de controles,
     # met name, die ValueErrors kunnen geven,
@@ -81,9 +93,8 @@ def plan_stratified(
     # Controleer de waarden van de parameters van de functie.
     if INVOER_CONTROLE:
         # Valideer steekproeven.
-        assert isinstance(steekproeven, pd.DataFrame), (
-            "steekproeven moet een pandas DataFrame zijn."
-        )
+        if not isinstance(steekproeven, pd.DataFrame):
+            raise TypeError("steekproeven moet een pandas DataFrame zijn.")
         if len(steekproeven) == 0:
             raise ValueError("steekproeven is leeg: moet tenminste 1 stratum bevatten.")
 
@@ -101,7 +112,8 @@ def plan_stratified(
             "materialiteit",
         }
         ontbrekend = vereiste_kolommen - set(steekproeven.columns)
-        assert not ontbrekend, f"Ontbrekende kolommen: {', '.join(sorted(ontbrekend))}"
+        if ontbrekend:
+            raise ValueError(f"Ontbrekende kolommen: {', '.join(sorted(ontbrekend))}")
 
         # Controle op dubbele stratumnamen.
         if steekproeven["naam"].duplicated().any():
@@ -192,57 +204,90 @@ def plan_stratified(
                 )
 
         # Valideer het model.
-        assert model in ["binomiaal", "poisson"], (
-            "Model moet 'binomiaal' of 'poisson' zijn."
-        )
+        if model not in ["binomiaal", "poisson"]:
+            raise ValueError("Model moet 'binomiaal' of 'poisson' zijn.")
 
         # Valideer de materialiteit.
-        assert not isinstance(materialiteit, bool), (
-            "Materialiteit mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
-        )
-        assert isinstance(materialiteit, (int, float)), (
-            "Materialiteit moet een getal zijn. (Namelijk, een element van het segment [0, 1].)"
-        )
-        assert materialiteit >= 0, (
-            "Materialiteit moet >= 0 zijn. (En liggen op het segment [0, 1].)"
-        )
-        assert materialiteit <= 1, (
-            "Materialiteit moet <= 1 zijn. (En liggen op het segment [0, 1].)"
-        )
+        if isinstance(materialiteit, bool) or not isinstance(
+            materialiteit, (int, float)
+        ):
+            raise TypeError(
+                "Materialiteit mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
+            )
+        if materialiteit < 0:
+            raise ValueError(
+                "Materialiteit moet >= 0 zijn. (En liggen op het segment [0, 1].)"
+            )
+        if materialiteit > 1:
+            raise ValueError(
+                "Materialiteit moet <= 1 zijn. (En liggen op het segment [0, 1].)"
+            )
 
         # Valideer de zekerheid.
-        assert not isinstance(zekerheid, bool), (
-            "Zekerheid mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
-        )
-        assert isinstance(zekerheid, (int, float)), (
-            "Zekerheid moet een getal zijn. (Namelijk, een element van het segment [0, 1].)"
-        )
-        assert zekerheid >= 0, (
-            "Zekerheid moet >= 0 zijn. (En liggen op het segment [0, 1].)"
-        )
-        assert zekerheid <= 1, (
-            "Zekerheid moet <= 1 zijn. (En liggen op het segment [0, 1].)"
-        )
+        if isinstance(zekerheid, bool) or not isinstance(zekerheid, (int, float)):
+            raise TypeError(
+                "Zekerheid mag geen boolean zijn, maar moet een getal van 0 tot 1 zijn."
+            )
+        if zekerheid < 0:
+            raise ValueError(
+                "Zekerheid moet >= 0 zijn. (En liggen op het segment [0, 1].)"
+            )
+        if zekerheid > 1:
+            raise ValueError(
+                "Zekerheid moet <= 1 zijn. (En liggen op het segment [0, 1].)"
+            )
 
         # Valideer de granulariteit.
-        assert not isinstance(granulariteit, bool), (
-            "Granulariteit mag geen boolean zijn, maar moet een geheel, positief getal zijn."
-        )
-        assert isinstance(granulariteit, int), (
-            "Granulariteit moet een geheel getal zijn. En positief bovendien."
-        )
-        assert granulariteit > 0, "Granulariteit moet > 0 zijn. En geheel bovendien."
+        if isinstance(granulariteit, bool) or not isinstance(granulariteit, int):
+            raise TypeError(
+                "Granulariteit mag geen boolean zijn, maar moet een geheel getal zijn."
+            )
+        if granulariteit <= 0:
+            raise ValueError("Granulariteit moet > 0 zijn. En geheel bovendien.")
 
-        # Controleer op stratuminconsistentie waarbij de verwachte foutfractie
-        # in een laagstratum >= de stratummaterialiteit.
-        probleem_strata = steekproeven.loc[
-            steekproeven["verwachte_foutfractie"] >= steekproeven["materialiteit"],
+        # Controleer cross-constraint: materialiteit * (waarde_laag + waarde_hoog) > fout_hoog.
+        # Er moet na aftrek van de reeds bekende fout_hoog een positief budget overblijven voor het laagstratum.
+        waarde_populatie_check = (
+            steekproeven["waarde_laag"] + steekproeven["waarde_hoog"]
+        )
+        afgekeurde_strata_check = steekproeven.loc[
+            steekproeven["materialiteit"] * waarde_populatie_check
+            <= steekproeven["fout_hoog"],
             "naam",
         ].tolist()
-        if probleem_strata:
+        if afgekeurde_strata_check:
             raise ValueError(
-                f"Verwachte foutfractie >= de stratummaterialiteit in: {', '.join(probleem_strata)}"
+                f"De reeds gevonden fout in het hoogstratum overschrijdt (of evenaart) de toegestane "
+                f"stratum-materialiteit. Er is geen foutmarge meer over voor het laagstratum. "
+                f"Fout bij: {', '.join(afgekeurde_strata_check)}."
             )
+
+        # Controleer op stratuminconsistentie waarbij de verwachte foutfractie
+        # in het laagstratum >= de omgerekende materialiteit van het laagstratum.
+        mask_laag = steekproeven["waarde_laag"] > 0
+        if mask_laag.any():
+            materialiteit_laag_check = (
+                (
+                    steekproeven.loc[mask_laag, "materialiteit"]
+                    * waarde_populatie_check.loc[mask_laag]
+                )
+                - steekproeven.loc[mask_laag, "fout_hoog"]
+            ) / steekproeven.loc[mask_laag, "waarde_laag"]
+
+            probleem_strata = steekproeven.loc[
+                mask_laag
+                & (
+                    steekproeven.loc[mask_laag, "verwachte_foutfractie"]
+                    >= materialiteit_laag_check
+                ),
+                "naam",
+            ].tolist()
+
+            if probleem_strata:
+                raise ValueError(
+                    f"Verwachte foutfractie >= de omgerekende materialiteit van het laagstratum in: {', '.join(probleem_strata)}. "
+                    f"Verlaag de verwachte fout of verhoog de materialiteit."
+                )
 
         # Bereken de totale geldswaarde van de populatie en
         # de bekende fout in geld in de hoogstrata en de
@@ -375,27 +420,43 @@ def plan_stratified_basis(
     # Maak een kopie om waarschuwingen (SettingWithCopyWarning) van Pandas te voorkomen.
     strata = steekproeven.copy()
 
-    # Controleer of uitvoeringskosten zijn meegegeven; zo niet, hanteer een neutrale waarde van 1.0.
-    if "kosten" not in strata.columns:
-        strata["kosten"] = 1.0
+    strata["waarde_populatie"] = strata["waarde_laag"] + strata["waarde_hoog"]
 
-    # Bereken n_basis en neem de berekening van 'cert' inline op.
-    strata["n_basis"] = np.ceil(
-        strata.apply(
-            lambda row: drawsneeded(
-                posited_defect_rate=row["verwachte_foutfractie"],
-                allowed_defect_rate=row["materialiteit"],
-                cert=haro_nog_nodige_zekerheid(row["ihr"], row["ibr"], row["car"]),
-                distribution=dist_eng,
-            ),
-            axis=1,
+    # Wiskundig zuiver: bereken het daadwerkelijke foutbudget voor het laagstratum.
+    strata["materialiteit_in_geld"] = (
+        strata["materialiteit"] * strata["waarde_populatie"]
+    ) - strata["fout_hoog"]
+
+    strata["materialiteit_laag"] = None
+    strata["n_basis"] = 0
+
+    masker = strata["waarde_laag"] > 0
+
+    if masker.any():
+        strata.loc[masker, "materialiteit_laag"] = (
+            strata.loc[masker, "materialiteit_in_geld"]
+            / strata.loc[masker, "waarde_laag"]
         )
-    ).astype(int)
+
+        # Bereken n_basis uitsluitend op basis van de omgerekende materialiteit_laag.
+        strata.loc[masker, "n_basis"] = np.ceil(
+            strata.loc[masker].apply(
+                lambda row: drawsneeded(
+                    posited_defect_rate=row["verwachte_foutfractie"],
+                    allowed_defect_rate=row["materialiteit_laag"],
+                    cert=haro_nog_nodige_zekerheid(row["ihr"], row["ibr"], row["car"]),
+                    distribution=dist_eng,
+                ),
+                axis=1,
+            )
+        )
+
+    # Forceer de datatypes netjes naar integers.
+    strata["n_basis"] = strata["n_basis"].astype(int)
 
     # Initialiseer de startwaarden voor het klimalgoritme uit de basisomvang.
     strata["n_laag"] = strata["n_basis"]
     strata["k_laag"] = strata["n_laag"] * strata["verwachte_foutfractie"]
-    strata["waarde_populatie"] = strata["waarde_laag"] + strata["waarde_hoog"]
 
     return strata
 

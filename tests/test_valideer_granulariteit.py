@@ -6,18 +6,19 @@ import warnings
 import pandas as pd
 import pytest
 
-from auditstratified.valideer_granulariteit import _delta_i, valideer_granulariteit
+from auditstratified.valideer_granulariteit import (  # pyrefly: ignore[missing-import]
+    _delta_i,
+    valideer_granulariteit,
+)
 
 
 def _basis_strata():
-    return pd.DataFrame(
-        {
-            "naam": ["StratumA", "StratumB"],
-            "waarde_laag": [700_000.0, 300_000.0],
-            "fout_hoog": [0.0, 0.0],
-            "waarde_hoog": [0.0, 0.0],
-        }
-    )
+    return pd.DataFrame({
+        "naam": ["StratumA", "StratumB"],
+        "waarde_laag": [700_000.0, 300_000.0],
+        "fout_hoog": [0.0, 0.0],
+        "waarde_hoog": [0.0, 0.0],
+    })
 
 
 def test_rapport_zonder_n_kolom():

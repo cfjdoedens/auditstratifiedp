@@ -3,13 +3,20 @@ import time
 import pandas as pd
 import streamlit as st
 
-from auditstratified.eval_stratified import eval_stratified
-from auditstratified.plan_stratified import (
+from auditstratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+    eval_stratified,
+)
+from auditstratified.plan_stratified import (  # pyrefly: ignore[missing-import]
     plan_stratified_basis,
     vind_beste_strata_groep,
 )
-from auditstratified.plot_kanskromme import plot_kanskromme
-from auditstratified.utils import foutloze_posten_equivalent, haro_nog_nodige_zekerheid
+from auditstratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+    plot_kanskromme,
+)
+from auditstratified.utils import (  # pyrefly: ignore[missing-import]
+    foutloze_posten_equivalent,
+    haro_nog_nodige_zekerheid,
+)
 
 # Configureer de pagina lay-out en titel van de Streamlit webapplicatie.
 st.set_page_config(page_title="auditstratified", layout="wide")
@@ -27,9 +34,9 @@ LEGE_EVAL_DF = pd.DataFrame({
     "ihr": ["H"] * 8,
     "ibr": ["H"] * 8,
     "car": ["H"] * 8,
-    "materialiteit": ["0,01"] * 8,
     "waarde_hoog": ["0"] * 8,
     "fout_hoog": ["0"] * 8,
+    "materialiteit": ["0,01"] * 8,
 })
 
 # Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de planning te initialiseren.
@@ -40,10 +47,10 @@ LEGE_PLAN_DF = pd.DataFrame({
     "ihr": ["H"] * 8,
     "ibr": ["H"] * 8,
     "car": ["H"] * 8,
-    "materialiteit": ["0,01"] * 8,
     "kosten": ["1,0"] * 8,
     "waarde_hoog": ["0"] * 8,
     "fout_hoog": ["0"] * 8,
+    "materialiteit": ["0,01"] * 8,
     "n_laag": [None] * 8,
     "n_laag_extra": [None] * 8,
     "n_laag_tot": [None] * 8,
@@ -91,6 +98,8 @@ def _parse_nl(waarde) -> float | None:
     tekst = str(waarde).strip()
     if tekst == "":
         return None
+    if tekst.startswith("€"):
+        tekst = tekst.lstrip("€").strip()
     tekst = tekst.replace(".", "").replace(",", ".")
     try:
         return float(tekst)
@@ -126,13 +135,13 @@ def on_eval_tabel_change():
 
     weggepoetste_fouten = []
 
-    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst
+    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst.
     for row_idx_raw, changes in state.get("edited_rows", {}).items():
         row_idx = int(row_idx_raw)
         if row_idx < len(df):
             for col, val in changes.items():
-                if val is not None:
-                    df.at[row_idx, col] = str(val).strip()
+                # Vertaal een leeggemaakte cel (None) direct naar een lege string.
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
 
     # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df)
     for row in state.get("added_rows", []):
@@ -141,9 +150,9 @@ def on_eval_tabel_change():
             "ihr": "H",
             "ibr": "H",
             "car": "H",
-            "materialiteit": "0,01",
             "waarde_hoog": "0",
             "fout_hoog": "0",
+            "materialiteit": "0,01",
         })
         for col, val in row.items():
             if val is not None:
@@ -155,9 +164,9 @@ def on_eval_tabel_change():
             "ihr": "H",
             "ibr": "H",
             "car": "H",
-            "materialiteit": "0,01",
             "waarde_hoog": "0",
             "fout_hoog": "0",
+            "materialiteit": "0,01",
         })
         oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
 
@@ -202,10 +211,12 @@ def on_eval_tabel_change():
                         val_str, 0 if col == "n_laag" else 2
                     )
             elif col == "materialiteit":
-                if not (0 < val_num < 1):
+                if val_num <= 0:
                     revert_cel(
-                        col, "materialiteit moet in (0, 1) liggen", idx, rij_naam
+                        col, "materialiteit moet groter zijn dan 0", idx, rij_naam
                     )
+                elif val_num > 1:
+                    df.at[idx, col] = "€ " + _format_nl_auto(val_str, 2)
                 else:
                     df.at[idx, col] = _format_nl_auto(val_str, 2)
 
@@ -253,13 +264,13 @@ def on_plan_tabel_change():
 
     weggepoetste_fouten = []
 
-    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst
+    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst.
     for row_idx_raw, changes in state.get("edited_rows", {}).items():
         row_idx = int(row_idx_raw)
         if row_idx < len(df):
             for col, val in changes.items():
-                if val is not None:
-                    df.at[row_idx, col] = str(val).strip()
+                # Vertaal een leeggemaakte cel (None) direct naar een lege string.
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
 
     # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df)
     for row in state.get("added_rows", []):
@@ -268,11 +279,11 @@ def on_plan_tabel_change():
             "ihr": "H",
             "ibr": "H",
             "car": "H",
-            "materialiteit": "0,01",
             "verwachte_foutfractie": "0,001",
             "kosten": "1,0",
             "waarde_hoog": "0",
             "fout_hoog": "0",
+            "materialiteit": "0,01",
         })
         for col, val in row.items():
             if val is not None:
@@ -284,11 +295,11 @@ def on_plan_tabel_change():
             "ihr": "H",
             "ibr": "H",
             "car": "H",
-            "materialiteit": "0,01",
             "verwachte_foutfractie": "0,001",
             "kosten": "1,0",
             "waarde_hoog": "0",
             "fout_hoog": "0",
+            "materialiteit": "0,01",
         })
         oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
 
@@ -340,9 +351,16 @@ def on_plan_tabel_change():
                     )
                 else:
                     df.at[idx, col] = _format_nl_auto(val_str, 3)
-            elif col in ["kosten", "materialiteit"]:
+            elif col == "kosten":
                 if val_num <= 0:
                     revert_cel(col, f"{col} moet groter zijn dan 0", idx, rij_naam)
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 2)
+            elif col == "materialiteit":
+                if val_num <= 0:
+                    revert_cel(col, f"{col} moet groter zijn dan 0", idx, rij_naam)
+                elif val_num > 1:
+                    df.at[idx, col] = "€ " + _format_nl_auto(val_str, 2)
                 else:
                     df.at[idx, col] = _format_nl_auto(val_str, 2)
 
@@ -368,6 +386,17 @@ def on_plan_tabel_change():
     else:
         st.session_state.plan_error = None
 
+    # Reset de berekende resultaten zodra de invoer wijzigt:
+    # Als de gebruiker iets in de tabel verandert, is de vorige berekening ongeldig.
+    # We zetten de status terug naar gereed en maken alle uitvoerkolommen (n_laag etc.) leeg,
+    # ongeacht of de rij een naam heeft of niet.
+    df["n_laag"] = None
+    df["n_laag_extra"] = None
+    df["n_laag_tot"] = None
+
+    st.session_state.plan_berekening_actief = False
+    st.session_state.plan_status = "Systeem is gereed voor berekening."
+
     st.session_state.plan_tabel = df
 
 
@@ -390,19 +419,19 @@ with tab_nnz:
         haro_ihr = st.selectbox(
             "IHR (InHerent Risico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="haro_ihr",
         )
         haro_ibr = st.selectbox(
             "IBR (Interne BeheersingsRisico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="haro_ibr",
         )
         haro_car = st.selectbox(
             "CAR (CijferAnalyseRisico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="haro_car",
         )
 
@@ -420,19 +449,19 @@ with tab_fpe:
         fpe_ihr = st.selectbox(
             "IHR (InHerent Risico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="fpe_ihr",
         )
         fpe_ibr = st.selectbox(
             "IBR (Interne BeheersingsRisico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="fpe_ibr",
         )
         fpe_car = st.selectbox(
             "CAR (CijferAnalyseRisico)",
             RISK_OPTIES,
-            format_func=RISK_LABELS.get,
+            format_func=lambda k: RISK_LABELS.get(k, k),
             key="fpe_car",
         )
 
@@ -535,7 +564,7 @@ with tab_eval:
                     ),
                     "k_laag": st.column_config.TextColumn(
                         "k_laag",
-                        help="Som van de foutfracties van de getrokken posten; dus van de gedane waarnemingen.",
+                        help="Som van de geconstateerde foutfracties (fracties: dus >= 0 en <= 1) van de getrokken posten.",
                     ),
                     "waarde_hoog": st.column_config.TextColumn(
                         "waarde hoog (€)",
@@ -563,8 +592,8 @@ with tab_eval:
                         required=True,
                     ),
                     "materialiteit": st.column_config.TextColumn(
-                        "materialiteit laag",
-                        help="Materialiteit voor het laagstratum.",
+                        "materialiteit totaal",
+                        help="Totale materialiteit voor dit hele stratum (dus laagstratum en hoogstratum samen). Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000).",
                     ),
                 },
             )
@@ -648,14 +677,24 @@ with tab_eval:
             for _kol in _EVAL_NL_KOLOMREN:
                 eval_num[_kol] = _parse_nl_kolom(eval_num[_kol])
 
-            # Filter de lege rijen uit de opgeslagen tabel en bereken de populatiewaarden.
-            df_clean = (
-                eval_num
-                .dropna(subset=["naam"])
-                .loc[lambda d: d["naam"].str.strip() != ""]
-                .dropna(subset=["waarde_laag", "n_laag", "k_laag"])
-                .reset_index(drop=True)
-                .assign(
+            # Selecteer eerst alle rijen waar de auditor bewust een naam heeft ingevuld.
+            df_met_naam = eval_num.dropna(subset=["naam"]).loc[
+                lambda d: d["naam"].str.strip() != ""
+            ]
+
+            # Controleer of er bij deze benoemde strata verplichte velden missen.
+            mask_ontbrekend = (
+                df_met_naam[["waarde_laag", "n_laag", "k_laag"]].isna().any(axis=1)
+            )
+
+            if df_met_naam.empty:
+                st.session_state.eval_error = "Vul minimaal één stratum in met een naam en de bijbehorende waarden."
+            elif mask_ontbrekend.any():
+                namen_fout = ", ".join(df_met_naam.loc[mask_ontbrekend, "naam"])
+                st.session_state.eval_error = f"Ontbrekende waarden (waarde laag, n_laag of k_laag) bij stratum: {namen_fout}."
+            else:
+                # Alles is aanwezig, nu kunnen we veilig de afgeleide kolommen toewijzen.
+                df_clean = df_met_naam.reset_index(drop=True).assign(
                     waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
                     waarde_populatie=lambda d: (
                         d["waarde_laag"] + d["waarde_hoog"].fillna(0)
@@ -663,14 +702,17 @@ with tab_eval:
                     ihr=lambda d: d["ihr"].str.upper(),
                     ibr=lambda d: d["ibr"].str.upper(),
                     car=lambda d: d["car"].str.upper(),
+                    # --- Nieuw in tab_eval: reken absoluut bedrag om naar totale fractie ---
+                    materialiteit=lambda d: d.apply(
+                        lambda row: (
+                            row["materialiteit"] / row["waarde_populatie"]
+                            if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
+                            else row["materialiteit"]
+                        ),
+                        axis=1,
+                    ),
                 )
-            )
 
-            if df_clean.empty:
-                st.session_state.eval_error = (
-                    "Vul minimaal één stratum met waarde_laag, n_laag en k_laag in."
-                )
-            else:
                 # Valideer kolominvoer: negatieve waarden en andere grenzen.
                 if (df_clean["waarde_laag"] < 0).any():
                     namen = ", ".join(df_clean.loc[df_clean["waarde_laag"] < 0, "naam"])
@@ -689,6 +731,14 @@ with tab_eval:
                     namen = ", ".join(df_clean.loc[mask, "naam"])
                     st.error(f"k_laag mag niet groter zijn dan n_laag bij: {namen}.")
                     st.stop()
+                _mat = df_clean["materialiteit"].fillna(0)
+                if ((_mat <= 0) | (_mat >= 1)).any():
+                    mask = (_mat <= 0) | (_mat >= 1)
+                    namen = ", ".join(df_clean.loc[mask, "naam"])
+                    st.error(
+                        f"materialiteit moet een fractie in (0, 1) zijn bij: {namen}."
+                    )
+                    st.stop()
                 if (df_clean["waarde_hoog"] < 0).any():
                     namen = ", ".join(df_clean.loc[df_clean["waarde_hoog"] < 0, "naam"])
                     st.error(f"waarde_hoog is negatief bij: {namen}.")
@@ -703,31 +753,22 @@ with tab_eval:
                     namen = ", ".join(df_clean.loc[mask, "naam"])
                     st.error(f"fout_hoog is groter dan waarde_hoog bij: {namen}.")
                     st.stop()
-                _mat = df_clean["materialiteit"].fillna(0)
-                if ((_mat <= 0) | (_mat >= 1)).any():
-                    mask = (_mat <= 0) | (_mat >= 1)
-                    namen = ", ".join(df_clean.loc[mask, "naam"])
-                    st.error(
-                        f"materialiteit moet een fractie in (0, 1) zijn bij: {namen}."
+                try:
+                    # Bereken de geconvolueerde resultaten via de rekenmotor.
+                    res = eval_stratified(
+                        df_clean,
+                        model=strat_model,
+                        zekerheid=strat_conf,
+                        methode="FFT samen",
+                        granulariteit=strat_gran,
                     )
-                    st.stop()
-                else:
-                    try:
-                        # Bereken de geconvolueerde resultaten via de rekenmotor.
-                        res = eval_stratified(
-                            df_clean,
-                            model=strat_model,
-                            zekerheid=strat_conf,
-                            methode="FFT samen",
-                            granulariteit=int(strat_gran),
-                        )
-                        st.session_state.eval_res = res
-                        st.session_state.eval_error = None
+                    st.session_state.eval_res = res
+                    st.session_state.eval_error = None
 
-                        # Schakel de actieve subtab-index over naar het resultatenvenster.
-                        st.session_state.eval_subtab_index = 1
-                    except Exception as e:
-                        st.session_state.eval_error = f"Fout bij de berekening: {e}"
+                    # Schakel de actieve subtab-index over naar het resultatenvenster.
+                    st.session_state.eval_subtab_index = 1
+                except Exception as e:
+                    st.session_state.eval_error = f"Fout bij de berekening: {e}"
 
         # Herstart de scriptuitvoering om de tab-wissel visueel door te voeren.
         st.rerun()
@@ -885,8 +926,8 @@ with tab_plan:
                     help="Totaal foutbedrag van het hoogstratum.",
                 ),
                 "materialiteit": st.column_config.TextColumn(
-                    "materialiteit laag",
-                    help="Materialiteit voor het laagstratum. Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro\u2019s (bijv. 736.000.000).",
+                    "materialiteit totaal",
+                    help="Totale materialiteit voor dit stratum. Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000).",
                 ),
                 "n_laag": st.column_config.NumberColumn(
                     "n_laag",
@@ -930,10 +971,10 @@ with tab_plan:
         _NL_KOLOMMEN = [
             "waarde_laag",
             "verwachte_foutfractie",
+            "kosten",
             "waarde_hoog",
             "fout_hoog",
             "materialiteit",
-            "kosten",
         ]
         invoer_num = invoer_df.copy()
         for _kol in _NL_KOLOMMEN:
@@ -942,35 +983,43 @@ with tab_plan:
         # Zorg dat de kostenkolom gevuld is (fallback naar 1.0 als leeg):
         invoer_num["kosten"] = invoer_num["kosten"].fillna(1.0)
 
-        df_clean = (
-            invoer_num
-            .dropna(subset=["naam"])
-            .loc[lambda d: d["naam"].str.strip() != ""]
-            .dropna(subset=["waarde_laag"])
-            .reset_index(drop=True)
-            .assign(
-                waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
-                waarde_populatie=lambda d: (
-                    d["waarde_laag"] + d["waarde_hoog"].fillna(0)
-                ),
-                ihr=lambda d: d["ihr"].str.upper(),
-                ibr=lambda d: d["ibr"].str.upper(),
-                car=lambda d: d["car"].str.upper(),
-                kosten=lambda d: d["kosten"].fillna(1.0),  # <--- DEZE REGEL IS CRUCIAAL
-                materialiteit=lambda d: d.apply(
-                    lambda row: (
-                        row["materialiteit"] / row["waarde_populatie"]
-                        if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
-                        else row["materialiteit"]
-                    ),
-                    axis=1,
-                ),
-            )
-        )
+        # Selecteer eerst alle rijen waar de auditor bewust een naam heeft ingevuld.
+        df_met_naam = invoer_num.dropna(subset=["naam"]).loc[
+            lambda d: d["naam"].str.strip() != ""
+        ]
 
-        if df_clean.empty:
-            st.error("Vul minimaal één stratum in met naam en waarde_laag.")
+        if df_met_naam.empty:
+            st.error(
+                "Vul minimaal één stratum in met een naam en de bijbehorende waarde_laag."
+            )
             st.stop()
+
+        # Protesteer hard als een benoemd stratum geen geldige waarde_laag heeft.
+        if df_met_naam["waarde_laag"].isna().any():
+            namen_fout = ", ".join(
+                df_met_naam.loc[df_met_naam["waarde_laag"].isna(), "naam"]
+            )
+            st.error(f"Ontbrekende 'waarde laag' bij stratum: {namen_fout}.")
+            st.stop()
+
+        # Alles is aanwezig, nu kunnen we veilig de afgeleide kolommen toewijzen.
+        df_clean = df_met_naam.reset_index(drop=True).assign(
+            waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
+            waarde_populatie=lambda d: d["waarde_laag"] + d["waarde_hoog"].fillna(0),
+            ihr=lambda d: d["ihr"].str.upper(),
+            ibr=lambda d: d["ibr"].str.upper(),
+            car=lambda d: d["car"].str.upper(),
+            kosten=lambda d: d["kosten"].fillna(1.0),
+            # Reken absoluut bedrag om naar totale fractie.
+            materialiteit=lambda d: d.apply(
+                lambda row: (
+                    row["materialiteit"] / row["waarde_populatie"]
+                    if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
+                    else row["materialiteit"]
+                ),
+                axis=1,
+            ),
+        )
 
         # Bereken de effectieve rekenmaterialiteit.
         totale_pop_waarde = df_clean["waarde_populatie"].sum()
@@ -980,14 +1029,34 @@ with tab_plan:
             else plan_mat
         )
 
-        # Valideer: verwachte foutfractie < materialiteit per stratum.
+        # Valideer cross-constraint: materialiteit * waarde_populatie > fout_hoog per stratum.
+        # Zonder positief budget resteert er niets voor het laagstratum.
+        _fout_hoog_cc = df_clean["fout_hoog"].fillna(0)
+        _budget_laag = (
+            df_clean["materialiteit"] * df_clean["waarde_populatie"] - _fout_hoog_cc
+        )
+        _mask_cc = (df_clean["waarde_laag"] > 0) & (_budget_laag <= 0)
+        if _mask_cc.any():
+            namen = ", ".join(df_clean.loc[_mask_cc, "naam"])
+            st.error(
+                f"De bekende fout in het hoogstratum overschrijdt (of evenaart) de stratum-materialiteit bij: {namen}. "
+                "Verhoog de materialiteit of verlaag de bekende fout."
+            )
+            st.stop()
+
+        # Valideer: verwachte foutfractie < omgerekende materialiteit laagstratum per stratum.
+        # materialiteit_laag = (materialiteit × waarde_populatie − fout_hoog) / waarde_laag.
+        _mat_laag_per_rij = _budget_laag / df_clean["waarde_laag"].replace(
+            0, float("nan")
+        )
         probleem = df_clean[
-            df_clean["verwachte_foutfractie"] >= df_clean["materialiteit"]
+            (df_clean["waarde_laag"] > 0)
+            & (df_clean["verwachte_foutfractie"] >= _mat_laag_per_rij)
         ]
         if not probleem.empty:
             namen = ", ".join(probleem["naam"].tolist())
             st.error(
-                f"Verwachte foutfractie \u2265 materialiteit bij: {namen}. Pas de invoer aan."
+                f"Verwachte foutfractie \u2265 omgerekende materialiteit van het laagstratum bij: {namen}. Pas de invoer aan."
             )
             st.stop()
 
@@ -1049,7 +1118,7 @@ with tab_plan:
                 model=plan_model,
                 zekerheid=plan_conf,
                 methode="FFT samen",
-                granulariteit=int(plan_gran),
+                granulariteit=plan_gran,
                 vergelijk=False,
             )["max_fout_convolutie"]
         except ValueError as e:
@@ -1057,7 +1126,12 @@ with tab_plan:
             st.stop()
 
         # Vul de weergavetabel met de berekende basiswaarden.
+        # Reset de outputkolommen eerst voor alle rijen zodat naamloze of
+        # niet-berekende rijen geen oude waarden tonen.
         tabel_update = invoer_df.copy()
+        tabel_update["n_laag"] = None
+        tabel_update["n_laag_extra"] = None
+        tabel_update["n_laag_tot"] = None
         for _, rij in strata_init.iterrows():
             idx = tabel_update.index[tabel_update["naam"] == rij["naam"]]
             if len(idx) > 0:
@@ -1072,7 +1146,7 @@ with tab_plan:
         st.session_state.plan_reken_mat = reken_mat
         st.session_state.plan_conf = plan_conf
         st.session_state.plan_model = plan_model
-        st.session_state.plan_granulariteit = int(plan_gran)
+        st.session_state.plan_granulariteit = plan_gran
         st.session_state.plan_vertraging = plan_vertraging
         st.session_state.plan_berekening_actief = True
         st.session_state.plan_status = (
@@ -1166,7 +1240,6 @@ with tab_plan:
                 )
             else:
                 st.session_state.plan_status = (
-                    f"Optimalisatie voltooid! Eindfout: {fmt_fout} is "
-                    "kleiner dan de materialiteit."
+                    f"Optimalisatie voltooid! Eindfout: {fmt_fout} <= materialiteit."
                 )
             st.rerun()

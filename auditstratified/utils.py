@@ -1,4 +1,6 @@
 import math
+from collections.abc import Iterable
+from typing import Any
 
 from scipy.stats import beta, gamma
 
@@ -14,7 +16,11 @@ def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") ->
     """
     # Controleer invoerparameters.
     geldige_risicos = ["H", "M", "L"]
-    if ihr not in geldige_risicos or ibr not in geldige_risicos or car not in geldige_risicos:
+    if (
+        ihr not in geldige_risicos
+        or ibr not in geldige_risicos
+        or car not in geldige_risicos
+    ):
         raise ValueError("Risico-inschattingen moeten 'H', 'M' of 'L' zijn.")
 
     # Zie HAR0 7.3.4 voor de vertaling van risico's naar getallen.
@@ -37,7 +43,10 @@ def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") ->
 
     return nog_nodige_zekerheid
 
-def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", materialiteit: float = 0.01) -> float:
+
+def foutloze_posten_equivalent(
+    ihr: str = "H", ibr: str = "H", car: str = "H", materialiteit: float = 0.01
+) -> float:
     """
     Geef equivalent in getrokken foutloze posten voor verlaagde risicoschattingen.
 
@@ -50,7 +59,11 @@ def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", m
     """
     # Controleer de invoerparameters strak op de toegestane risicocategorieën.
     geldige_risicos = ["H", "M", "L"]
-    if ihr not in geldige_risicos or ibr not in geldige_risicos or car not in geldige_risicos:
+    if (
+        ihr not in geldige_risicos
+        or ibr not in geldige_risicos
+        or car not in geldige_risicos
+    ):
         raise ValueError("Risico-inschattingen moeten 'H', 'M' of 'L' zijn.")
 
     # Bepaal de referentiewaarde en de specifiek benodigde zekerheid.
@@ -67,11 +80,18 @@ def foutloze_posten_equivalent(ihr: str = "H", ibr: str = "H", car: str = "H", m
 
     return posten_alles_hoog - posten_niet_alles_hoog
 
-def _is_iterable_num(val) -> bool:
-    """Controleer of een object een lijst of array is, maar uitsluitend voor getallen (geen strings)."""
-    return hasattr(val, '__iter__') and not isinstance(val, str)
 
-def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, distribution="binomial"):
+def _is_iterable_num(val: Any) -> bool:
+    """Controleer of een object een lijst of array is, maar uitsluitend voor getallen (geen strings)."""
+    return hasattr(val, "__iter__") and not isinstance(val, str)
+
+
+def drawsneeded(
+    posited_defect_rate: float | Iterable[float] = 0.0,
+    allowed_defect_rate: float | Iterable[float] = 0.01,
+    cert: float | Iterable[float] = 0.95,
+    distribution: str | Iterable[str] = "binomial",
+) -> int | float | dict:
     """
     Bereken het aantal benodigde steken om de maximale foutfractie met voldoende zekerheid vast te stellen.
 
@@ -80,16 +100,28 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
     """
     # Handel de recursie af voor invoer met meerdere waarden (vectorisatie).
     if _is_iterable_num(posited_defect_rate):
-        return {p: drawsneeded(p, allowed_defect_rate, cert, distribution) for p in posited_defect_rate}
+        return {
+            p: drawsneeded(p, allowed_defect_rate, cert, distribution)
+            for p in posited_defect_rate
+        }
 
     if _is_iterable_num(allowed_defect_rate):
-        return {a: drawsneeded(posited_defect_rate, a, cert, distribution) for a in allowed_defect_rate}
+        return {
+            a: drawsneeded(posited_defect_rate, a, cert, distribution)
+            for a in allowed_defect_rate
+        }
 
     if _is_iterable_num(cert):
-        return {c: drawsneeded(posited_defect_rate, allowed_defect_rate, c, distribution) for c in cert}
+        return {
+            c: drawsneeded(posited_defect_rate, allowed_defect_rate, c, distribution)
+            for c in cert
+        }
 
     if _is_iterable_num(distribution):
-        return {d: drawsneeded(posited_defect_rate, allowed_defect_rate, cert, d) for d in distribution}
+        return {
+            d: drawsneeded(posited_defect_rate, allowed_defect_rate, cert, d)
+            for d in distribution
+        }
 
     # Voer de daadwerkelijke berekening uit voor enkelvoudige numerieke waarden (base case).
     # Controleer of de parameters wiskundig logisch en toegestaan zijn.
@@ -98,7 +130,9 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
     if not (0 < allowed_defect_rate < 1):
         raise ValueError("allowed_defect_rate moet in (0, 1) liggen.")
     if posited_defect_rate >= allowed_defect_rate:
-        raise ValueError("posited_defect_rate moet kleiner zijn dan allowed_defect_rate.")
+        raise ValueError(
+            "posited_defect_rate moet kleiner zijn dan allowed_defect_rate."
+        )
     if not (0 <= cert <= 1):
         raise ValueError("cert moet in [0, 1] liggen.")
     if distribution not in ["binomial", "Poisson", "Poisson_interpolated"]:
@@ -108,7 +142,7 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
     if cert == 0:
         return 0
     if cert == 1:
-        return float('inf')
+        return float("inf")
 
     # Gebruik de analytische benadering als daarom gevraagd wordt.
     if distribution == "Poisson_interpolated":
@@ -120,8 +154,11 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
     end_range = max_n
 
     # Controleer of het antwoord zich überhaupt in onze extreme bandbreedte bevindt.
-    if max_defect_rate(end_range, posited_defect_rate, cert, distribution) > allowed_defect_rate:
-        return float('inf')
+    if (
+        max_defect_rate(end_range, posited_defect_rate, cert, distribution)
+        > allowed_defect_rate
+    ):
+        return float("inf")
 
     # Blijf het interval halveren zolang de ondergrens en bovengrens niet aan elkaar gelijk zijn.
     while True:
@@ -129,23 +166,33 @@ def drawsneeded(posited_defect_rate=0.0, allowed_defect_rate=0.01, cert=0.95, di
             return begin_range
         elif begin_range + 1 == end_range:
             # We hebben geen echt midden meer, test direct de ondergrens.
-            if max_defect_rate(begin_range, posited_defect_rate, cert, distribution) <= allowed_defect_rate:
+            if (
+                max_defect_rate(begin_range, posited_defect_rate, cert, distribution)
+                <= allowed_defect_rate
+            ):
                 return begin_range
             else:
                 return end_range
         else:
             # Bepaal het nieuwe midden en evalueer of we in de onderste of bovenste helft verder zoeken.
             middle = (end_range - begin_range) // 2 + begin_range
-            if max_defect_rate(middle, posited_defect_rate, cert, distribution) <= allowed_defect_rate:
+            if (
+                max_defect_rate(middle, posited_defect_rate, cert, distribution)
+                <= allowed_defect_rate
+            ):
                 end_range = middle
             else:
                 begin_range = middle
+
 
 def get_R(k: int, cert: float = 0.95) -> float:
     """Haal de R-waarde op voor een gegeven k en zekerheidsniveau via de inverse Gamma-verdeling."""
     return gamma.ppf(cert, a=k + 1, scale=1)
 
-def calc_n_inverse(allowed_defect_rate: float, posited_defect_rate: float, cert: float) -> float:
+
+def calc_n_inverse(
+    allowed_defect_rate: float, posited_defect_rate: float, cert: float
+) -> float:
     """Benader het benodigde aantal posten analytisch via de formule van Paul van Batenburg."""
     ratio_target = posited_defect_rate / allowed_defect_rate
     found = False
@@ -169,20 +216,28 @@ def calc_n_inverse(allowed_defect_rate: float, posited_defect_rate: float, cert:
 
     # Werp een fout op als de waarden te dicht op elkaar liggen voor interpolatie.
     if not found:
-        raise ValueError("k niet binnen 0:1000 gevonden; posited_defect_rate ligt te dicht bij allowed_defect_rate.")
+        raise ValueError(
+            "k niet binnen 0:1000 gevonden; posited_defect_rate ligt te dicht bij allowed_defect_rate."
+        )
 
     R_k1 = get_R(k1, cert)
     R_k2 = get_R(k2, cert)
 
     # Pas de teller van de formule toe, waarbij we uitgaan van M = 1.
-    numerator = (k2 * R_k1 - k1 * R_k2)
+    numerator = k2 * R_k1 - k1 * R_k2
 
     # Pas de noemer van de formule toe, gebruikmakend van het feit dat k2 - k1 altijd 1 is.
     denominator = allowed_defect_rate - posited_defect_rate * (R_k2 - R_k1)
 
     return numerator / denominator
 
-def max_defect_rate(n: int, posited_defect_rate: float, cert: float = 0.95, distribution: str = "binomial") -> float:
+
+def max_defect_rate(
+    n: int,
+    posited_defect_rate: float,
+    cert: float = 0.95,
+    distribution: str = "binomial",
+) -> float:
     """Bereken de maximale foutfractie bij een specifieke steekproefomvang en zekerheid."""
     # Controleer de randvoorwaarden van de parameters.
     if not (n > 0):
@@ -203,7 +258,9 @@ def max_defect_rate(n: int, posited_defect_rate: float, cert: float = 0.95, dist
         # Voer een robuustheidscontrole uit via de inverse functie.
         controle_cert = beta.cdf(q, a=k + 1, b=n - k + 1)
         if not math.isclose(cert, controle_cert, rel_tol=1e-5):
-            raise ArithmeticError("Inversie van de bètaverdeling (pbeta test) gaf een onverwacht resultaat.")
+            raise ArithmeticError(
+                "Inversie van de bètaverdeling (pbeta test) gaf een onverwacht resultaat."
+            )
     else:
         risk_factor = gamma.ppf(cert, a=k + 1, scale=1)
         q = risk_factor / n

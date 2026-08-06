@@ -1,7 +1,10 @@
 import pandas as pd
 import pytest
 
-from auditstratified.plan_stratified import plan_stratified, plan_stratified_basis
+from auditstratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+    plan_stratified,
+    plan_stratified_basis,
+)
 
 
 def test_happy_flow_succesvolle_planning():
@@ -49,7 +52,11 @@ def test_foutmelding_verwachte_foutfractie_te_hoog():
 
 
 def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
-    """Foutmelding: Bekende fout in hoogstratum nekt de materialiteit."""
+    """Foutmelding: Bekende fout in hoogstratum nekt de algehele materialiteit.
+
+    materialiteit_kolom=0.10: 0.10 * 1.000.000 = 100.000 > 60.000 → per-stratum check passeert.
+    Algehele check: fout_hoog=60.000 > materialiteit_param=0.05 * 1.000.000=50.000 → ValueError.
+    """
     test_fout_hoog = pd.DataFrame({
         "naam": ["Alle_Klanten"],
         "waarde_laag": [800000.0],
@@ -57,7 +64,7 @@ def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
         "ihr": ["H"],
         "ibr": ["H"],
         "car": ["H"],
-        "materialiteit": [0.05],
+        "materialiteit": [0.10],
         "fout_hoog": [60000.0],
         "waarde_hoog": [200000.0],
         "kosten": [1.0],
@@ -83,7 +90,7 @@ def test_foutmelding_inconsistentie_op_stratum_niveau():
     })
 
     with pytest.raises(
-        ValueError, match="Verwachte foutfractie >= de stratummaterialiteit"
+        ValueError, match="Verwachte foutfractie >= de omgerekende materialiteit"
     ):
         plan_stratified(test_inconsistent, materialiteit=0.05)
 
@@ -148,57 +155,61 @@ def basis_plan_invoer():
 def test_plan_ongeldig_model(basis_plan_invoer):
     """Foutmelding: Ongeldig model opgegeven."""
     # Test of een ongeldig model direct wordt afgewezen.
-    with pytest.raises(AssertionError, match="Model moet"):
+    with pytest.raises(ValueError, match="Model moet"):
         plan_stratified(basis_plan_invoer, model="frequentist", materialiteit=0.05)
 
 
 # Test alle foutieve invoer voor de parameter materialiteit in één keer.
 @pytest.mark.parametrize(
-    "foute_waarde, match_tekst",
+    "foute_waarde, exc_type, match_tekst",
     [
-        (True, "boolean"),
-        ("0.05", "getal"),
-        (-0.01, "Materialiteit moet >= 0"),
-        (1.5, "Materialiteit moet <= 1"),
+        (True, TypeError, "boolean"),
+        ("0.05", TypeError, "getal"),
+        (-0.01, ValueError, "Materialiteit moet >= 0"),
+        (1.5, ValueError, "Materialiteit moet <= 1"),
     ],
 )
-def test_plan_materialiteit_invoer(basis_plan_invoer, foute_waarde, match_tekst):
+def test_plan_materialiteit_invoer(
+    basis_plan_invoer, foute_waarde, exc_type, match_tekst
+):
     """Invoercontrole op de parameter materialiteit."""
     # Voer de test uit met de schone dataset uit de fixture en de foute parameter.
-    with pytest.raises(AssertionError, match=match_tekst):
+    with pytest.raises(exc_type, match=match_tekst):
         plan_stratified(basis_plan_invoer, materialiteit=foute_waarde)
 
 
 # Test alle foutieve invoer voor de parameter zekerheid in één keer.
 @pytest.mark.parametrize(
-    "foute_waarde, match_tekst",
+    "foute_waarde, exc_type, match_tekst",
     [
-        (True, "boolean"),
-        ("0.95", "getal"),
-        (-0.1, "Zekerheid moet >= 0"),
-        (1.5, "Zekerheid moet <= 1"),
+        (True, TypeError, "boolean"),
+        ("0.95", TypeError, "getal"),
+        (-0.1, ValueError, "Zekerheid moet >= 0"),
+        (1.5, ValueError, "Zekerheid moet <= 1"),
     ],
 )
-def test_plan_zekerheid_invoer(basis_plan_invoer, foute_waarde, match_tekst):
+def test_plan_zekerheid_invoer(basis_plan_invoer, foute_waarde, exc_type, match_tekst):
     """Invoercontrole op de parameter zekerheid."""
     # Weer wordt de functie geïnjecteerd met de dataset.
-    with pytest.raises(AssertionError, match=match_tekst):
+    with pytest.raises(exc_type, match=match_tekst):
         plan_stratified(basis_plan_invoer, materialiteit=0.05, zekerheid=foute_waarde)
 
 
 # Test alle foutieve invoer voor de parameter granulariteit in één keer.
 @pytest.mark.parametrize(
-    "foute_waarde, match_tekst",
+    "foute_waarde, exc_type, match_tekst",
     [
-        (True, "boolean"),
-        (100.5, "geheel getal"),
-        (-1, "Granulariteit moet > 0"),
+        (True, TypeError, "boolean"),
+        (100.5, TypeError, "geheel getal"),
+        (-1, ValueError, "Granulariteit moet > 0"),
     ],
 )
-def test_plan_granulariteit_invoer(basis_plan_invoer, foute_waarde, match_tekst):
+def test_plan_granulariteit_invoer(
+    basis_plan_invoer, foute_waarde, exc_type, match_tekst
+):
     """Invoercontrole op de parameter granulariteit."""
     # Voer de test uit met een schone dataset en foutieve granulariteit.
-    with pytest.raises(AssertionError, match=match_tekst):
+    with pytest.raises(exc_type, match=match_tekst):
         plan_stratified(
             basis_plan_invoer, materialiteit=0.05, granulariteit=foute_waarde
         )
@@ -278,10 +289,11 @@ def test_plan_stratified_poisson_strakke_marges(basis_steekproeven):
 
 
 def test_materialiteit_kolom_stuurt_laagstratum_n_basis():
-    """De kolom 'materialiteit' stuurt uitsluitend de steekproefomvang van het laagstratum.
+    """De kolom 'materialiteit' stuurt de steekproefomvang van het laagstratum.
 
-    Een strakkere stratummaterialiteit vereist meer steken in het laagstratum.
-    Dit bewijst dat de kolom exclusief op het laagstratum werkt via drawsneeded().
+    materialiteit slaat op laag+hoog samen; voor strata zonder hoogstratum (waarde_hoog=0,
+    fout_hoog=0) is materialiteit_laag gelijk aan materialiteit_kolom zelf.
+    Een strakkere stratummaterialiteit vereist daardoor meer steken in het laagstratum.
     """
     gemeenschappelijk = dict(
         naam=["Stratum_A"],
@@ -310,9 +322,8 @@ def test_materialiteit_kolom_stuurt_laagstratum_n_basis():
 def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum():
     """De kolom 'materialiteit' heeft geen invloed op de verwerking van het hoogstratum.
 
-    fout_hoog en waarde_hoog worden ongewijzigd doorgegeven ongeacht de waarde
-    van de 'materialiteit'-kolom. Dit bewijst dat de kolom exclusief op het
-    laagstratum van toepassing is.
+    materialiteit slaat op laag+hoog samen; fout_hoog en waarde_hoog worden
+    als invoerkolommen ongewijzigd doorgegeven ongeacht de waarde van 'materialiteit'.
     """
     basis = dict(
         naam=["Stratum_A"],
@@ -467,7 +478,7 @@ def test_kolominhoud_ihr_ontbreekt_in_vereiste_kolommen():
         "waarde_hoog": [0.0],
         "kosten": [1.0],
     })
-    with pytest.raises(AssertionError, match="ihr"):
+    with pytest.raises(ValueError, match="ihr"):
         plan_stratified(zonder_ihr, materialiteit=0.05)
 
 
