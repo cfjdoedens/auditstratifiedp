@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auditstratified"
-version = "0.1.5"
+version = "0.1.6"
 authors = [
     {name = "Crist-Jan Doedens", email = "auditstratified_python@chance-matters.nl"}, 
 ]
