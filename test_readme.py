@@ -1,9 +1,17 @@
 import time
-import pandas as pd
+
 import matplotlib.pyplot as plt
-from auditstratified.plan_stratified import plan_stratified
-from auditstratified.eval_stratified import eval_stratified
-from auditstratified.plot_kanskromme import plot_kanskromme
+import pandas as pd
+
+from auditstratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+    eval_stratified,
+)
+from auditstratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+    plan_stratified,
+)
+from auditstratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+    plot_kanskromme,
+)
 
 print("--- SCRIPT GESTART ---", flush=True)
 
