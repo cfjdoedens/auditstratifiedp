@@ -20,6 +20,12 @@ htmlcov/
 
 # Gegenereerde HTML
 README.html
+README.quarto_ipynb_*
+VERANTWOORDING_*.html
+VERANTWOORDING_*_files/
+t.html
+t.log
+t.tex
 
 # Ongerelateerde bestanden in deze map
 door Python opgehaald bijlagen/
