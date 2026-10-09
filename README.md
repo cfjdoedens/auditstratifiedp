@@ -1,11 +1,11 @@
-# README auditstratified
+# README auditstat
 
 
 # Inleiding
 
-Het doel van het **auditstratified**-pakket is om de totale foutfractie
-van een aantal geldmassa’s te schatten gebaseerd op steekproeven. De
-aanname is dat er geen samenhang in foutkans is tussen de afzonderlijke
+Het doel van het **auditstat**-pakket is om de totale foutfractie van
+een aantal geldmassa’s te schatten gebaseerd op steekproeven. De aanname
+is dat er geen samenhang in foutkans is tussen de afzonderlijke
 steekproeven. Elke afzonderlijk gecontroleerde massa heet een
 **stratum**; bij elkaar gaat het om meerdere **strata**. Een combinatie
 van meerdere steekproeven noemen we een **gestratificeerde steekproef**.
@@ -50,7 +50,7 @@ vanuit de evaluatiemethode.
 
 # Demo
 
-Probeer de live auditstratified app
+Probeer de live auditstat app
 [**hier.**](https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/)
 
 # Installatie
@@ -133,11 +133,11 @@ afzonderlijke strata simpelweg bij elkaar op te tellen.
 
 # Vier rekenmethoden voor convolutie
 
-auditstratified ondersteunt vier verschillende algoritmen om de
-convolutie uit te voeren. Waarom vier? Vooral om het vertrouwen in de
-uitkomst te verhogen: elk van de methoden levert — afgezien van kleine
-rekenkundige verschillen en statistische ruis bij Monte Carlo —
-hetzelfde resultaat op.
+auditstat ondersteunt vier verschillende algoritmen om de convolutie uit
+te voeren. Waarom vier? Vooral om het vertrouwen in de uitkomst te
+verhogen: elk van de methoden levert — afgezien van kleine rekenkundige
+verschillen en statistische ruis bij Monte Carlo — hetzelfde resultaat
+op.
 
 1.  Direct. Numerieke benadering waarbij de foutas wordt verdeeld in
     kleine stukjes, zeg een raster. Kanskrommen worden vervolgens
@@ -150,7 +150,7 @@ hetzelfde resultaat op.
 
 3.  FFT samen. Alle kanskrommen worden op één gezamenlijk raster
     geplaatst en samen gecombineerd. Dit is de aanbevolen
-    standaardmethode binnen auditstratified.
+    standaardmethode binnen auditstat.
 
 4.  Monte Carlo. De gecombineerde verdeling wordt opgebouwd door een
     groot aantal willekeurige trekkingen uit de afzonderlijke
@@ -205,7 +205,7 @@ statistische onzekerheid onjuist behandeld.
 ## Verfijning: Hoogstratum en Laagstratum
 
 In de praktijk bevatten bestanden soms grote posten die integraal (100%)
-worden gecontroleerd. `auditstratified` maakt onderscheid tussen:
+worden gecontroleerd. `auditstat` maakt onderscheid tussen:
 
 1.  Laagstratum. De populatie waaruit daadwerkelijk een steekproef wordt
     getrokken. De resultaten worden geëxtrapoleerd.
@@ -333,7 +333,7 @@ en CAR.
 
 ## Verschillende steekproeven combineren via harmonisatie
 
-Dit concept vormt het wiskundige fundament onder auditstratified bij het
+Dit concept vormt het wiskundige fundament onder auditstat bij het
 combineren van verschillende steekproeven:
 
     Steekproef A (Hoog risico): Vereist 95% zekerheid. Er is
@@ -347,9 +347,9 @@ Als je de resultaten van Steekproef A en B wilt samenvoegen, kun je niet
 zomaar de gevonden fouten en getrokken aantallen bij elkaar optellen;
 het statistische vertrekpunt is immers ongelijk.
 
-auditstratified lost dit op door bij de evaluatie voor élke
-afzonderlijke steekproef het totale bewijs te harmoniseren (fysiek
-getrokken posten + virtuele foutloze posten op basis van de opgegeven
+auditstat lost dit op door bij de evaluatie voor élke afzonderlijke
+steekproef het totale bewijs te harmoniseren (fysiek getrokken posten +
+virtuele foutloze posten op basis van de opgegeven
 IHR/IBR/CAR-parameters en materialiteit). Na toevoeging van deze
 virtuele posten past het package de convolutie toe. Hierdoor weegt de
 vooraf verkregen zekerheid per bestand mee in de berekende maximale fout
@@ -459,9 +459,8 @@ waarbij stapsgewijs de steek wordt toegevoegd die op dat moment de
 grootste foutreductie per kosteneenheid oplevert om zo uiteindelijk
 onder de gestelde algehele materialiteit te komen.
 
-Als auditstratified nog niet lokaal is geïnstalleerd, dan doen we dat nu
-door het volgende uit te voeren in een terminal met een shell, zoals
-bash.
+Als auditstat nog niet lokaal is geïnstalleerd, dan doen we dat nu door
+het volgende uit te voeren in een terminal met een shell, zoals bash.
 
 ``` {bash}
 pip install git+https://github.com/cfjdoedens/auditstratifiedp.git
