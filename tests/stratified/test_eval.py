@@ -1,9 +1,7 @@
-import math
-
 import pandas as pd
 import pytest
 
-from auditstratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
 
@@ -113,11 +111,19 @@ def test_vergelijk_convolutie_methoden():
     )
 
     # Eis dat de wiskundig exacte methoden tot op zeer grote precisie overeenkomen met de referentie.
-    assert math.isclose(paarsgewijs_res["max_fout_convolutie"], ref_fout, abs_tol=1e-7)
-    assert math.isclose(direct_res["max_fout_convolutie"], ref_fout, abs_tol=1e-7)
+    assert paarsgewijs_res["max_fout_convolutie"] == pytest.approx(
+        ref_fout, abs=1e-7
+    ), (
+        f"FFT paarsgewijs max fout ({paarsgewijs_res['max_fout_convolutie']:.7f}) wijkt af van referentie ({ref_fout:.7f})."
+    )
+    assert direct_res["max_fout_convolutie"] == pytest.approx(ref_fout, abs=1e-7), (
+        f"Direct max fout ({direct_res['max_fout_convolutie']:.7f}) wijkt af van referentie ({ref_fout:.7f})."
+    )
 
     # Eis dat de stochastische Monte Carlo methode binnen een acceptabele foutmarge van de referentie valt.
-    assert math.isclose(mc_res["max_fout_convolutie"], ref_fout, abs_tol=0.01)
+    assert mc_res["max_fout_convolutie"] == pytest.approx(ref_fout, abs=0.01), (
+        f"Monte Carlo max fout ({mc_res['max_fout_convolutie']:.4f}) wijkt te veel af van referentie ({ref_fout:.4f})."
+    )
 
 
 def test_voorbeeld_paul_van_batenburg():
@@ -137,7 +143,9 @@ def test_voorbeeld_paul_van_batenburg():
     r = eval_stratified(
         vb_paul, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.0310, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.0310, abs=1e-3), (
+        f"Paul van Batenburg casus wijkt af. Berekend: {r['max_fout_convolutie']:.5f}, Verwacht: 0.0310"
+    )
 
 
 def test_uitleg_samennemen_beschrijving():
@@ -157,7 +165,9 @@ def test_uitleg_samennemen_beschrijving():
     r = eval_stratified(
         example, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.0184, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.0184, abs=1e-3), (
+        f"Samennemen casus wijkt af. Berekend: {r['max_fout_convolutie']:.5f}, Verwacht: 0.0184"
+    )
 
 
 def test_voorbeelden_niels_van_leeuwen():
@@ -179,29 +189,31 @@ def test_voorbeelden_niels_van_leeuwen():
     r = eval_stratified(
         sniels, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.0136, abs_tol=1e-3)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.0156, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.0136, abs=1e-3), (
+        f"Niels van Leeuwen (95%) wijkt af. Berekend: {r['max_fout_convolutie']:.5f}"
+    )
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0156, abs=1e-3)
 
     # Test 90%
     r = eval_stratified(
         sniels, zekerheid=0.90, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.0108, abs_tol=1e-3)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.0120, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.0108, abs=1e-3)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0120, abs=1e-3)
 
     # Test 55%
     r = eval_stratified(
         sniels, zekerheid=0.55, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.004510, abs_tol=1e-4)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.00418, abs_tol=1e-4)
+    assert r["max_fout_convolutie"] == pytest.approx(0.004510, abs=1e-4)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.00418, abs=1e-4)
 
     # Test 10% (Hier is convolutie voor het eerst groter dan los)
     r = eval_stratified(
         sniels, zekerheid=0.10, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.00118, abs_tol=1e-4)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.000553, abs_tol=1e-5)
+    assert r["max_fout_convolutie"] == pytest.approx(0.00118, abs=1e-4)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.000553, abs=1e-5)
 
 
 def test_drie_dezelfde_steekproeven():
@@ -221,8 +233,8 @@ def test_drie_dezelfde_steekproeven():
     r = eval_stratified(
         dezelfde_drie, zekerheid=0.60, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.088, abs_tol=1e-3)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.0799, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.088, abs=1e-3)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0799, abs=1e-3)
 
 
 def test_tweeendertig_dezelfde_steekproeven():
@@ -244,15 +256,15 @@ def test_tweeendertig_dezelfde_steekproeven():
     r = eval_stratified(
         dezelfde_32, zekerheid=0.51, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.0830, abs_tol=1e-3)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.0628, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.0830, abs=1e-3)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0628, abs=1e-3)
 
     # 95% Zekerheid
     r = eval_stratified(
         dezelfde_32, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
-    assert math.isclose(r["max_fout_convolutie"], 0.106, abs_tol=1e-3)
-    assert math.isclose(r["vergelijk_met"]["max_fout_los"], 0.238, abs_tol=1e-3)
+    assert r["max_fout_convolutie"] == pytest.approx(0.106, abs=1e-3)
+    assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.238, abs=1e-3)
 
 
 def test_lnv_2023_wim_slot():
@@ -276,8 +288,8 @@ def test_lnv_2023_wim_slot():
 
     # De originele R-test gebruikte Monte Carlo, wat kleine stochastische ruis opleverde.
     # Omdat we hier de exacte FFT-methode gebruiken, testen we op de zuivere wiskundige uitkomst van 42,34 miljoen.
-    assert math.isclose(r["max_fout_convolutie"], 0.139, abs_tol=1e-3)
-    assert math.isclose(r["max_fout_convolutie_geld"], 42343061, abs_tol=50.0)
+    assert r["max_fout_convolutie"] == pytest.approx(0.139, abs=1e-3)
+    assert r["max_fout_convolutie_geld"] == pytest.approx(42343061, abs=50.0)
 
 
 def test_evaluatie_met_hoogstratum():
@@ -301,7 +313,7 @@ def test_evaluatie_met_hoogstratum():
     })
 
     r_fft = eval_stratified(test_top, zekerheid=0.95, methode="FFT paarsgewijs")
-    assert math.isclose(r_fft["mw_fout_convolutie_geld"], 15000, abs_tol=10.0)
+    assert r_fft["mw_fout_convolutie_geld"] == pytest.approx(15000, abs=10.0)
 
 
 def test_fft_vs_monte_carlo():
@@ -327,8 +339,8 @@ def test_fft_vs_monte_carlo():
     )
 
     # De resultaten mogen een klein beetje ruis hebben vanwege de Monte Carlo benadering.
-    assert math.isclose(
-        r_fft["max_fout_convolutie"], r_mc["max_fout_convolutie"], abs_tol=0.015
+    assert r_fft["max_fout_convolutie"] == pytest.approx(
+        r_mc["max_fout_convolutie"], abs=0.015
     )
 
 
@@ -366,7 +378,7 @@ def test_effect_hoogstratum_toevoeging():
 
     verwacht_verschil = (1000.0 - 0.0) / (10000.0 + 1000.0)
     werkelijk_verschil = rb["max_fout_convolutie"] - ra["max_fout_convolutie"]
-    assert math.isclose(werkelijk_verschil, verwacht_verschil, abs_tol=1e-3)
+    assert werkelijk_verschil == pytest.approx(verwacht_verschil, abs=1e-3)
 
 
 # --- Invoercontroles ---
@@ -503,6 +515,27 @@ def test_invoercontrole_ontbrekende_kolom():
     slecht = get_geldige_steekproef().drop(columns=["k_laag"])
     with pytest.raises(ValueError, match="Ontbrekende kolommen"):
         eval_stratified(slecht)
+
+
+def test_optionele_kolommen_worden_aangevuld_als_ontbrekend():
+    """ihr, ibr, car, waarde_hoog, fout_hoog en materialiteit zijn optioneel.
+
+    Als ze ontbreken worden ze aangevuld met respectievelijk 'H', 'H', 'H', 0.0, 0.0, 0.01.
+    """
+    minimaal = pd.DataFrame({
+        "naam": ["Stratum_A"],
+        "waarde_laag": [100000.0],
+        "n_laag": [50],
+        "k_laag": [0],
+    })
+    resultaat = eval_stratified(minimaal, vergelijk=False)
+    steekproeven_uit = resultaat["steekproeven"]
+    assert (steekproeven_uit["ihr"] == "H").all()
+    assert (steekproeven_uit["ibr"] == "H").all()
+    assert (steekproeven_uit["car"] == "H").all()
+    assert (steekproeven_uit["waarde_hoog"] == 0.0).all()
+    assert (steekproeven_uit["fout_hoog"] == 0.0).all()
+    assert (steekproeven_uit["materialiteit"] == 0.01).all()
 
 
 def test_invoercontrole_dubbele_stratumnamen():
@@ -763,3 +796,37 @@ def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
         assert resultaat["steekproeven"]["waarde_hoog"].iloc[0] == 50000.0, (
             f"waarde_hoog mag niet wijzigen bij materialiteit-kolom={mat_kolom}."
         )
+
+
+def test_edge_case_extreme_fout_kleine_steekproef():
+    """
+    Test een extreme edge case: n_laag = 1 en k_laag = n_laag
+    (100% fouten geconstateerd in een minimale steekproef van 1).
+    """
+    data_extreem = pd.DataFrame({
+        "naam": ["Mini Stratum"],
+        "waarde_laag": [100_000.0],
+        "n_laag": [1],
+        "k_laag": [1.0],  # Alle steekproeven bevatten een fout
+        "ihr": ["H"],
+        "ibr": ["H"],
+        "car": ["H"],
+        "materialiteit": [0.05],
+        "waarde_hoog": [0.0],
+        "fout_hoog": [0.0],
+    })
+
+    # Controleer of de motor niet breekt over deze extreme statistische input
+    resultaat = eval_stratified(
+        data_extreem,
+        model="binomiaal",
+        zekerheid=0.95,
+        methode="FFT samen",
+        granulariteit=10_000,
+        vergelijk=False,
+    )
+
+    assert isinstance(resultaat, dict)
+    assert "max_fout_convolutie" in resultaat
+    # Bij 100% fouten op 1 eenheid is de onzekerheid maximaal, dus de fout moet fors zijn
+    assert resultaat["max_fout_convolutie"] > 0.0

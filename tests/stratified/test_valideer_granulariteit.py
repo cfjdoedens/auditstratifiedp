@@ -6,7 +6,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from auditstratified.valideer_granulariteit import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.valideer_granulariteit import (  # pyrefly: ignore[missing-import]
     _delta_i,
     valideer_granulariteit,
 )
@@ -31,7 +31,11 @@ def test_rapport_zonder_n_kolom():
 def test_gewichten_sommeren_naar_een():
     """De gewichten van alle strata moeten optellen tot 1."""
     rapport = valideer_granulariteit(_basis_strata(), granulariteit=10_000)
-    assert abs(rapport["gewicht"].sum() - 1.0) < 1e-9
+    totaal_gewicht = rapport["gewicht"].sum()
+    assert totaal_gewicht == pytest.approx(1.0, abs=1e-9), (
+        f"De som van alle stratum gewichten wijkt af van 1.0. "
+        f"Berekende som: {totaal_gewicht:.12f}"
+    )
 
 
 def test_n_max_grensvoorwaarde():
@@ -49,10 +53,10 @@ def test_n_max_grensvoorwaarde():
         target = 1.0 / g
 
         assert _delta_i(n_max, d, w, zekerheid) >= target, (
-            f"{rij['naam']}: Δᵢ(n_max={n_max}) < 1/g={target}"
+            f"{rij['naam']}: Δᵢ(n_max={n_max}) is te klein (< 1/g={target})"
         )
         assert _delta_i(n_max + 1, d, w, zekerheid) < target, (
-            f"{rij['naam']}: Δᵢ(n_max+1={n_max + 1}) ≥ 1/g={target}"
+            f"{rij['naam']}: Δᵢ(n_max+1={n_max + 1}) is te groot (≥ 1/g={target})"
         )
 
 
