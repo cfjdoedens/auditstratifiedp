@@ -219,6 +219,7 @@ dev = [
     { name = "hypothesis" },
     { name = "jupyter" },
     { name = "pytest" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -239,6 +240,7 @@ dev = [
     { name = "hypothesis", specifier = ">=6.168.5" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "ruff", specifier = ">=0.16.10" },
 ]
 
 [[package]]

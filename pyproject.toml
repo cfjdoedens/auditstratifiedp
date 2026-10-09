@@ -55,4 +55,5 @@ dev = [
     "hypothesis>=6.168.5",
     "jupyter>=1.1.1",
     "pytest>=9.1.1",
+    "ruff>=0.16.10",
 ]

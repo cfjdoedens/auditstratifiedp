@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.interpolate import interp1d
 from scipy import stats
+from scipy.interpolate import interp1d
 
 
 def _continue_kwantiel(cdf_func, max_val, target_p):
@@ -38,7 +38,10 @@ def max_fout_exact_SSO(n, k, N_klant, zekerheid=0.95, verdeling="binomiaal"):
         # Voorspellende verdeling: Negatief-Binomiaal (r=k+1, p=n/(n+N_klant))
         # scipy.stats.nbinom hanteert het aantal mislukkingen, we passen parameters hierop aan.
         p_succes = n / (n + N_klant)
-        cdf_func = lambda x: stats.nbinom.cdf(x, k + 1, p_succes)
+
+        def cdf_func(x):
+            return stats.nbinom.cdf(x, k + 1, p_succes)
+
         aantal_fouten = _continue_kwantiel(cdf_func, N_klant, zekerheid)
         return aantal_fouten / N_klant
     else:

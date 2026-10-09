@@ -1,4 +1,8 @@
 import matplotlib.pyplot as plt
+import numpy as np
+
+from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
+from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO
 
 
 def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaal"):
@@ -28,7 +32,7 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
         p = params.copy()
         p[var_name] = val
         exact_vals.append(
-            max_fout_SSO(p["n"], p["k"], p["N_klant"], p["zekerheid"], verdeling)
+            max_fout_exact_SSO(p["n"], p["k"], p["N_klant"], p["zekerheid"], verdeling)
         )
         benaderd_vals.append(
             max_fout_benaderd_SSO(
