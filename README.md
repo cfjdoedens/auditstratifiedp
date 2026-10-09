@@ -473,7 +473,7 @@ bijvoorbeeld in een Jupyter-notebook of in een Python-script.
 ``` python
 import time
 import pandas as pd
-from auditstratified.plan_stratified import plan_stratified # type: ignore
+from auditstat.stratified.plan_stratified import plan_stratified # type: ignore
 
 # Definieer de strata en de HARo-risico's
 data = pd.DataFrame({
@@ -513,7 +513,7 @@ print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}\n")
 Na de uitvoering van de controle kun je de gevonden fouten evalueren.
 
 ``` python
-from auditstratified.eval_stratified import eval_stratified # type: ignore
+from auditstat.stratified.eval_stratified import eval_stratified # type: ignore
 
 # Voeg de testresultaten toe aan je dataset
 data["n_laag"] = [60, 30]
@@ -536,7 +536,7 @@ print(f"In euro's: € {geld_nl}")
 
 ``` python
 import matplotlib.pyplot as plt
-from auditstratified.plot_kanskromme import plot_kanskromme # type: ignore
+from auditstat.stratified.plot_kanskromme import plot_kanskromme # type: ignore
 
 fig = plot_kanskromme(resultaat)  # resultaat is gemaakt in het vorige codeblok.
 ```
@@ -548,7 +548,7 @@ fig = plot_kanskromme(resultaat)  # resultaat is gemaakt in het vorige codeblok.
 ## Benodigde zekerheid berekenen
 
 ``` python
-from auditstratified.utils import haro_nog_nodige_zekerheid # type: ignore
+from auditstat.stratified.utils import haro_nog_nodige_zekerheid # type: ignore
 
 zekerheid = haro_nog_nodige_zekerheid(ihr="L", ibr="M", car="H")
 
@@ -562,7 +562,7 @@ print(zekerheid)
 ## Virtuele foutloze posten berekenen
 
 ``` python
-from auditstratified.utils import foutloze_posten_equivalent  # type: ignore
+from auditstat.stratified.utils import foutloze_posten_equivalent  # type: ignore
 
 virtuele_posten = foutloze_posten_equivalent(
     ihr="L", ibr="M", car="H", materialiteit=0.02
