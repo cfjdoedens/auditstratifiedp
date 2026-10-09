@@ -28,11 +28,20 @@ auditstat/
   sso/
     __init__.py             # Leeg, inhoud volgt later
 tests/
-  test_eval.py
-  test_plan.py
-  test_utils.py
-  test_klimheuristiek.py
-  test_valideer_granulariteit.py
+  __init__.py
+  stratified/              # Spiegelt auditstat/stratified/
+    __init__.py
+    test_eval.py
+    test_plan.py
+    test_utils.py
+    test_klimheuristiek.py
+    test_valideer_granulariteit.py
+    test_convolutie_analytisch.py
+    test_hypothesis_properties.py
+  sso/                     # Spiegelt auditstat/sso/
+    __init__.py
+    test_max_fout_benaderd_SSO.py
+    test_max_fout_exact_SSO.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
 pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
@@ -173,9 +182,11 @@ De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldb
 .venv/bin/python -m pytest
 ```
 
-187 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+191 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
-**Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
+**Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO` — niet uit een kale modulenaam.
+
+**Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `tests/stratified/test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
 
 ## App starten
 
