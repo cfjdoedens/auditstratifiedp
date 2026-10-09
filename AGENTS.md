@@ -1,24 +1,32 @@
-# auditstratified — projectgeheugen
+# auditstat — projectgeheugen
 
 ## Wat is dit project?
 
-Python-pakket voor gestratificeerde steekproefaudits conform het Handboek Auditing Rijksoverheid (HARo). Drie hoofdfuncties:
+Python-pakket voor statistische auditmethoden voor de Rijksoverheid. Overkoepelend pakket `auditstat` met subpakketten:
 
-- `plan_stratified()` — berekent optimale steekproefomvang per stratum
-- `eval_stratified()` — combineert steekproeven via convolutie tot één gezamenlijke foutschatting
-- `plot_kanskromme()` — visualiseert de resulterende kansverdeling
+- `auditstat.stratified` — gestratificeerde steekproefaudits (HARo-compatibel)
+  - `plan_stratified()` — berekent optimale steekproefomvang per stratum
+  - `eval_stratified()` — combineert steekproeven via convolutie tot één gezamenlijke foutschatting
+  - `plot_kanskromme()` — visualiseert de resulterende kansverdeling
+- `auditstat.sso` — (in voorbereiding)
 
 Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/
 
 ## Bestandsstructuur
 
 ```
-auditstratified/
-  eval_stratified.py      # Convolutie-evaluatie (FFT, Monte Carlo, direct)
-  plan_stratified.py      # Heuvelklimalgoritme voor steekproefplanning
-  plot_kanskromme.py      # Visualisatie
-  utils.py                # HARo-helpers: haro_nog_nodige_zekerheid, drawsneeded, foutloze_posten_equivalent
-  valideer_granulariteit.py
+auditstat/
+  __init__.py
+  stratified/               # Was: auditstratified/
+    __init__.py
+    eval_stratified.py      # Convolutie-evaluatie (FFT, Monte Carlo, direct)
+    plan_stratified.py      # Heuvelklimalgoritme voor steekproefplanning
+    plot_kanskromme.py      # Visualisatie
+    utils.py                # HARo-helpers: haro_nog_nodige_zekerheid, drawsneeded, foutloze_posten_equivalent
+    valideer_granulariteit.py
+    analyseer_klimheuristiek.py
+  sso/
+    __init__.py             # Leeg, inhoud volgt later
 tests/
   test_eval.py
   test_plan.py
@@ -27,7 +35,7 @@ tests/
   test_valideer_granulariteit.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
-pyproject.toml            # Pakketconfiguratie (versie 0.1.x)
+pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
 push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub + PyPI
 ```
 
@@ -42,8 +50,6 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 
 `plan_stratified` gebruikt **nog wel asserts** voor API-contractchecks (`model`, `zekerheid`, `granulariteit`, type van `steekproeven`, aanwezigheid van vereiste kolommen) en `raise ValueError` voor gebruikersinvoerfouten. Dit is historisch en verdient migratie naar het patroon van `eval_stratified`.
 
-**plan_stratified invoer:** De kolom `kosten` is verplicht (relatieve uitvoeringskosten per steek). Wordt echter in `plan_stratified_basis` automatisch op 1.0 gezet als hij ontbreekt — dit is bedoeld voor aanroep vanuit `analyseer_klimheuristiek`.
-
 **Convolutiemethoden in eval_stratified:** `"FFT paarsgewijs"`, `"FFT samen"`, `"direct"`, `"Monte Carlo"`. Plan gebruikt altijd `"FFT samen"`.
 
 **HARo-risicocombinaties:** 27 mogelijke combinaties van IHR × IBR × CAR (`H`/`M`/`L`), getest via `@pytest.mark.parametrize`.
@@ -55,12 +61,44 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 - Het hoogstratum wordt volledig bepaald door `fout_hoog` en `waarde_hoog`, onafhankelijk van de `materialiteit`-kolom.
 - In `app.py`: de helptekst zegt "Totale materialiteit voor dit stratum. Opgevat als fractie als ≤ 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000)." — geldt voor zowel de plannings- als evaluatietab.
 
+## Optionele kolommen in de invoer DataFrames
+
+Beide functies vullen ontbrekende kolommen automatisch aan met standaardwaarden **vóór** de validatie, zodat de validatie altijd op volledige data werkt. De check `if kolom not in steekproeven.columns` triggert alleen als de kolom echt afwezig is — aanwezige kolommen met `None`/NaN worden nog steeds geweigerd.
+
+**plan_stratified — verplicht:** `naam`, `waarde_laag`
+
+**plan_stratified — optioneel (standaardwaarden):**
+
+| Kolom                  | Standaard |
+|------------------------|-----------|
+| `verwachte_foutfractie`| `0.001`   |
+| `ihr`                  | `"H"`     |
+| `ibr`                  | `"H"`     |
+| `car`                  | `"H"`     |
+| `waarde_hoog`          | `0.0`     |
+| `fout_hoog`            | `0.0`     |
+| `materialiteit`        | `0.01`    |
+| `kosten`               | `1.0`     |
+
+**eval_stratified — verplicht:** `naam`, `waarde_laag`, `n_laag`, `k_laag`
+
+**eval_stratified — optioneel (standaardwaarden):**
+
+| Kolom           | Standaard |
+|-----------------|-----------|
+| `ihr`           | `"H"`     |
+| `ibr`           | `"H"`     |
+| `car`           | `"H"`     |
+| `waarde_hoog`   | `0.0`     |
+| `fout_hoog`     | `0.0`     |
+| `materialiteit` | `0.01`    |
+
 ## Kolominhoudvalidatie in plan_stratified en eval_stratified
 
-Beide functies bevatten nu een uitgebreid validatieblok (in `INVOER_CONTROLE`), dat na de structuurchecks (kolomaanwezigheid, dubbele namen) wordt uitgevoerd:
+Beide functies bevatten een uitgebreid validatieblok (in `INVOER_CONTROLE`), dat na de structuurchecks (kolomaanwezigheid, dubbele namen) wordt uitgevoerd. De NaN-check valideert zowel verplichte als optionele kolommen (via `alle_te_valideren_kolommen`).
 
 **Gedeeld (beide functies):**
-- NaN/None in alle vereiste kolommen (inclusief tekstkolommen `naam`, `ihr`, `ibr`, `car`) → `ValueError`
+- NaN/None in alle kolommen (inclusief tekstkolommen `naam`, `ihr`, `ibr`, `car`) → `ValueError`
 - Lege of whitespace-only `naam` → `ValueError`
 - Niet-numeriek dtype voor numerieke kolommen → `ValueError`
 - `waarde_laag` < 0 → `ValueError`
@@ -85,13 +123,6 @@ Beide functies bevatten nu een uitgebreid validatieblok (in `INVOER_CONTROLE`), 
 **NaN-tests:**
 - Numerieke kolommen: getest met `float("nan")`
 - Tekstkolommen (`naam`, `ihr`, `ibr`, `car`): getest met `None`
-
-**Bugfixes bij implementatie:**
-- `ihr` ontbrak in `vereiste_kolommen` van `plan_stratified` — hersteld.
-- De `kosten`-defaultregel (`if "kosten" not in strata.columns: strata["kosten"] = 1.0`) was per ongeluk verwijderd uit `plan_stratified_basis` — hersteld.
-- NaN/None-check voor tekstkolommen ontbrak in `plan_stratified` — toegevoegd.
-- `assert granulariteit >= 0` was fout in `plan_stratified` (zou 0 doorlaten); gecorrigeerd naar `> 0`.
-- `print()` in `vind_beste_strata_groep` vervangen door `warnings.warn(..., RuntimeWarning, stacklevel=2)`.
 
 ## Granulariteitscheck (FFT-crashpreventie)
 
@@ -142,7 +173,7 @@ De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldb
 .venv/bin/python -m pytest
 ```
 
-156 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+187 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
 
@@ -171,4 +202,4 @@ git push origin main   # geen tag → alleen test-workflow
 ## CI/CD
 
 - `.github/workflows/test.yml` — draait bij elke push/PR op main; matrix Python 3.10–3.13; inclusief ruff-linting en pakket-importtest
-- `.github/workflows/publish.yml` — triggert op `v*`-tags; publiceert naar PyPI
+- `.github/workflows/publish.yml` — triggert op `v*`-tags; publiceert naar PyPI (`pypi.org/p/auditstat`)

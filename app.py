@@ -3,17 +3,17 @@ import time
 import pandas as pd
 import streamlit as st
 
-from auditstratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
-from auditstratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
     plan_stratified_basis,
     vind_beste_strata_groep,
 )
-from auditstratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
     plot_kanskromme,
 )
-from auditstratified.utils import (  # pyrefly: ignore[missing-import]
+from auditstat.stratified.utils import (  # pyrefly: ignore[missing-import]
     foutloze_posten_equivalent,
     haro_nog_nodige_zekerheid,
 )

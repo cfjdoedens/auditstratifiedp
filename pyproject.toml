@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "auditstratified"
+name = "auditstat"
 version = "0.1.7"
 authors = [
     {name = "Crist-Jan Doedens", email = "auditstratified_python@chance-matters.nl"}, 
 ]
-description = "Gestratificeerde steekproefaudits voor de Rijksoverheid (HARo-compatibel)"
+description = "Statistische auditmethoden voor de Rijksoverheid (HARo-compatibel)"
 readme = "README.md"
 license = "EUPL-1.2"
 requires-python = ">=3.10"
@@ -43,6 +43,14 @@ dev = [
 "Source" = "https://github.com/cfjdoedens/auditstratifiedp"
 "Demo" = "https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/"
 
+[tool.setuptools.exclude-package-data]
+"*" = ["20250108 opmerkingen app geautomatiseerde steekproef - cjd met reactie ws bkl.odt"]
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["auditstratified*"]
+include = ["auditstat*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

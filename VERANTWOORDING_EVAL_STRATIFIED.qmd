@@ -1,0 +1,103 @@
+# Verantwoording van convolutie en van de implementatie in eval_stratified 
+
+## Hoe het niet kan
+
+We hebben ons de taak gesteld om gegeven een aantal strata
+en gegeven de steekproefresultaten van die strata de maximale fout over
+de strata samen te berekenen.
+
+Als de foutfracties in de strata bekend zijn, en de relatieve gewichten in geld van de strata, kunnen we daaruit de totale foutfractie
+gewogen berekenen. 
+Echter de foutfracties van de strata kennen we niet. We hebben alleen een kansverdeling van de mogelijke waarden. Daaruit kunnen wel per stratum de maximale fout bepalen.
+
+Een eenvoudige optelling van de afzonderlijke maximale fouten is niet geschikt. Stel dat voor twee strata ieder een maximale fout bij 95% zekerheid wordt berekend. De som van deze twee 95%-bovengrenzen is in het algemeen niet gelijk aan de 95%-bovengrens van de totale fout. Door de afzonderlijke bovengrenzen simpelweg op te tellen ontstaat doorgaans een te conservatieve schatting.
+
+## Hoe wel: convolutie
+
+Onder de aanname dat de foutverdelingen van de verschillende strata onderling onafhankelijk zijn, volgt uit de kansrekening dat de kansverdeling van de 
+totale foutfractie wordt verkregen door convolutie van de afzonderlijke, naar geldgewicht geschaalde kansverdelingen. 
+
+Convolutie betekent in het geldsteekproefdomein
+dat voor ieder mogelijk totaalbedrag aan fout wordt gekeken naar alle combinaties van fouten in de afzonderlijke strata die samen precies dat totaal kunnen opleveren; en de kansen van dat totaal worden bij elkaar opgeteld. Het resultaat is één nieuwe kansverdeling die de onzekerheid over de fout in de gehele populatie beschrijft.
+
+## Drie stappen
+
+We hebben dan de volgende stappen nodig om tot de maximale fout
+van de strata samen te komen.
+
+1. *Bepaal de afzonderlijke kansverdelingen uit hun steekproefresultaat.*
+   Dit gebaseerd op het gekozen kansmodel bijvoorbeeld binomiaal
+   of Poisson.
+   Bij het binomiale model
+   wordt hiervoor een Beta-verdeling gebruikt; 
+   bij het Poissonmodel een Gamma-verdeling. 
+1. *Combineer de kansverdelingen, gewogen naar de geldomvang van ieder stratum; dit dus met convolutie.*
+   `auditstratified` gebruikt voor deze samenvoeging bij verstek FFT. 
+   Maar ook is ter vergelijking de Monte Carlo methode beschikbaar.
+1. *Bepaal van deze combinatie de maximale fout.*
+   Bij een zekerheid van bijvoorbeeld 95% wordt het 95%-kwantiel 
+   van de gecombineerde verdeling genomen. 
+   Dus die foutfractie, $f$ wordt opgezocht waarbij
+   95% van alle foutfracties <= $f$, gewogen naar hun kans. 
+
+## Waarom FFT?
+
+Bij convolutie moeten voor ieder mogelijk totaal aan fouten alle combinaties van fouten uit de afzonderlijke strata worden meegenomen die tot dat totaal kunnen leiden. Wanneer de kansverdelingen uit slechts enkele punten zouden bestaan, kan dit rechtstreeks worden uitgerekend. In auditstratified worden de kansverdelingen echter weergegeven door een zeer groot aantal punten. Rechtstreekse convolutie wordt daardoor rekenkundig kostbaar.
+
+De Fast Fourier Transform (FFT) biedt een veel efficiëntere manier om dezelfde convolutie te berekenen. Daarbij worden de kansverdelingen tijdelijk omgezet naar een andere wiskundige representatie. Een belangrijke wiskundige eigenschap, de convolutiestelling, zegt dat convolutie in deze representatie kan worden uitgevoerd door de getransformeerde waarden eenvoudig met elkaar te vermenigvuldigen. Daarna wordt het resultaat met de inverse FFT terugvertaald naar de kansverdeling van de totale fout.
+
+## Waarom `FFT samen`?
+
+Binnen auditstratified zijn verschillende methoden voor het berekenen van convolutie met behulp van de FFT beschikbaar. FFT samen is de standaardmethode. Deze methode is
+meer algemeen bekend als FFT-gebaseerde meervoudige convolutie (FFT-based n-fold convolution).
+
+Eerst wordt één gemeenschappelijke rasterstap in geld bepaald. Vervolgens wordt voor ieder stratum op basis van deze rasterstap een afzonderlijke gediscretiseerde kansverdeling opgebouwd. De kansvectoren kunnen daarbij verschillende lengtes hebben, omdat de mogelijke foutbedragen per stratum verschillen.
+
+Voor de FFT-berekening worden deze kansvectoren met nullen aangevuld tot dezelfde, voldoende grote lengte (zero-padding). Van iedere aldus aangevulde kansvector wordt vervolgens de Fouriertransformatie berekend. De Fouriergetransformeerde kansvectoren worden per zelfde index (overeenkomstige positie in de vector) met elkaar vermenigvuldigd. (Hier zit de snelheidswinst, geen kruisvermenigvuldiging nodig!) Eén inverse Fouriertransformatie van dit product levert tenslotte de gecombineerde kansverdeling van alle strata op.
+
+Deze aanpak heeft een belangrijk voordeel: alle strata worden op volstrekt symmetrische wijze behandeld. Er is geen eerste, tweede of laatste stratum in de rekenmethode. 
+
+De volgorde waarin de strata in het invoerbestand staan behoort daarom geen invloed te hebben op de uitkomst. Dit kan bovendien expliciet met geautomatiseerde tests worden gecontroleerd door dezelfde strata in verschillende volgorden aan te bieden en de uitkomsten met elkaar te vergelijken.
+
+Een alternatieve methode is paarsgewijze FFT-convolutie. Daarbij worden bijvoorbeeld eerst stratum A en B geconvolueerd en wordt het resultaat vervolgens met C geconvolueerd. Wiskundig zijn convoluties associatief en commutatief en hoort ook deze methode dezelfde uitkomst te geven. In numerieke floating-point-berekeningen kunnen door herhaald afronden echter uiterst kleine verschillen ontstaan. `FFT samen` vermijdt die opeenvolgende paarsgewijze stappen en verwerkt de strata in één gezamenlijke frequentiedomeinberekening.
+
+## Validatie van de implementatie
+
+Dat een methode wiskundig juist is, betekent nog niet automatisch dat een software-implementatie ervan correct is. Daarom wordt de implementatie van `FFT samen` afzonderlijk gevalideerd tegen situaties waarvoor de theoretische uitkomst onafhankelijk kan worden berekend.
+
+Een eerste controle betreft één enkel binomiaal stratum. In dat geval vindt feitelijk nog geen convolutie plaats en moet de door `eval_stratified()` berekende verdeling rechtstreeks overeenkomen met de theoretische Beta-verdeling. In de tests worden onder meer de minimale en maximale fout, mediaan, gemiddelde en modus vergeleken met de overeenkomstige waarden uit de analytische Beta-verdeling.
+
+Voor het Poissonmodel bestaat een tweede exacte controle. Wanneer meerdere Gamma-verdelingen dezelfde schaalparameter hebben, is hun som opnieuw Gamma-verdeeld. Door strata zo te kiezen dat deze reproductie-eigenschap geldt, kan de gecombineerde verdeling exact vooraf worden berekend. De uitkomst van `FFT samen` wordt vervolgens rechtstreeks vergeleken met deze theoretische Gamma-verdeling.
+
+Een derde analytische controle ontstaat uit de Beta-verdeling met parameters (1,1). Deze is exact gelijk aan een uniforme verdeling op het interval van 0 tot 1. Het gemiddelde van meerdere onafhankelijke uniforme verdelingen heeft een bekende verdeling. Dit wordt de Bates-verdeling genoemd. Door strata met deze specifieke parameters te construeren, kan de via FFT berekende gecombineerde verdeling worden getoetst aan de exact bekende Bates-verdeling.
+
+Daarnaast worden ook ongelijk gewogen strata getest. Door de geldgewichten en steekproefomvangen zo te kiezen dat de gewogen Gamma-verdelingen dezelfde schaalparameter behouden, blijft opnieuw een exacte analytische oplossing beschikbaar. Daarmee wordt niet alleen de convolutie zelf, maar ook de correcte geldweging van de afzonderlijke strata gevalideerd.
+
+Ook de verwerking van integraal gecontroleerde hoogstrata wordt afzonderlijk getest. Een reeds bekende fout in het hoogstratum bevat geen statistische onzekerheid. Deze fout moet daarom als een vaste verschuiving aan de kansverdeling van de statistisch gecontroleerde laagstrata worden toegevoegd. De tests controleren expliciet of deze verschuiving exact op de juiste wijze plaatsvindt.
+
+Verder worden de verschillende numerieke convolutiemethoden onderling vergeleken. Naast `FFT samen` bevat het pakket een paarsgewijze FFT-convolutie en een directe implementatie van de wiskundige convolutie. Deze methoden gebruiken verschillende rekenroutes, maar moeten binnen de grenzen van numerieke afronding dezelfde uitkomst produceren.
+
+Ten slotte wordt gecontroleerd of de numerieke benadering verbetert wanneer het raster fijner wordt. De kansverdelingen worden namelijk noodzakelijkerwijs op een eindig raster gediscretiseerd. Door dezelfde analytisch bekende situatie met steeds hogere granulariteit te berekenen, kan worden vastgesteld dat de numerieke fout bij voldoende rasterdichtheid klein wordt en de uitkomst naar de theoretische waarde convergeert.
+
+## Betekenis voor de auditor
+
+De essentie van de methode is daarmee betrekkelijk eenvoudig.
+
+Voor ieder stratum wordt eerst afzonderlijk de onzekerheid over de fout gemodelleerd. Omdat de totale fout de som is van de fouten in de afzonderlijke strata, wordt vervolgens de kansverdeling van die totale fout bepaald door convolutie. Daarna wordt uit deze gezamenlijke verdeling de gewenste bovengrens bij bijvoorbeeld 95% zekerheid afgeleid.
+
+Het gebruik van convolutie volgt rechtstreeks uit de kansrekening, onder de expliciete aanname dat de foutverdelingen van de strata onafhankelijk zijn.
+
+`FFT samen` verandert deze statistische grondslag niet. Het is een efficiënte numerieke implementatie van dezelfde convolutie, gebaseerd op de convolutiestelling van Fourier. De gekozen aanpak behandelt alle strata symmetrisch en maakt het mogelijk om ook grote problemen praktisch snel door te rekenen.
+
+De implementatie wordt bovendien niet alleen intern met andere algoritmen vergeleken, maar ook onafhankelijk getoetst aan gevallen waarvoor de juiste gecombineerde kansverdeling analytisch bekend is, waaronder Beta-, Gamma- en Bates-verdelingen.
+
+Daarmee zijn twee verschillende vragen afzonderlijk beantwoord:
+
+1. **Waarom worden de kansverdelingen door convolutie gecombineerd?**
+   Omdat convolutie volgens de kansrekening de verdeling geeft van de som van onafhankelijke stochastische variabelen.
+
+2. **Waarom kan erop worden vertrouwd dat `FFT samen` die convolutie correct berekent?**
+   Omdat de implementatie wordt getoetst aan exacte analytische oplossingen, alternatieve convolutiealgoritmen en numerieke convergentietests.
+
+Daarmee vormt convolutie via `FFT samen` een transparante, reproduceerbare en rechtstreeks controleerbare statistische basis voor de gezamenlijke evaluatie van gestratificeerde auditsteekproeven.
+

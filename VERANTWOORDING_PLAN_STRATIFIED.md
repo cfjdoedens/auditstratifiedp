@@ -1,4 +1,4 @@
-# Wiskundige verantwoording van het planningsalgoritme
+# Verantwoording van het planningsalgoritme
 
 ## 1. Inleiding
 

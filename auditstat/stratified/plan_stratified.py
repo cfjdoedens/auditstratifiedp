@@ -39,6 +39,17 @@ def plan_stratified(
     ----------
     steekproeven : pd.DataFrame
         Invoertabel met één rij per stratum.
+        Verplichte kolommen: ``naam``, ``waarde_laag``.
+        Optionele kolommen (standaardwaarden worden ingevuld als ze ontbreken):
+
+        - ``verwachte_foutfractie`` (float, standaard ``0.001``)
+        - ``ihr`` (str, standaard ``'H'``)
+        - ``ibr`` (str, standaard ``'H'``)
+        - ``car`` (str, standaard ``'H'``)
+        - ``waarde_hoog`` (float, standaard ``0.0``)
+        - ``fout_hoog`` (float, standaard ``0.0``)
+        - ``materialiteit`` (float, standaard ``0.01``)
+        - ``kosten`` (float, standaard ``1.0``)
     model : {"binomiaal", "poisson"}
         Kansmodel voor de convolutieberekening.
         binomiaal bij verstek.
@@ -86,6 +97,24 @@ def plan_stratified(
         Als de verwachte foutfractie ≥ de omgerekende materialiteit van het laagstratum.
         Als de totale bekende of verwachte fout de algehele materialiteit overschrijdt.
     """
+    # Voeg standaardwaarden toe voor optionele kolommen als ze ontbreken.
+    # Dit gebeurt vóór de validatie zodat die altijd op volledige data werkt.
+    if isinstance(steekproeven, pd.DataFrame):
+        steekproeven = steekproeven.copy()
+        optionele_standaarden = {
+            "verwachte_foutfractie": 0.001,
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "waarde_hoog": 0.0,
+            "fout_hoog": 0.0,
+            "materialiteit": 0.01,
+            "kosten": 1.0,
+        }
+        for kolom, standaard in optionele_standaarden.items():
+            if kolom not in steekproeven.columns:
+                steekproeven[kolom] = standaard
+
     INVOER_CONTROLE = True  # Niet op False zetten, tenzij je de controles,
     # met name, die ValueErrors kunnen geven,
     # buiten de functieaanroep overdoet!
@@ -99,17 +128,11 @@ def plan_stratified(
             raise ValueError("steekproeven is leeg: moet tenminste 1 stratum bevatten.")
 
         # Controle op vereiste kolommen in steekproeven.
+        # verwachte_foutfractie, ihr, ibr, car, waarde_hoog, fout_hoog, materialiteit
+        # en kosten zijn optioneel: ze zijn al aangevuld met standaardwaarden als ze ontbraken.
         vereiste_kolommen = {
             "naam",
             "waarde_laag",
-            "verwachte_foutfractie",
-            "ihr",
-            "ibr",
-            "car",
-            "kosten",
-            "waarde_hoog",
-            "fout_hoog",
-            "materialiteit",
         }
         ontbrekend = vereiste_kolommen - set(steekproeven.columns)
         if ontbrekend:
@@ -122,9 +145,22 @@ def plan_stratified(
                 f"Evaluatiefout: De volgende stratumnamen komen vaker dan één keer voor: {', '.join(dubbele)}"
             )
 
-        # Controleer op NaN/None-waarden in alle vereiste kolommen.
+        # Controleer op NaN/None-waarden in alle aanwezige kolommen
+        # (verplicht én optioneel; optionele zijn al aangevuld met standaardwaarden).
+        alle_te_valideren_kolommen = vereiste_kolommen | {
+            "verwachte_foutfractie",
+            "ihr",
+            "ibr",
+            "car",
+            "kosten",
+            "waarde_hoog",
+            "fout_hoog",
+            "materialiteit",
+        }
         kolommen_met_nan = [
-            k for k in sorted(vereiste_kolommen) if steekproeven[k].isna().any()
+            k
+            for k in sorted(alle_te_valideren_kolommen)
+            if steekproeven[k].isna().any()
         ]
         if kolommen_met_nan:
             raise ValueError(

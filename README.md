@@ -1,7 +1,7 @@
-# auditstratified
+# README auditstratified
 
 
-# auditstratified
+# Inleiding
 
 Het doel van het **auditstratified**-pakket is om de totale foutfractie
 van een aantal geldmassa’s te schatten gebaseerd op steekproeven. De
