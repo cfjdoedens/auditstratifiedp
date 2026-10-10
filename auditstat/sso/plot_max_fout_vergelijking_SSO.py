@@ -12,7 +12,7 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
     """
     params = {"n": n, "k": k, "N_klant": N_klant, "zekerheid": zekerheid}
 
-    # Detecteer welke parameter de vector is
+    # Detecteer welke parameter de vector is.
     var_name = None
     var_vector = None
     for name, val in params.items():
@@ -40,6 +40,13 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
             )
         )
 
+    # Vaste parameters (alles behalve de gevarieerde en 'verdeling', die al in
+    # de titel staat) tonen we als onderschrift bij de plot.
+    vaste_params = {name: val for name, val in params.items() if name != var_name}
+    vaste_params_tekst = ", ".join(
+        f"{name}={val}" for name, val in vaste_params.items()
+    )
+
     plt.figure(figsize=(10, 6))
     plt.plot(
         var_vector, exact_vals, label="Exact (Beta-Binomiaal)", marker="o", markersize=4
@@ -47,16 +54,19 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
     plt.plot(
         var_vector,
         benaderd_vals,
-        label="Benadering ($n_{klant}$)",
+        label="Benadering met $ n_{klant} = (n * N_{klant}) / (n + N_{klant}) $ en $ k_{klant} = k * (n_{klant} / n) $",
         linestyle="--",
         marker="x",
         markersize=4,
     )
     plt.title(
         f"Vergelijking Maximale Foutfractie ({verdeling.capitalize()}) - Gevarieerd: {var_name}"
+        f"\n(vast: {vaste_params_tekst})",
+        fontsize=11,
     )
     plt.xlabel(var_name)
     plt.ylabel("Maximale Foutfractie")
     plt.legend()
     plt.grid(True, alpha=0.3)
+    plt.tight_layout()
     plt.show()
