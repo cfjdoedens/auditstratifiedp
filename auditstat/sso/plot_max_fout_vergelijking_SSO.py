@@ -40,12 +40,14 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
             )
         )
 
-    # Vaste parameters (alles behalve de gevarieerde en 'verdeling', die al in
-    # de titel staat) tonen we als onderschrift bij de plot.
+    # Onderschrift bij de plot: vaste parameters, plus de gevarieerde
+    # parameter met zijn bereik.
     vaste_params = {name: val for name, val in params.items() if name != var_name}
     vaste_params_tekst = ", ".join(
         f"{name}={val}" for name, val in vaste_params.items()
     )
+    gevarieerd_tekst = f"{var_name}={min(var_vector)}..{max(var_vector)}"
+    onderschrift = f"vast: {vaste_params_tekst}; gevarieerd: {gevarieerd_tekst}"
 
     plt.figure(figsize=(10, 6))
     plt.plot(
@@ -60,8 +62,8 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
         markersize=4,
     )
     plt.title(
-        f"Vergelijking Maximale Foutfractie ({verdeling.capitalize()}) - Gevarieerd: {var_name}"
-        f"\n(vast: {vaste_params_tekst})",
+        f"Vergelijking Maximale Foutfractie ({verdeling.capitalize()})"
+        f"\n({onderschrift})",
         fontsize=11,
     )
     plt.xlabel(var_name)
