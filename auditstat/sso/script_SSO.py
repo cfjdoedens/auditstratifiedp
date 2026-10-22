@@ -4,7 +4,9 @@ import numpy as np
 
 from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
 from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO
+from auditstat.sso.plot_kanskromme_SSO import plot_kanskromme_SSO
 from auditstat.sso.plot_max_fout_vergelijking_SSO import (
+    # plot_max_fout_vergelijking_SSO,
     plot_max_fout_vergelijking_SSO_overzicht,
 )
 from auditstat.sso.simuleer_SSO import simuleer_SSO
@@ -84,7 +86,11 @@ def script_SSO():
                 verdeling=verdeling,
             ),
         ],
-        titel=f"Vier gevarieerde parameters ({verdeling.capitalize()})",
+    )
+
+    print("\n--- 4. Kanskromme exact vs. benaderd ---")
+    plot_kanskromme_SSO(
+        n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling
     )
 
 
