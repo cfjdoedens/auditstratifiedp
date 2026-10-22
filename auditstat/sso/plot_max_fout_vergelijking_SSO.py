@@ -1,11 +1,19 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
 from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO
 
+hoofdtitel = (
+    "Vergelijking maximale foutfractie van klant SSO op basis van steekproef uit SSO, n, \n"
+    "som foutfracties, k, en aantal posten klant, N_klant"
+)
 
-def _teken_vergelijking(ax, n, k, N_klant, zekerheid, verdeling="binomiaal"):
+
+def _teken_vergelijking(
+    ax, n, k, N_klant, zekerheid, verdeling="binomiaal", met_titel=True
+):
     """
     Berekent de exacte en benaderde foutfractie en tekent deze op de
     meegegeven Axes. Verwacht precies één lijst/array als input voor
@@ -41,14 +49,14 @@ def _teken_vergelijking(ax, n, k, N_klant, zekerheid, verdeling="binomiaal"):
             )
         )
 
-    # Onderschrift bij de plot: vaste parameters, plus de gevarieerde
-    # parameter met zijn bereik.
+    # Subtitel bij de plot:
+    #   vaste parameters, plus de gevarieerde parameter met zijn bereik, en de verdeling.
     vaste_params = {name: val for name, val in params.items() if name != var_name}
     vaste_params_tekst = ", ".join(
         f"{name}={val}" for name, val in vaste_params.items()
     )
     gevarieerd_tekst = f"{var_name}={min(var_vector)}..{max(var_vector)}"
-    onderschrift = f"vast: {vaste_params_tekst}; gevarieerd: {gevarieerd_tekst}"
+    subtitel = f"{vaste_params_tekst}; {gevarieerd_tekst}, verdeling: {verdeling}"
 
     ax.plot(
         var_vector, exact_vals, label="Exact (Beta-Binomiaal)", marker="o", markersize=4
@@ -61,13 +69,18 @@ def _teken_vergelijking(ax, n, k, N_klant, zekerheid, verdeling="binomiaal"):
         marker="x",
         markersize=4,
     )
-    ax.set_title(
-        f"Vergelijking Maximale Foutfractie ({verdeling.capitalize()})"
-        f"\n({onderschrift})",
-        fontsize=11,
-    )
+    if met_titel:
+        ax.set_title(
+            f"{hoofdtitel}\n{subtitel}",
+            fontsize=11,
+        )
+    else:
+        ax.set_title(
+            f"{subtitel}",
+            fontsize=11,
+        )
     ax.set_xlabel(var_name)
-    ax.set_ylabel("Maximale Foutfractie")
+    ax.set_ylabel("maximale foutfractie")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
@@ -78,14 +91,22 @@ def plot_max_fout_vergelijking_SSO(n, k, N_klant, zekerheid, verdeling="binomiaa
     """
     Plot de exacte en benaderde foutfractie. Verwacht precies één lijst/array als input
     voor n, k, N_klant of zekerheid om de x-as te bepalen.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
     """
-    _, ax = plt.subplots(figsize=(10, 6))
-    _teken_vergelijking(ax, n, k, N_klant, zekerheid, verdeling)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    _teken_vergelijking(ax, n, k, N_klant, zekerheid, verdeling, met_titel=True)
     plt.tight_layout()
-    plt.show()
+    # Alleen tonen bij een interactieve backend; bij bijv. Streamlit (Agg)
+    # geeft plt.show() alleen een onnodige waarschuwing.
+    if matplotlib.get_backend().lower() != "agg":
+        plt.show()
+    return fig
 
 
-def plot_max_fout_vergelijking_SSO_overzicht(parameter_sets, titel=None):
+def plot_max_fout_vergelijking_SSO_overzicht(parameter_sets):
     """
     Combineert meerdere aanroepen van plot_max_fout_vergelijking_SSO in één
     figuur met een 2x2-raster subplots.
@@ -114,11 +135,13 @@ def plot_max_fout_vergelijking_SSO_overzicht(parameter_sets, titel=None):
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 10))
     for ax, params in zip(axes.flat, parameter_sets, strict=True):
-        _teken_vergelijking(ax, **params)
+        _teken_vergelijking(ax, **params, met_titel=False)
 
-    if titel:
-        fig.suptitle(titel, fontsize=14)
+    fig.suptitle(hoofdtitel, fontsize=14)
 
     plt.tight_layout()
-    plt.show()
+    # Alleen tonen bij een interactieve backend; bij bijv. Streamlit (Agg)
+    # geeft plt.show() alleen een onnodige waarschuwing.
+    if matplotlib.get_backend().lower() != "agg":
+        plt.show()
     return fig
