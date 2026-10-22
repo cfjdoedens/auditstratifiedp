@@ -1,8 +1,27 @@
 import time
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
+from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    evalueer_SSO_klant_gestratificeerd,
+)
+from auditstat.sso.max_fout_benaderd_SSO import (  # pyrefly: ignore[missing-import]
+    max_fout_benaderd_SSO,
+)
+from auditstat.sso.max_fout_exact_continu_SSO import (  # pyrefly: ignore[missing-import]
+    max_fout_exact_continu_SSO,
+)
+from auditstat.sso.max_fout_exact_SSO import (  # pyrefly: ignore[missing-import]
+    max_fout_exact_SSO,
+)
+from auditstat.sso.plot_kanskromme_SSO import (  # pyrefly: ignore[missing-import]
+    plot_kanskromme_SSO,
+)
+from auditstat.sso.plot_max_fout_vergelijking_SSO import (  # pyrefly: ignore[missing-import]
+    plot_max_fout_vergelijking_SSO,
+)
 from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
@@ -56,6 +75,20 @@ LEGE_PLAN_DF = pd.DataFrame({
     "n_laag_tot": [None] * 8,
 })
 
+# Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de
+# gestratificeerde SSO-klantevaluatie te initialiseren (één rij per type post).
+LEGE_SSO_STRATA_DF = pd.DataFrame({
+    "naam": [""] * 4,
+    "n": [""] * 4,
+    "k": [""] * 4,
+    "N_klant": [""] * 4,
+    "waarde_laag": [""] * 4,
+    "ihr": ["H"] * 4,
+    "ibr": ["H"] * 4,
+    "car": ["H"] * 4,
+    "materialiteit": ["0,01"] * 4,
+})
+
 # Initialiseer de sessiestatus met standaardwaarden voor de plannings- en evaluatieberekening.
 for key, standaard in {
     "plan_tabel": LEGE_PLAN_DF.copy(),
@@ -76,6 +109,9 @@ for key, standaard in {
     "eval_tabel_key": 0,
     "plan_error": None,
     "plan_tabel_key": 0,
+    "sso_strata_tabel": LEGE_SSO_STRATA_DF.copy(),
+    "sso_strata_res": None,
+    "sso_strata_error": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
@@ -403,11 +439,12 @@ def on_plan_tabel_change():
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
 st.title("auditstratified")
 
-tab_nnz, tab_fpe, tab_eval, tab_plan = st.tabs([
+tab_nnz, tab_fpe, tab_eval, tab_plan, tab_sso = st.tabs([
     "nog nodige zekerheid",
     "foutlozepostenequivalent",
     "evaluatie gestratificeerd",
     "planning gestratificeerd",
+    "SSO",
 ])
 
 # Configureer het eerste tabblad voor de berekening van de nog nodige zekerheid.
@@ -1243,3 +1280,334 @@ with tab_plan:
                     f"Optimalisatie voltooid! Eindfout: {fmt_fout} <= materialiteit."
                 )
             st.rerun()
+
+# Configureer het vijfde tabblad voor de maximale foutfractie bij een SSO-klant.
+with tab_sso:
+    col_inst, col_hoofd = st.columns([1, 3])
+
+    with col_inst:
+        st.subheader("instellingen")
+        sso_verdeling = st.radio(
+            "verdeling",
+            ["binomiaal", "poisson"],
+            horizontal=True,
+            key="sso_verdeling",
+        )
+        sso_n_text = st.text_input(
+            "n (steekproefomvang bij SSO)", value="200", key="sso_n_text"
+        )
+        sso_k_text = st.text_input(
+            "k (aantal fouten in de steekproef)", value="0", key="sso_k_text"
+        )
+        sso_N_klant_text = st.text_input(
+            "N_klant (aantal posten bij de klant)", value="150", key="sso_N_klant_text"
+        )
+        sso_zekerheid_text = st.text_input(
+            "zekerheid", value="0,95", key="sso_zekerheid_text"
+        )
+
+        sso_n = _parse_nl(sso_n_text)
+        sso_k = _parse_nl(sso_k_text)
+        sso_N_klant = _parse_nl(sso_N_klant_text)
+        sso_zekerheid = _parse_nl(sso_zekerheid_text)
+
+    with col_hoofd:
+        st.subheader("Resultaat")
+
+        # Verzamel invoerfouten voordat er iets berekend wordt.
+        sso_fouten = []
+        if sso_n is None or sso_n <= 0:
+            sso_fouten.append("Voer een geldige n in (groter dan 0).")
+        if sso_k is None or sso_k < 0:
+            sso_fouten.append("Voer een geldige k in (0 of groter).")
+        if sso_n is not None and sso_k is not None and sso_k > sso_n:
+            sso_fouten.append("k mag niet groter zijn dan n.")
+        if sso_N_klant is None or sso_N_klant <= 0:
+            sso_fouten.append("Voer een geldige N_klant in (groter dan 0).")
+        if sso_zekerheid is None or not (0.0 < sso_zekerheid < 1.0):
+            sso_fouten.append(
+                "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
+            )
+
+        if sso_fouten:
+            for sso_msg in sso_fouten:
+                st.error(sso_msg)
+        else:
+            sso_n_int = int(sso_n)
+            sso_k_int = int(sso_k)
+            sso_N_klant_int = int(sso_N_klant)
+
+            try:
+                sso_exact = max_fout_exact_SSO(
+                    sso_n_int, sso_k_int, sso_N_klant_int, sso_zekerheid, sso_verdeling
+                )
+                sso_exact_continu = max_fout_exact_continu_SSO(
+                    sso_n_int, sso_k_int, sso_N_klant_int, sso_zekerheid, sso_verdeling
+                )
+                sso_benaderd = max_fout_benaderd_SSO(
+                    sso_n_int, sso_k_int, sso_N_klant_int, sso_zekerheid, sso_verdeling
+                )
+            except ValueError as e:
+                st.error(f"Fout bij berekening: {e}")
+            else:
+                sso_metric_col1, sso_metric_col2, sso_metric_col3 = st.columns(3)
+                sso_metric_col1.metric(
+                    "Maximale foutfractie (exact)", _nl(sso_exact, 4)
+                )
+                sso_metric_col2.metric(
+                    "Maximale foutfractie (exact, continu)", _nl(sso_exact_continu, 4)
+                )
+                sso_metric_col3.metric(
+                    "Maximale foutfractie (benaderd)", _nl(sso_benaderd, 4)
+                )
+
+                st.caption(
+                    "Exact: Beta-Binomiaal resp. Negatief-Binomiaal voorspellende "
+                    "verdeling (discreet). Exact, continu: dezelfde voorspellende "
+                    "verdeling analytisch doorgetrokken naar reële foutfracties, "
+                    "met behoud van beide onzekerheidslagen. Benaderd: eenvoudiger "
+                    "Beta- resp. Gamma-benadering op basis van een effectieve "
+                    "steekproefomvang bij de klant, die de twee onzekerheidslagen "
+                    "samenvoegt."
+                )
+
+                st.subheader("Kanskromme: exact vs. benaderd")
+                sso_fig_kans = plot_kanskromme_SSO(
+                    sso_n_int, sso_k_int, sso_N_klant_int, sso_zekerheid, sso_verdeling
+                )
+                st.pyplot(sso_fig_kans)
+
+        st.divider()
+        st.subheader("Gevoeligheid over een bereik")
+        st.caption(
+            "Varieer één van de parameters over een bereik en vergelijk de "
+            "exacte en benaderde maximale foutfractie."
+        )
+
+        sso_var_col, sso_van_col, sso_tot_col, sso_stap_col = st.columns(4)
+        with sso_var_col:
+            sso_var_naam = st.selectbox(
+                "varieer",
+                ["n", "k", "N_klant", "zekerheid"],
+                key="sso_var_naam",
+            )
+        with sso_van_col:
+            sso_van_text = st.text_input("van", value="10", key="sso_van_text")
+        with sso_tot_col:
+            sso_tot_text = st.text_input("tot en met", value="200", key="sso_tot_text")
+        with sso_stap_col:
+            sso_stap_text = st.text_input(
+                "stapgrootte", value="10", key="sso_stap_text"
+            )
+
+        if st.button("plot vergelijking", key="sso_plot_knop"):
+            sso_van = _parse_nl(sso_van_text)
+            sso_tot = _parse_nl(sso_tot_text)
+            sso_stap = _parse_nl(sso_stap_text)
+
+            if sso_van is None or sso_tot is None or sso_stap is None:
+                st.error(
+                    "Voer geldige getallen in voor van, tot en met, en stapgrootte."
+                )
+            elif sso_stap <= 0:
+                st.error("De stapgrootte moet groter zijn dan 0.")
+            elif sso_van >= sso_tot:
+                st.error("'van' moet kleiner zijn dan 'tot en met'.")
+            elif sso_fouten:
+                st.error("Los eerst de foutmeldingen bij de instellingen hierboven op.")
+            else:
+                sso_vast = {
+                    "n": sso_n_int,
+                    "k": sso_k_int,
+                    "N_klant": sso_N_klant_int,
+                    "zekerheid": sso_zekerheid,
+                }
+                sso_vector = np.arange(sso_van, sso_tot + sso_stap / 2, sso_stap)
+                if sso_var_naam in ("n", "k", "N_klant"):
+                    sso_vector = sso_vector.astype(int)
+                sso_vast[sso_var_naam] = sso_vector
+
+                try:
+                    sso_fig_verg = plot_max_fout_vergelijking_SSO(
+                        n=sso_vast["n"],
+                        k=sso_vast["k"],
+                        N_klant=sso_vast["N_klant"],
+                        zekerheid=sso_vast["zekerheid"],
+                        verdeling=sso_verdeling,
+                    )
+                except ValueError as e:
+                    st.error(f"Fout bij plotten: {e}")
+                else:
+                    st.pyplot(sso_fig_verg)
+
+    st.divider()
+    st.subheader("Gestratificeerde evaluatie van een klant (meerdere typen posten)")
+    st.caption(
+        "Verschillende klanten maken in verschillende mate gebruik van diverse "
+        "typen posten (bijv. emolumenten, inkoopfacturen), met een eigen "
+        "risico-inschatting per type. Voer per type post de steekproef bij de "
+        "SSO in (n, k) en het aantal posten van dat type bij de klant (N_klant), "
+        "plus de geldwaarde van dat type bij de klant. Elk type post wordt "
+        "vervolgens als een apart stratum voor de klant behandeld en "
+        "gezamenlijk geëvalueerd."
+    )
+
+    col_strata_inst, col_strata_hoofd = st.columns([1, 3])
+
+    with col_strata_inst:
+        st.subheader("instellingen")
+        sso_strata_model = st.radio(
+            "model",
+            ["binomiaal", "poisson"],
+            horizontal=True,
+            key="sso_strata_model",
+        )
+        sso_strata_zekerheid_text = st.text_input(
+            "zekerheid", value="0,95", key="sso_strata_zekerheid_text"
+        )
+        sso_strata_bereken = st.button(
+            "evalueer gestratificeerd", type="primary", key="sso_strata_bereken"
+        )
+
+    with col_strata_hoofd:
+        st.subheader("typen posten")
+        sso_strata_tabel = st.data_editor(
+            st.session_state.sso_strata_tabel,
+            width="stretch",
+            num_rows="dynamic",
+            key="sso_strata_tabel_editor",
+            column_config={
+                "naam": st.column_config.TextColumn(
+                    "naam", help="Naam van het type post, bijv. Emolumenten."
+                ),
+                "n": st.column_config.TextColumn(
+                    "n", help="Steekproefomvang bij de SSO voor dit type post."
+                ),
+                "k": st.column_config.TextColumn(
+                    "k", help="Aantal fouten in de SSO-steekproef voor dit type post."
+                ),
+                "N_klant": st.column_config.TextColumn(
+                    "N_klant", help="Aantal posten van dit type bij de klant."
+                ),
+                "waarde_laag": st.column_config.TextColumn(
+                    "waarde_laag",
+                    help="Totale geldwaarde van dit type post bij de klant.",
+                ),
+                "ihr": st.column_config.SelectboxColumn(
+                    "ihr", options=RISK_OPTIES, help="InHerent Risico."
+                ),
+                "ibr": st.column_config.SelectboxColumn(
+                    "ibr", options=RISK_OPTIES, help="Interne BeheersingsRisico."
+                ),
+                "car": st.column_config.SelectboxColumn(
+                    "car", options=RISK_OPTIES, help="CijferAnalyseRisico."
+                ),
+                "materialiteit": st.column_config.TextColumn(
+                    "materialiteit",
+                    help=(
+                        "Materialiteit voor dit type post. Opgevat als fractie "
+                        "als \u2264 1 (bijv. 0,01) anders als bedrag in euro\u2019s."
+                    ),
+                ),
+            },
+        )
+        st.session_state.sso_strata_tabel = sso_strata_tabel
+
+        if st.session_state.sso_strata_error:
+            st.error(st.session_state.sso_strata_error)
+
+        if sso_strata_bereken:
+            sso_strata_zekerheid = _parse_nl(sso_strata_zekerheid_text)
+            sso_strata_rijen = sso_strata_tabel.dropna(how="all").to_dict("records")
+            sso_strata_rijen = [
+                r for r in sso_strata_rijen if str(r.get("naam", "")).strip()
+            ]
+
+            if sso_strata_zekerheid is None or not (0.0 < sso_strata_zekerheid < 1.0):
+                st.session_state.sso_strata_error = (
+                    "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
+                )
+                st.session_state.sso_strata_res = None
+            elif not sso_strata_rijen:
+                st.session_state.sso_strata_error = (
+                    "Voer tenminste 1 type post (rij) in."
+                )
+                st.session_state.sso_strata_res = None
+            else:
+                post_typen = []
+                parse_fouten = []
+                for rij in sso_strata_rijen:
+                    naam = str(rij.get("naam", "")).strip()
+                    n_val = _parse_nl(rij.get("n"))
+                    k_val = _parse_nl(rij.get("k"))
+                    N_klant_val = _parse_nl(rij.get("N_klant"))
+                    waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
+                    materialiteit_val = _parse_nl(rij.get("materialiteit"))
+
+                    if None in (n_val, k_val, N_klant_val, waarde_laag_val):
+                        parse_fouten.append(
+                            f"Type post '{naam}': n, k, N_klant en waarde_laag "
+                            "moeten geldige getallen zijn."
+                        )
+                        continue
+
+                    # Monetaire materialiteit (> 1) omrekenen naar fractie, net
+                    # als in de overige tabbladen.
+                    if materialiteit_val is not None and materialiteit_val > 1:
+                        materialiteit_val = materialiteit_val / waarde_laag_val
+
+                    post_typen.append(
+                        dict(
+                            naam=naam,
+                            n=n_val,
+                            k=k_val,
+                            N_klant=N_klant_val,
+                            waarde_laag=waarde_laag_val,
+                            ihr=rij.get("ihr", "H"),
+                            ibr=rij.get("ibr", "H"),
+                            car=rij.get("car", "H"),
+                            materialiteit=(
+                                materialiteit_val
+                                if materialiteit_val is not None
+                                else 0.01
+                            ),
+                        )
+                    )
+
+                if parse_fouten:
+                    st.session_state.sso_strata_error = " ".join(parse_fouten)
+                    st.session_state.sso_strata_res = None
+                else:
+                    try:
+                        st.session_state.sso_strata_res = (
+                            evalueer_SSO_klant_gestratificeerd(
+                                post_typen,
+                                model=sso_strata_model,
+                                zekerheid=sso_strata_zekerheid,
+                            )
+                        )
+                        st.session_state.sso_strata_error = None
+                    except ValueError as e:
+                        st.session_state.sso_strata_error = (
+                            f"Fout bij gestratificeerde evaluatie: {e}"
+                        )
+                        st.session_state.sso_strata_res = None
+
+        sso_strata_res = st.session_state.sso_strata_res
+        if sso_strata_res is not None:
+            st.subheader("Resultaat")
+            sso_strata_col1, sso_strata_col2 = st.columns(2)
+            sso_strata_col1.metric(
+                "Maximale fout (fractie)", _nl(sso_strata_res["max_fout_convolutie"], 4)
+            )
+            sso_strata_col2.metric(
+                "Maximale fout (euro\u2019s)",
+                _nl(sso_strata_res["max_fout_convolutie_geld"], 2),
+            )
+            st.table(
+                sso_strata_res["steekproeven"][
+                    ["naam", "waarde_laag", "n_laag", "k_laag"]
+                ]
+            )
+            sso_strata_fig = plot_kanskromme(sso_strata_res)
+            st.pyplot(sso_strata_fig)
