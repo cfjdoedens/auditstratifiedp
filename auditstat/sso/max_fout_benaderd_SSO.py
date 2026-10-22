@@ -1,12 +1,13 @@
 from scipy import stats
 
+from auditstat.sso.n_klant_k_klant_SSO import n_klant_k_klant_SSO
+
 
 def max_fout_benaderd_SSO(n, k, N_klant, zekerheid=0.95, verdeling="binomiaal"):
     """
     Berekent de benaderde maximale foutfractie voor een SSO-klant.
     """
-    n_klant = (n * N_klant) / (n + N_klant)
-    k_klant = (n_klant / n) * k
+    n_klant, k_klant = n_klant_k_klant_SSO(n, k, N_klant)
 
     if verdeling == "binomiaal":
         # Vlakke prior (Beta(1,1)), posterior is Beta(k_klant+1, n_klant-k_klant+1)
