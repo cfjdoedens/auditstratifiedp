@@ -1,0 +1,116 @@
+import math
+
+import pandas as pd
+
+from auditstat.sso.moment_match_SSO import moment_match_SSO
+
+# Optionele kolommen die, indien aanwezig, worden doorgegeven aan
+# eval_stratified (dat zelf standaardwaarden invult als ze ontbreken).
+_OPTIONELE_KOLOMMEN = (
+    "ihr",
+    "ibr",
+    "car",
+    "waarde_hoog",
+    "fout_hoog",
+    "materialiteit",
+)
+
+
+def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
+    """
+    Bouwt een stratatabel voor één klant op basis van SSO-steekproeven per
+    type post, geschikt als invoer voor ``auditstat.stratified.eval_stratified``.
+
+    Achtergrond
+    -----------
+    Verschillende klanten maken in verschillende mate gebruik van diverse
+    typen posten (bijv. emolumenten, inkoopfacturen) die door een SSO
+    worden verwerkt. Per type post is er een steekproef bij de SSO
+    beschikbaar (``n``, ``k``), en is bekend hoeveel posten van dat type de
+    klant zelf heeft (``N_klant``). Deze functie kalibreert per type post
+    een effectieve steekproefomvang en een effectief aantal fouten bij de
+    klant (zie ``moment_match_SSO``) en zet dat om in een stratum. Zo kan
+    de klant gestratificeerd worden geëvalueerd: één stratum per type
+    post.
+
+    In tegenstelling tot een eerdere versie die de SSO-steekproef en de
+    klantpopulatie naïef poolde tot één kleinere "as-if"-steekproef
+    (``n_klant_k_klant_SSO``, nog gebruikt door ``max_fout_benaderd_SSO``),
+    kalibreert ``moment_match_SSO`` (n_eff, k_eff) zodanig dat de Beta-
+    resp. Gamma-verdeling die ``eval_stratified`` hieruit opbouwt dezelfde
+    gemiddelde én variantie heeft als de werkelijke, continue exacte
+    samengestelde verdeling (``max_fout_exact_continu_SSO``). Dat behoudt
+    beide onzekerheidslagen (posterior-onzekerheid over de ware foutkans,
+    én steekproefvariabiliteit van die foutkans bij de klant) voor zover
+    dat binnen een enkele Beta/Gamma-verdeling mogelijk is.
+
+    Parameters
+    ----------
+    post_typen : list[dict]
+        Eén dict per type post (= stratum), met verplichte sleutels:
+
+        - ``naam`` (str): naam van het type post, bijv. "Emolumenten".
+        - ``n`` (int): steekproefomvang bij de SSO voor dit type post.
+        - ``k`` (int): aantal fouten in de SSO-steekproef voor dit type post.
+        - ``N_klant`` (int): aantal posten van dit type bij de klant.
+        - ``waarde_laag`` (float): totale geldwaarde van dit type post bij
+          de klant.
+
+        Optioneel (standaardwaarden conform ``eval_stratified`` als ze
+        ontbreken): ``ihr``, ``ibr``, ``car``, ``waarde_hoog``,
+        ``fout_hoog``, ``materialiteit``.
+    model : {"binomiaal", "poisson"}, standaard "binomiaal"
+        Kansmodel waarop gekalibreerd wordt. Moet overeenkomen met het
+        ``model``-argument dat straks aan ``eval_stratified`` wordt
+        doorgegeven (zie ``evalueer_SSO_klant_gestratificeerd``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Eén rij per type post, met kolommen ``naam``, ``waarde_laag``,
+        ``n_laag``, ``k_laag`` en de eventueel meegegeven optionele
+        kolommen — rechtstreeks bruikbaar als ``steekproeven``-argument
+        van ``eval_stratified``.
+
+    Let op
+    ------
+    ``eval_stratified`` vereist een geheel getal voor ``n_laag`` dat niet
+    kleiner is dan ``k_laag``, terwijl (n_eff, k_eff) reële, gekalibreerde
+    waarden zijn. ``n_laag`` wordt daarom naar boven afgerond tot
+    tenminste ``ceil(k_eff)``; ``k_laag`` (= k_eff) blijft ongeafrond.
+    """
+    if not post_typen:
+        raise ValueError("Geef tenminste 1 type post (stratum) mee.")
+
+    rijen = []
+    for post in post_typen:
+        naam = post.get("naam")
+        if not naam or not str(naam).strip():
+            raise ValueError("Elk type post moet een niet-lege 'naam' hebben.")
+
+        ontbrekend = [
+            veld for veld in ("n", "k", "N_klant", "waarde_laag") if veld not in post
+        ]
+        if ontbrekend:
+            raise ValueError(
+                f"Type post '{naam}' mist verplicht(e) veld(en): {', '.join(ontbrekend)}."
+            )
+
+        n_eff, k_eff = moment_match_SSO(
+            post["n"], post["k"], post["N_klant"], verdeling=model
+        )
+        n_laag = max(round(n_eff), math.ceil(k_eff))
+
+        rij = {
+            "naam": naam,
+            "waarde_laag": post["waarde_laag"],
+            "n_laag": n_laag,
+            "k_laag": k_eff,
+        }
+        for optioneel in _OPTIONELE_KOLOMMEN:
+            if optioneel in post:
+                rij[optioneel] = post[optioneel]
+
+        rijen.append(rij)
+
+    return pd.DataFrame(rijen)
