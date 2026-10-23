@@ -1278,66 +1278,74 @@ with tab_sso:
         "gezamenlijk geëvalueerd."
     )
 
-    col_strata_inst, col_strata_hoofd = st.columns([1, 3])
+    # In een st.form gebundeld zodat een celbewerking (bijv. in "k") altijd
+    # wordt doorgestuurd vóórdat de berekening start. Buiten een form kan een
+    # klik op de knop een rerun triggeren vóórdat de laatst bewerkte cel haar
+    # blur-event heeft verstuurd, waardoor die waarde pas bij een tweede
+    # invoerpoging wordt meegenomen.
+    with st.form("sso_strata_form"):
+        col_strata_inst, col_strata_hoofd = st.columns([1, 3])
 
-    with col_strata_inst:
-        st.subheader("instellingen")
-        sso_strata_model = st.radio(
-            "model",
-            ["binomiaal", "poisson"],
-            horizontal=True,
-            key="sso_strata_model",
-        )
-        sso_strata_zekerheid_text = st.text_input(
-            "zekerheid", value="0,95", key="sso_strata_zekerheid_text"
-        )
-        sso_strata_bereken = st.button(
-            "evalueer gestratificeerd", type="primary", key="sso_strata_bereken"
-        )
+        with col_strata_inst:
+            st.subheader("instellingen")
+            sso_strata_model = st.radio(
+                "model",
+                ["binomiaal", "poisson"],
+                horizontal=True,
+                key="sso_strata_model",
+            )
+            sso_strata_zekerheid_text = st.text_input(
+                "zekerheid", value="0,95", key="sso_strata_zekerheid_text"
+            )
+            sso_strata_bereken = st.form_submit_button(
+                "evalueer gestratificeerd", type="primary"
+            )
 
-    with col_strata_hoofd:
-        st.subheader("typen posten")
-        sso_strata_tabel = st.data_editor(
-            st.session_state.sso_strata_tabel,
-            width="stretch",
-            num_rows="dynamic",
-            key="sso_strata_tabel_editor",
-            column_config={
-                "naam": st.column_config.TextColumn(
-                    "naam", help="Naam van het type post, bijv. Emolumenten."
-                ),
-                "n": st.column_config.TextColumn(
-                    "n", help="Steekproefomvang bij de SSO voor dit type post."
-                ),
-                "k": st.column_config.TextColumn(
-                    "k", help="Aantal fouten in de SSO-steekproef voor dit type post."
-                ),
-                "N_klant": st.column_config.TextColumn(
-                    "N_klant", help="Aantal posten van dit type bij de klant."
-                ),
-                "waarde_laag": st.column_config.TextColumn(
-                    "waarde_laag",
-                    help="Totale geldwaarde van dit type post bij de klant.",
-                ),
-                "ihr": st.column_config.SelectboxColumn(
-                    "ihr", options=RISK_OPTIES, help="InHerent Risico."
-                ),
-                "ibr": st.column_config.SelectboxColumn(
-                    "ibr", options=RISK_OPTIES, help="Interne BeheersingsRisico."
-                ),
-                "car": st.column_config.SelectboxColumn(
-                    "car", options=RISK_OPTIES, help="CijferAnalyseRisico."
-                ),
-                "materialiteit": st.column_config.TextColumn(
-                    "materialiteit",
-                    help=(
-                        "Materialiteit voor dit type post. Opgevat als fractie "
-                        "als \u2264 1 (bijv. 0,01) anders als bedrag in euro\u2019s."
+        with col_strata_hoofd:
+            st.subheader("typen posten")
+            sso_strata_tabel = st.data_editor(
+                st.session_state.sso_strata_tabel,
+                width="stretch",
+                num_rows="dynamic",
+                key="sso_strata_tabel_editor",
+                column_config={
+                    "naam": st.column_config.TextColumn(
+                        "naam", help="Naam van het type post, bijv. Emolumenten."
                     ),
-                ),
-            },
-        )
-        st.session_state.sso_strata_tabel = sso_strata_tabel
+                    "n": st.column_config.TextColumn(
+                        "n", help="Steekproefomvang bij de SSO voor dit type post."
+                    ),
+                    "k": st.column_config.TextColumn(
+                        "k",
+                        help="Aantal fouten in de SSO-steekproef voor dit type post.",
+                    ),
+                    "N_klant": st.column_config.TextColumn(
+                        "N_klant", help="Aantal posten van dit type bij de klant."
+                    ),
+                    "waarde_laag": st.column_config.TextColumn(
+                        "waarde_laag",
+                        help="Totale geldwaarde van dit type post bij de klant.",
+                    ),
+                    "ihr": st.column_config.SelectboxColumn(
+                        "ihr", options=RISK_OPTIES, help="InHerent Risico."
+                    ),
+                    "ibr": st.column_config.SelectboxColumn(
+                        "ibr", options=RISK_OPTIES, help="Interne BeheersingsRisico."
+                    ),
+                    "car": st.column_config.SelectboxColumn(
+                        "car", options=RISK_OPTIES, help="CijferAnalyseRisico."
+                    ),
+                    "materialiteit": st.column_config.TextColumn(
+                        "materialiteit",
+                        help=(
+                            "Materialiteit voor dit type post. Opgevat als "
+                            "fractie als \u2264 1 (bijv. 0,01) anders als "
+                            "bedrag in euro\u2019s."
+                        ),
+                    ),
+                },
+            )
+            st.session_state.sso_strata_tabel = sso_strata_tabel
 
         if st.session_state.sso_strata_error:
             st.error(st.session_state.sso_strata_error)
