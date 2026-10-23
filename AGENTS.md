@@ -8,7 +8,7 @@ Python-pakket voor statistische auditmethoden voor de Rijksoverheid. Overkoepele
   - `plan_stratified()` — berekent optimale steekproefomvang per stratum
   - `eval_stratified()` — combineert steekproeven via convolutie tot één gezamenlijke foutschatting
   - `plot_kanskromme()` — visualiseert de resulterende kansverdeling
-- `auditstat.sso` — (in voorbereiding)
+- `auditstat.sso` — steekproefaudits voor shared service organisaties (SSO's); berekent de maximale foutfractie van één klant binnen een SSO-brede steekproef onder het **uitwisselbare model** (`max_fout_exact_SSO`, `max_fout_exact_continu_SSO`, `max_fout_benaderd_SSO`), dat veronderstelt dat elke post (van welke klant dan ook) dezelfde SSO-brede foutfractie deelt.
 
 Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/
 
@@ -17,6 +17,7 @@ Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.ap
 ```
 auditstat/
   __init__.py
+  _formatting.py           # Gedeelde NL-getalnotatie voor alle plots: nl_getal, nl_getal_variabel, nl_tick_formatter
   stratified/               # Was: auditstratified/
     __init__.py
     eval_stratified.py      # Convolutie-evaluatie (FFT, Monte Carlo, direct)
@@ -26,7 +27,13 @@ auditstat/
     valideer_granulariteit.py
     analyseer_klimheuristiek.py
   sso/
-    __init__.py             # Leeg, inhoud volgt later
+    __init__.py
+    max_fout_exact_SSO.py           # Uitwisselbaar model (discreet)
+    max_fout_exact_continu_SSO.py   # Uitwisselbaar model (continu/Poisson-achtig)
+    max_fout_benaderd_SSO.py        # Uitwisselbaar model, benadering
+    plot_kanskromme_SSO.py
+    plot_max_fout_vergelijking_SSO.py
+    script_SSO.py                     # Demonstratiescript
 tests/
   __init__.py
   stratified/              # Spiegelt auditstat/stratified/
@@ -60,6 +67,10 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 `plan_stratified` gebruikt **nog wel asserts** voor API-contractchecks (`model`, `zekerheid`, `granulariteit`, type van `steekproeven`, aanwezigheid van vereiste kolommen) en `raise ValueError` voor gebruikersinvoerfouten. Dit is historisch en verdient migratie naar het patroon van `eval_stratified`.
 
 **Convolutiemethoden in eval_stratified:** `"FFT paarsgewijs"`, `"FFT samen"`, `"direct"`, `"Monte Carlo"`. Plan gebruikt altijd `"FFT samen"`.
+
+**Heterogeen SSO-model: verwijderd (was `max_fout_heterogeen_SSO`).** Dit model veronderstelde dat klant X een eigen, onafhankelijke foutfractie heeft (flat prior), los van de rest van de SSO-populatie, en marginaliseerde de posterior over welke van de `n` SSO-breed getrokken posten (`n_X ~ Binomial(n, f)`) bij klant X hoorden — op basis van alleen het SSO-brede totaal `(n, k)` en het relatieve aandeel `f`, zonder de opsplitsing per klant te kennen. Bij nadere analyse bleek deze aanname onrealistisch: de auditor moet elke gestoken post in de administratie van de betreffende klant controleren en kent dus altijd welke posten (en fouten) bij klant X horen (`n_X`, `k_X`). Zodra die opsplitsing bekend is, is conditioneren op `n_X` de statistisch juiste aanpak — simpelweg `Beta(k_X+1, n_X−k_X+1)` op de klanteigen deelsteekproef — en is marginaliseren over een onbekende verdeling nodeloos conservatief (in een rekenvoorbeeld: grens 0,21 bij direct conditioneren vs. 0,40 bij marginaliseren, bij n=100, k=5, f=0,2). Het model, de bijbehorende plotfunctie `plot_posterior_heterogeen_SSO`, de tests en de app-integratie zijn verwijderd. Mocht een vergelijkbare behoefte terugkomen, dan is dat waarschijnlijk alleen zinvol voor **planning vooraf** (vóór de steekproeftrekking, wanneer `n_X` nog niet gerealiseerd is en alleen `f` bekend is) — niet voor evaluatie achteraf.
+
+**Dutch getalnotatie in plots (`auditstat/_formatting.py`):** alle plotfuncties (`plot_kanskromme`, `plot_kanskromme_SSO`, `plot_max_fout_vergelijking_SSO`) gebruiken de gedeelde helpers `nl_getal`, `nl_getal_variabel` en `nl_tick_formatter` voor komma-decimalen in titels, legenda's en astick-labels, in plaats van losse `.replace(",","X")`-achtige implementaties per bestand.
 
 **HARo-risicocombinaties:** 27 mogelijke combinaties van IHR × IBR × CAR (`H`/`M`/`L`), getest via `@pytest.mark.parametrize`.
 
@@ -182,7 +193,7 @@ De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldb
 .venv/bin/python -m pytest
 ```
 
-191 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+227 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO` — niet uit een kale modulenaam.
 
@@ -213,4 +224,15 @@ git push origin main   # geen tag → alleen test-workflow
 ## CI/CD
 
 - `.github/workflows/test.yml` — draait bij elke push/PR op main; matrix Python 3.10–3.13; inclusief ruff-linting en pakket-importtest
-- `.github/workflows/publish.yml` — triggert op `v*`-tags; publiceert naar PyPI (`pypi.org/p/auditstat`)
+- `.github/workflows/python-tests.yml` — aparte "Python tests"-workflow, cross-platform matrix (ubuntu/windows/macos); installeert met `pip install -e ".[dev]"` (net als `test.yml`)
+- `.github/workflows/publish.yml` — triggert op `v*`-tags; draait eerst de testmatrix, publiceert daarna naar PyPI (`pypi.org/p/auditstat`) via Trusted Publishing (OIDC, geen API-token)
+
+**Valkuil: dev-dependencies op twee plekken in `pyproject.toml`.** `[dependency-groups] dev` (gebruikt door lokale `uv sync`) en `[project.optional-dependencies] dev` (gebruikt door CI's `pip install -e ".[dev]"`) moeten **beide** worden bijgewerkt als er een nieuwe dev-dependency wordt toegevoegd. Toen `hypothesis` alleen aan de eerste was toegevoegd en niet aan de tweede, faalden zowel `test.yml` als `publish.yml` met `ModuleNotFoundError: No module named 'hypothesis'` bij het verzamelen van `tests/stratified/test_hypothesis_properties.py`. Fix: voeg de dependency aan beide secties toe.
+
+**Trusted Publishing registreren bij naamswijziging van het pakket.** Na het hernoemen van het PyPI-project (van `auditstratified` naar `auditstat`) moet er handmatig, eenmalig, een nieuwe "pending publisher" worden geregistreerd op https://pypi.org/manage/account/publishing/ (Project Name = `auditstat`, Owner = `cfjdoedens`, Repository = `auditstratifiedp`, Workflow = `publish.yml`, Environment = `pypi`). Zonder dit faalt de publish-stap met `400 ... Non-user identities cannot create new projects`, ook als de testmatrix wel slaagt. Dit is al gedaan voor `auditstat`; alleen relevant bij een volgende naamswijziging.
+
+**Huidige PyPI-status:** `auditstat` 0.1.9 is live (gepubliceerd 2026-10-23). Tags `v0.1.8` (publish gefaald, nooit gepubliceerd, overruled door 0.1.9) en `v0.1.9` (gepubliceerd na een `gh run rerun` nadat de trusted publisher was geregistreerd) staan beide op GitHub.
+
+## Beveiligingsonderhoud
+
+Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op MITM voor tools met eigen CA-store zoals `pip`/`uv`/`certifi`) zijn volgende acties ondernomen: `uv self update` (0.11.28 → 0.13.5, bevat afwijzing van de gecompromitteerde keten), en `uv lock --upgrade-package certifi` + `uv sync` om `certifi` in `uv.lock` bij te werken naar 2026.10.19 (was transitief gepind via streamlit/requests op een kwetsbare versie). GitHub Actions-runners zijn niet getroffen (altijd verse images met actuele `pip`/`certifi`). Check bij toekomstige soortgelijke incidenten `uv.lock` op verouderde `certifi`-pins.

@@ -9,7 +9,6 @@ from auditstat.sso.plot_max_fout_vergelijking_SSO import (
     # plot_max_fout_vergelijking_SSO,
     plot_max_fout_vergelijking_SSO_overzicht,
 )
-from auditstat.sso.plot_posterior_heterogeen_SSO import plot_posterior_heterogeen_SSO
 from auditstat.sso.simuleer_SSO import simuleer_SSO
 
 
@@ -91,15 +90,6 @@ def script_SSO():
 
     print("\n--- 4. Kanskromme exact vs. benaderd ---")
     plot_kanskromme_SSO(n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling)
-
-    print("\n--- 5. Uitwisselbaar vs. heterogeen model, over een reeks f-waarden ---")
-    plot_posterior_heterogeen_SSO(
-        n_basis,
-        k_basis,
-        f_waarden=[0.5, 0.05, 0.005],
-        zekerheid=zekerheid_basis,
-        verdeling=verdeling,
-    )
 
 
 if __name__ == "__main__":
