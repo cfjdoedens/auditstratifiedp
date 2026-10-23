@@ -190,6 +190,18 @@ De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldb
 
 **SSO-tab — gestratificeerde-evaluatie-sectie:** per ingevoerd type post wordt elk veld (`n`, `k`, `N_klant`, `waarde_laag`, en optioneel `materialiteit`) **afzonderlijk** gevalideerd en geeft bij een ongeldige waarde een eigen specifieke foutmelding, met zowel de veldnaam als de daadwerkelijk ingevoerde waarde: `"Type post '{naam}': veld '{veld_naam}' (\"{ingevoerde waarde}\") is geen geldig getal."` — niet één gedeelde melding per rij voor meerdere foute velden tegelijk. Meerdere foutmeldingen worden met `"\n".join(...)` gecombineerd in `st.error()` (niet `" ".join(...)`) zodat ze leesbaar als aparte regels verschijnen. `materialiteit` is optioneel (leeg = standaard 0,01), maar een niet-lege, onparseerbare waarde krijgt ook een eigen foutmelding in plaats van stilzwijgend op de standaardwaarde terug te vallen.
 
+**SSO-tab — valkuil "lege rij" filteren (`naam` None/NaN):** bij het filteren van lege rijen uit `sso_strata_tabel` (vóór validatie) **nooit** filteren op `str(r.get("naam", "")).strip()`. Als een cel leeggemaakt is, levert `r.get("naam")` `None` of `float("nan")` op (de key bestaat immers nog, met een missende waarde) — en `str(None)` / `str(float("nan"))` geven respectievelijk `"None"` en `"nan"`, wat na `.strip()` een niet-lege, "truthy" string is. Zo'n rij werd dus tóch als "heeft een naam" behandeld en kreeg bij validatie absurde foutmeldingen als `Type post 'nan': veld 'n' ("nan") is geen geldig getal.`. Juiste filter controleert expliciet op `None`/`pd.isna(...)` vóórdat er naar string wordt geconverteerd:
+
+```python
+sso_strata_rijen = [
+    r
+    for r in sso_strata_rijen
+    if r.get("naam") is not None
+    and not pd.isna(r.get("naam"))
+    and str(r.get("naam")).strip()
+]
+```
+
 **SSO-tab — `data_editor` in een `st.form`:** de tabel met typen posten, de instellingen (`model`, `zekerheid`) en de bereken-knop staan sinds kort samen in `st.form("sso_strata_form")`, met de knop als `st.form_submit_button` in plaats van `st.button`. Reden: zonder form werd een celbewerking (bijv. in `k`) soms pas bij een **tweede** invoerpoging meegenomen. `st.data_editor` stuurt een celwijziging pas naar de server bij focusverlies (blur); een knopklik kan al een rerun triggeren vóórdat die blur-melding is verwerkt, waardoor de net getypte waarde de eerste keer wordt gemist. `st.form` bundelt alle widgetinteracties binnen de form en stuurt ze pas gezamenlijk door bij submit, wat deze race condition oplost. Dit is een ander patroon dan de `on_change`-aanpak van de eval-/planningstab (die juist meteen bij elke celbewerking valideert en wegpoetst); de SSO-tab valideert alleen bij submit, dus `st.form` volstaat hier zonder extra `on_change`-logica.
 
 ## Tests draaien
