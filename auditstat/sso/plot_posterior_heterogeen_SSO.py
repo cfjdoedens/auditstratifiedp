@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import trapezoid
 
+from auditstat._formatting import nl_getal, nl_getal_variabel, nl_tick_formatter
 from auditstat.sso.max_fout_heterogeen_SSO import (
     _kwantiel_van_theta_posterior,
     _posterior_theta_klant_binomiaal,
@@ -90,7 +91,10 @@ def plot_posterior_heterogeen_SSO(
         dichtheid_uitwisselbaar,
         color="black",
         linewidth=2.5,
-        label=f"Uitwisselbaar model (f = 1): {zekerheid * 100:.0f}%-kwantiel = {kwantiel_uitwisselbaar:.4f}",
+        label=(
+            f"Uitwisselbaar model (f = 1): {zekerheid * 100:.0f}%-kwantiel = "
+            f"{nl_getal(kwantiel_uitwisselbaar, 4)}"
+        ),
     )
     ax.axvline(kwantiel_uitwisselbaar, color="black", linestyle="--", linewidth=1.2)
 
@@ -106,11 +110,15 @@ def plot_posterior_heterogeen_SSO(
             dichtheid,
             color=kleur,
             linewidth=1.8,
-            label=f"Heterogeen model (f = {f:g}): {zekerheid * 100:.0f}%-kwantiel = {kwantiel:.4f}",
+            label=(
+                f"Heterogeen model (f = {nl_getal_variabel(f)}): "
+                f"{zekerheid * 100:.0f}%-kwantiel = {nl_getal(kwantiel, 4)}"
+            ),
         )
         ax.axvline(kwantiel, color=kleur, linestyle="--", linewidth=1.0)
 
     ax.set_xlim(0, 1)
+    ax.xaxis.set_major_formatter(nl_tick_formatter(1))
     ax.set_xlabel("foutkans/-fractie bij de klant (theta_klant)")
     ax.set_ylabel("kansdichtheid")
     fig.suptitle(

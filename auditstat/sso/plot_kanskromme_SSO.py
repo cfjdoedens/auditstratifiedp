@@ -4,6 +4,7 @@ import numpy as np
 from scipy import stats
 from scipy.special import gammaln
 
+from auditstat._formatting import nl_getal, nl_tick_formatter
 from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
 from auditstat.sso.max_fout_exact_continu_SSO import (
     _betabinom_continu_pdf,
@@ -152,24 +153,28 @@ def plot_kanskromme_SSO(n, k, N_klant, zekerheid=0.95, verdeling="binomiaal"):
         color="#2980b9",
         linestyle="--",
         linewidth=1.5,
-        label=f"Max. fout exact ({zekerheid * 100:.0f}%): {exact_max:.4f}",
+        label=f"Max. fout exact ({zekerheid * 100:.0f}%): {nl_getal(exact_max, 4)}",
     )
     ax.axvline(
         exact_continu_max,
         color="#1b4f72",
         linestyle=":",
         linewidth=1.5,
-        label=f"Max. fout exact continu ({zekerheid * 100:.0f}%): {exact_continu_max:.4f}",
+        label=(
+            f"Max. fout exact continu ({zekerheid * 100:.0f}%): "
+            f"{nl_getal(exact_continu_max, 4)}"
+        ),
     )
     ax.axvline(
         benaderd_max,
         color="#e67e22",
         linestyle="--",
         linewidth=1.5,
-        label=f"Max. fout benaderd ({zekerheid * 100:.0f}%): {benaderd_max:.4f}",
+        label=f"Max. fout benaderd ({zekerheid * 100:.0f}%): {nl_getal(benaderd_max, 4)}",
     )
 
     ax.set_xlim(0, x_lim)
+    ax.xaxis.set_major_formatter(nl_tick_formatter(3))
     ax.set_xlabel("foutfractie bij de klant")
     ax.set_ylabel("kansdichtheid")
     fig.suptitle(
@@ -178,7 +183,7 @@ def plot_kanskromme_SSO(n, k, N_klant, zekerheid=0.95, verdeling="binomiaal"):
         fontsize=13,
     )
     ax.set_title(
-        f"n={n}, k={k}, N_klant={N_klant}, zekerheid={zekerheid}, "
+        f"n={n}, k={k}, N_klant={N_klant}, zekerheid={nl_getal(zekerheid, 2)}, "
         f"verdeling={verdeling}",
         fontsize=10,
     )

@@ -2,6 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+from auditstat._formatting import nl_getal, nl_tick_formatter
 from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
 from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO
 
@@ -9,6 +10,13 @@ hoofdtitel = (
     "Vergelijking maximale foutfractie van klant SSO op basis van steekproef uit SSO, n, \n"
     "som foutfracties, k, en aantal posten klant, N_klant"
 )
+
+
+def _nl_param_waarde(naam, waarde):
+    """Formatteert een parameterwaarde met Nederlandse notatie: 2
+    decimalen voor zekerheid (een fractie), geen decimalen (met
+    duizendtal-scheidingsteken) voor de overige (gehele) parameters."""
+    return nl_getal(waarde, 2 if naam == "zekerheid" else 0)
 
 
 def _teken_vergelijking(
@@ -53,9 +61,12 @@ def _teken_vergelijking(
     #   vaste parameters, plus de gevarieerde parameter met zijn bereik, en de verdeling.
     vaste_params = {name: val for name, val in params.items() if name != var_name}
     vaste_params_tekst = ", ".join(
-        f"{name}={val}" for name, val in vaste_params.items()
+        f"{name}={_nl_param_waarde(name, val)}" for name, val in vaste_params.items()
     )
-    gevarieerd_tekst = f"{var_name}={min(var_vector)}..{max(var_vector)}"
+    gevarieerd_tekst = (
+        f"{var_name}={_nl_param_waarde(var_name, min(var_vector))}.."
+        f"{_nl_param_waarde(var_name, max(var_vector))}"
+    )
     subtitel = f"{vaste_params_tekst}; {gevarieerd_tekst}, verdeling: {verdeling}"
 
     ax.plot(
@@ -81,6 +92,8 @@ def _teken_vergelijking(
         )
     ax.set_xlabel(var_name)
     ax.set_ylabel("maximale foutfractie")
+    ax.xaxis.set_major_formatter(nl_tick_formatter(2 if var_name == "zekerheid" else 0))
+    ax.yaxis.set_major_formatter(nl_tick_formatter(4))
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 

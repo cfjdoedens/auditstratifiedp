@@ -2,6 +2,8 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
+from auditstat._formatting import nl_getal
+
 
 def plot_kanskromme(res: dict) -> plt.Figure:
     """Teken de kanskromme van de evaluatie.
@@ -39,10 +41,7 @@ def plot_kanskromme(res: dict) -> plt.Figure:
             0.5,
             0.5,
             f"100% Integraal Gecontroleerd\n\nEr is geen statistische onzekerheid.\n"
-            f"De fout is exact vastgesteld op \u20ac {min_geld:,.2f}"
-            .replace(",", "X")
-            .replace(".", ",")
-            .replace("X", "."),
+            f"De fout is exact vastgesteld op \u20ac {nl_getal(min_geld, 2)}",
             ha="center",
             va="center",
             fontsize=13,
@@ -103,12 +102,7 @@ def plot_kanskromme(res: dict) -> plt.Figure:
 
     # Opmaak.
     def nl_format(x, _pos=None):
-        return (
-            f"\u20ac\u00a0{x:,.0f}"
-            .replace(",", "X")
-            .replace(".", ",")
-            .replace("X", ".")
-        )
+        return f"\u20ac\u00a0{nl_getal(x, 0)}"
 
     ax.xaxis.set_major_formatter(plt.FuncFormatter(nl_format))
     ax.set_xlabel("fout in euro\u2019s", fontsize=12)
