@@ -1353,8 +1353,16 @@ with tab_sso:
         if sso_strata_bereken:
             sso_strata_zekerheid = _parse_nl(sso_strata_zekerheid_text)
             sso_strata_rijen = sso_strata_tabel.dropna(how="all").to_dict("records")
+            # Rijen zonder (geldige) naam worden als leeg beschouwd en
+            # genegeerd. Let op: een leeggemaakte cel levert hier None of
+            # NaN op, waarvan str(...) "None"/"nan" oplevert — niet filteren
+            # op de string-weergave, maar expliciet op pd.isna/None.
             sso_strata_rijen = [
-                r for r in sso_strata_rijen if str(r.get("naam", "")).strip()
+                r
+                for r in sso_strata_rijen
+                if r.get("naam") is not None
+                and not pd.isna(r.get("naam"))
+                and str(r.get("naam")).strip()
             ]
 
             if sso_strata_zekerheid is None or not (0.0 < sso_strata_zekerheid < 1.0):
