@@ -38,7 +38,7 @@ from auditstat.stratified.utils import (  # pyrefly: ignore[missing-import]
 )
 
 # Configureer de pagina lay-out en titel van de Streamlit webapplicatie.
-st.set_page_config(page_title="auditstratified", layout="wide")
+st.set_page_config(page_title="auditstat", layout="wide")
 
 # Definieer de risicocategorieën en de bijbehorende gebruikerslabels voor de selectievelden.
 RISK_OPTIES = ["H", "M", "L"]
@@ -437,7 +437,7 @@ def on_plan_tabel_change():
 
 
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
-st.title("auditstratified")
+st.title("auditstat")
 
 tab_nnz, tab_fpe, tab_eval, tab_plan, tab_sso = st.tabs([
     "nog nodige zekerheid",
