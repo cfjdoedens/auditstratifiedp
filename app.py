@@ -1368,13 +1368,37 @@ with tab_sso:
                     k_val = _parse_nl(rij.get("k"))
                     N_klant_val = _parse_nl(rij.get("N_klant"))
                     waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
-                    materialiteit_val = _parse_nl(rij.get("materialiteit"))
+                    materialiteit_ruw = rij.get("materialiteit")
+                    materialiteit_val = _parse_nl(materialiteit_ruw)
+
+                    # Eén aparte, specifieke boodschap per veld met een
+                    # ongeldige waarde (niet één verzamelboodschap per rij).
+                    for veld_naam, veld_waarde in (
+                        ("n", n_val),
+                        ("k", k_val),
+                        ("N_klant", N_klant_val),
+                        ("waarde_laag", waarde_laag_val),
+                    ):
+                        if veld_waarde is None:
+                            parse_fouten.append(
+                                f"Type post '{naam}': veld '{veld_naam}' "
+                                f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                            )
+                    # materialiteit is optioneel: een lege waarde is geldig
+                    # (gebruikt het standaardtarief), maar een ingevulde,
+                    # onparseerbare waarde is dat niet.
+                    materialiteit_tekst = (
+                        ""
+                        if materialiteit_ruw is None
+                        else str(materialiteit_ruw).strip()
+                    )
+                    if materialiteit_tekst != "" and materialiteit_val is None:
+                        parse_fouten.append(
+                            f"Type post '{naam}': veld 'materialiteit' "
+                            f'("{materialiteit_ruw}") is geen geldig getal.'
+                        )
 
                     if None in (n_val, k_val, N_klant_val, waarde_laag_val):
-                        parse_fouten.append(
-                            f"Type post '{naam}': n, k, N_klant en waarde_laag "
-                            "moeten geldige getallen zijn."
-                        )
                         continue
 
                     # Monetaire materialiteit (> 1) omrekenen naar fractie, net
@@ -1401,7 +1425,7 @@ with tab_sso:
                     )
 
                 if parse_fouten:
-                    st.session_state.sso_strata_error = " ".join(parse_fouten)
+                    st.session_state.sso_strata_error = "\n".join(parse_fouten)
                     st.session_state.sso_strata_res = None
                 else:
                     try:
