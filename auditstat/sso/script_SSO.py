@@ -1,95 +1,46 @@
-# Pas de diverse functies van auditstat.SSO toe in 1 script.
+# Demonstreert de gestratificeerde, geld-gebaseerde SSO-klantevaluatie.
 
-import numpy as np
-
-from auditstat.sso.max_fout_benaderd_SSO import max_fout_benaderd_SSO
-from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO
-from auditstat.sso.plot_kanskromme_SSO import plot_kanskromme_SSO
-from auditstat.sso.plot_max_fout_vergelijking_SSO import (
-    # plot_max_fout_vergelijking_SSO,
-    plot_max_fout_vergelijking_SSO_overzicht,
+from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (
+    evalueer_SSO_klant_gestratificeerd,
 )
-from auditstat.sso.simuleer_SSO import simuleer_SSO
+from auditstat.stratified.plot_kanskromme import plot_kanskromme
 
 
 def script_SSO():
-    n_basis = 200
-    k_basis = 0
-    N_klant_basis = 1500
-    zekerheid_basis = 0.95
-    iteraties = 10_000_000
-    verdeling = "binomiaal"
+    post_typen = [
+        dict(
+            naam="Emolumenten",
+            n=120,
+            k=1,
+            N_klant=400,
+            waarde_laag=2_000_000.0,
+        ),
+        dict(
+            naam="Inkoopfacturen",
+            n=200,
+            k=1,
+            N_klant=1500,
+            waarde_laag=5_000_000.0,
+        ),
+    ]
+    zekerheid = 0.95
 
-    print("--- 1. Puntberekening ---")
-    print(
-        f"Instellingen: n={n_basis}, k={k_basis}, N_klant={N_klant_basis}, Zekerheid={zekerheid_basis}"
+    print("--- Gestratificeerde evaluatie van een SSO-klant ---")
+    print(f"Zekerheid: {zekerheid}")
+    for post in post_typen:
+        print(
+            f"  {post['naam']}: n={post['n']}, k={post['k']}, "
+            f"N_klant={post['N_klant']}, waarde_laag={post['waarde_laag']:,.0f}"
+        )
+
+    resultaat = evalueer_SSO_klant_gestratificeerd(
+        post_typen, model="binomiaal", zekerheid=zekerheid
     )
 
-    exact = max_fout_exact_SSO(
-        n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling
-    )
-    benaderd = max_fout_benaderd_SSO(
-        n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling
-    )
+    print(f"\nMaximale fout (fractie): {resultaat['max_fout_convolutie']:.4f}")
+    print(f"Maximale fout (euro's): {resultaat['max_fout_convolutie_geld']:,.2f}")
 
-    print(f"Exacte methode:   {exact:.4f} ({exact * 100:.2f}%)")
-    print(f"Benaderingsmethode: {benaderd:.4f} ({benaderd * 100:.2f}%)")
-
-    print("\n--- 2. Validatie via Simulatie ---")
-    print(
-        f"Instellingen: n={n_basis}, k={k_basis}, N_klant={N_klant_basis}, Zekerheid={zekerheid_basis}"
-    )
-    print(f"Simuleren over {iteraties} iteraties... Dit duurt enkele seconden.")
-    sim = simuleer_SSO(
-        n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling, iteraties=iteraties
-    )
-
-    print(f"Simulatie grens (discreet, empirisch): {sim:.4f} ({sim * 100:.2f}%)")
-    print("Let op: De simulatie geeft uiteraard een discrete fractie (bijv. 4/150).")
-    print(
-        "De analytische exacte methode trekt dit door de interpolatie-logica juist continu door."
-    )
-
-    print("\n--- 3. Visuele vergelijking ---")
-    n_basis_vec = np.arange(10, 1001, 10)
-    k_basis_vec = np.arange(0, n_basis, 1)
-    zekerheid_vec = np.arange(0.6, 0.99, 0.01)
-    N_klant_vec = np.arange(10, 1001, 10)
-    plot_max_fout_vergelijking_SSO_overzicht(
-        [
-            dict(
-                n=n_basis_vec,
-                k=k_basis,
-                N_klant=N_klant_basis,
-                zekerheid=zekerheid_basis,
-                verdeling=verdeling,
-            ),
-            dict(
-                n=n_basis,
-                k=k_basis_vec,
-                N_klant=500,
-                zekerheid=zekerheid_basis,
-                verdeling=verdeling,
-            ),
-            dict(
-                n=n_basis,
-                k=k_basis,
-                N_klant=N_klant_vec,
-                zekerheid=zekerheid_basis,
-                verdeling=verdeling,
-            ),
-            dict(
-                n=n_basis,
-                k=k_basis,
-                N_klant=N_klant_basis,
-                zekerheid=zekerheid_vec,
-                verdeling=verdeling,
-            ),
-        ],
-    )
-
-    print("\n--- 4. Kanskromme exact vs. benaderd ---")
-    plot_kanskromme_SSO(n_basis, k_basis, N_klant_basis, zekerheid_basis, verdeling)
+    plot_kanskromme(resultaat)
 
 
 if __name__ == "__main__":

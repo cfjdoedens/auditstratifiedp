@@ -6,20 +6,18 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     Kalibreert een effectieve steekproefomvang (n_eff) en een effectief
     aantal fouten (k_eff) bij de klant, zodanig dat de resulterende
     Beta- (binomiaal) resp. Gamma-verdeling (poisson) dezelfde
-    gemiddelde en variantie heeft als de werkelijke, continue exacte
-    samengestelde verdeling van ``max_fout_exact_continu_SSO``
-    (Beta-Binomiaal resp. Negatief-Binomiaal).
+    gemiddelde en variantie heeft als de werkelijke, continue
+    samengestelde verdeling van de foutfractie bij de klant
+    (Beta-Binomiaal resp. Negatief-Binomiaal, met zowel
+    posterior-onzekerheid over de ware foutkans als
+    steekproefvariabiliteit van die foutkans bij de klant).
 
     Achtergrond
     -----------
-    ``n_klant_k_klant_SSO`` (gebruikt door ``max_fout_benaderd_SSO``)
-    poolt de SSO-steekproef en de klantpopulatie tot één kleinere
-    "as-if"-steekproef. Dat voegt de twee onzekerheidslagen samen
-    (posterior-onzekerheid over de ware foutkans, én
-    steekproefvariabiliteit van die foutkans bij de klant) tot één
-    enkele laag, en levert daardoor zowel een vertekend gemiddelde als
-    een te lage variantie op (zie ``max_fout_exact_continu_SSO`` voor de
-    precieze, continue versie van het exacte tweelagen-model).
+    Een naïeve aanpak poolt de SSO-steekproef en de klantpopulatie tot
+    één kleinere "as-if"-steekproef. Dat voegt de twee onzekerheidslagen
+    samen tot één enkele laag, en levert daardoor zowel een vertekend
+    gemiddelde als een te lage variantie op.
 
     Deze functie kiest in plaats daarvan (n_eff, k_eff) zó dat de
     Beta(k_eff + 1, n_eff - k_eff + 1)- resp. Gamma(k_eff + 1, schaal=1 /

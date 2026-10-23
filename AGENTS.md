@@ -8,7 +8,7 @@ Python-pakket voor statistische auditmethoden voor de Rijksoverheid. Overkoepele
   - `plan_stratified()` — berekent optimale steekproefomvang per stratum
   - `eval_stratified()` — combineert steekproeven via convolutie tot één gezamenlijke foutschatting
   - `plot_kanskromme()` — visualiseert de resulterende kansverdeling
-- `auditstat.sso` — steekproefaudits voor shared service organisaties (SSO's); berekent de maximale foutfractie van één klant binnen een SSO-brede steekproef onder het **uitwisselbare model** (`max_fout_exact_SSO`, `max_fout_exact_continu_SSO`, `max_fout_benaderd_SSO`), dat veronderstelt dat elke post (van welke klant dan ook) dezelfde SSO-brede foutfractie deelt.
+- `auditstat.sso` — steekproefaudits voor shared service organisaties (SSO's); evalueert gestratificeerd (één stratum per type post) een klant op basis van per-type-post SSO-steekproeven, volledig continu en in euro's (`evalueer_SSO_klant_gestratificeerd` → `eval_stratified`/`plot_kanskromme` uit `auditstat.stratified`). Zie "Item-count-gebaseerd SSO-pad: verwijderd" hieronder voor de achtergrond.
 
 Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/
 
@@ -28,11 +28,9 @@ auditstat/
     analyseer_klimheuristiek.py
   sso/
     __init__.py
-    max_fout_exact_SSO.py           # Uitwisselbaar model (discreet)
-    max_fout_exact_continu_SSO.py   # Uitwisselbaar model (continu/Poisson-achtig)
-    max_fout_benaderd_SSO.py        # Uitwisselbaar model, benadering
-    plot_kanskromme_SSO.py
-    plot_max_fout_vergelijking_SSO.py
+    moment_match_SSO.py              # Kalibreert (n_eff, k_eff) per type post op moment-matching (gemiddelde + variantie)
+    strata_SSO_klant.py              # bouw_strata_SSO_klant: zet post_typen (per type post: n, k, N_klant, waarde_laag) om in een stratatabel
+    evalueer_SSO_klant_gestratificeerd.py  # Roept bouw_strata_SSO_klant + eval_stratified aan
     script_SSO.py                     # Demonstratiescript
 tests/
   __init__.py
@@ -47,8 +45,9 @@ tests/
     test_hypothesis_properties.py
   sso/                     # Spiegelt auditstat/sso/
     __init__.py
-    test_max_fout_benaderd_SSO.py
-    test_max_fout_exact_SSO.py
+    test_moment_match_SSO.py
+    test_strata_SSO_klant.py
+    test_evalueer_SSO_klant_gestratificeerd.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
 pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
@@ -70,7 +69,9 @@ push_new_version.sh       # Script: bumpt versie, commit, tag, push naar GitHub 
 
 **Heterogeen SSO-model: verwijderd (was `max_fout_heterogeen_SSO`).** Dit model veronderstelde dat klant X een eigen, onafhankelijke foutfractie heeft (flat prior), los van de rest van de SSO-populatie, en marginaliseerde de posterior over welke van de `n` SSO-breed getrokken posten (`n_X ~ Binomial(n, f)`) bij klant X hoorden — op basis van alleen het SSO-brede totaal `(n, k)` en het relatieve aandeel `f`, zonder de opsplitsing per klant te kennen. Bij nadere analyse bleek deze aanname onrealistisch: de auditor moet elke gestoken post in de administratie van de betreffende klant controleren en kent dus altijd welke posten (en fouten) bij klant X horen (`n_X`, `k_X`). Zodra die opsplitsing bekend is, is conditioneren op `n_X` de statistisch juiste aanpak — simpelweg `Beta(k_X+1, n_X−k_X+1)` op de klanteigen deelsteekproef — en is marginaliseren over een onbekende verdeling nodeloos conservatief (in een rekenvoorbeeld: grens 0,21 bij direct conditioneren vs. 0,40 bij marginaliseren, bij n=100, k=5, f=0,2). Het model, de bijbehorende plotfunctie `plot_posterior_heterogeen_SSO`, de tests en de app-integratie zijn verwijderd. Mocht een vergelijkbare behoefte terugkomen, dan is dat waarschijnlijk alleen zinvol voor **planning vooraf** (vóór de steekproeftrekking, wanneer `n_X` nog niet gerealiseerd is en alleen `f` bekend is) — niet voor evaluatie achteraf.
 
-**Dutch getalnotatie in plots (`auditstat/_formatting.py`):** alle plotfuncties (`plot_kanskromme`, `plot_kanskromme_SSO`, `plot_max_fout_vergelijking_SSO`) gebruiken de gedeelde helpers `nl_getal`, `nl_getal_variabel` en `nl_tick_formatter` voor komma-decimalen in titels, legenda's en astick-labels, in plaats van losse `.replace(",","X")`-achtige implementaties per bestand.
+**Item-count-gebaseerd SSO-pad: verwijderd (was `max_fout_exact_SSO`, `max_fout_exact_continu_SSO`, `max_fout_benaderd_SSO`, `n_klant_k_klant_SSO`, `plot_kanskromme_SSO`, `plot_max_fout_vergelijking_SSO`, `simuleer_SSO`).** Dit pad behandelde `N_klant` als een exact aantal (gehele) posten bij de klant en modelleerde de voorspellende verdeling van het aantal foute posten daarbinnen als Beta-Binomiaal resp. Negatief-Binomiaal — een attribuutsteekproefmodel. De "exacte" kanskromme toonde daardoor een getrapte verdeling (foutfractie alleen op veelvouden van 1/N_klant), wat gebruikers als verwarrend/artificieel ervoeren. Bij nadere analyse bleek dit géén modelartefact te zijn — voor een attribuutsteekproef bij een exact bekende, eindige populatie ís die discreetheid correct — maar wél een mismatch met de praktijk: SSO-audits in dit project zijn **geldsteekproeven** (monetary unit sampling), niet attribuutsteekproeven op postenaantallen. Het project had hiervoor al het juiste, volledig continue alternatief: `moment_match_SSO` (kalibreert per type post een effectieve (n_eff, k_eff) op gemiddelde + variantie) → `bouw_strata_SSO_klant` (zet post_typen, mét `waarde_laag` in euro's, om in een stratatabel) → `evalueer_SSO_klant_gestratificeerd` (roept `eval_stratified` aan) → `plot_kanskromme` (continue convolutie, geen trapvorm) — dit pad was al aanwezig en in `app.py` geïntegreerd als het "gestratificeerd"-gedeelte van het SSO-tabblad. Het item-count-pad en het bijbehorende "simpele" (n, k, N_klant)-gedeelte van het SSO-tabblad zijn verwijderd; alleen het gestratificeerde, geld-gebaseerde pad resteert als SSO-evaluatiemethode. `test_moment_match_SSO.py` had twee tests die vergeleken met `max_fout_exact_continu_SSO`/`n_klant_k_klant_SSO` (regressietests "nieuwe kalibratie beter dan naïeve pooling") — die zijn geschrapt; de overige (zelfstandige) tests van `moment_match_SSO` blijven.
+
+**Dutch getalnotatie in plots (`auditstat/_formatting.py`):** alle plotfuncties (`plot_kanskromme`) gebruiken de gedeelde helpers `nl_getal`, `nl_getal_variabel` en `nl_tick_formatter` voor komma-decimalen in titels, legenda's en astick-labels, in plaats van losse `.replace(",","X")`-achtige implementaties per bestand.
 
 **HARo-risicocombinaties:** 27 mogelijke combinaties van IHR × IBR × CAR (`H`/`M`/`L`), getest via `@pytest.mark.parametrize`.
 
@@ -193,9 +194,9 @@ De per-stratum `materialiteit`-kolom accepteert zowel fracties (≤ 1) als geldb
 .venv/bin/python -m pytest
 ```
 
-227 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+205 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
-**Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.max_fout_exact_SSO import max_fout_exact_SSO` — niet uit een kale modulenaam.
+**Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
 **Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `tests/stratified/test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
 

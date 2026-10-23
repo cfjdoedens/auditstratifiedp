@@ -33,16 +33,13 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
     de klant gestratificeerd worden geëvalueerd: één stratum per type
     post.
 
-    In tegenstelling tot een eerdere versie die de SSO-steekproef en de
-    klantpopulatie naïef poolde tot één kleinere "as-if"-steekproef
-    (``n_klant_k_klant_SSO``, nog gebruikt door ``max_fout_benaderd_SSO``),
-    kalibreert ``moment_match_SSO`` (n_eff, k_eff) zodanig dat de Beta-
+    ``moment_match_SSO`` kalibreert (n_eff, k_eff) zodanig dat de Beta-
     resp. Gamma-verdeling die ``eval_stratified`` hieruit opbouwt dezelfde
-    gemiddelde én variantie heeft als de werkelijke, continue exacte
-    samengestelde verdeling (``max_fout_exact_continu_SSO``). Dat behoudt
-    beide onzekerheidslagen (posterior-onzekerheid over de ware foutkans,
-    én steekproefvariabiliteit van die foutkans bij de klant) voor zover
-    dat binnen een enkele Beta/Gamma-verdeling mogelijk is.
+    gemiddelde én variantie heeft als de werkelijke, continue samengestelde
+    verdeling van de foutfractie bij de klant. Dat behoudt beide
+    onzekerheidslagen (posterior-onzekerheid over de ware foutkans, én
+    steekproefvariabiliteit van die foutkans bij de klant) voor zover dat
+    binnen een enkele Beta/Gamma-verdeling mogelijk is.
 
     Parameters
     ----------
