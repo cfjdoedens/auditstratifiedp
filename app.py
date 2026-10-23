@@ -16,11 +16,17 @@ from auditstat.sso.max_fout_exact_continu_SSO import (  # pyrefly: ignore[missin
 from auditstat.sso.max_fout_exact_SSO import (  # pyrefly: ignore[missing-import]
     max_fout_exact_SSO,
 )
+from auditstat.sso.max_fout_heterogeen_SSO import (  # pyrefly: ignore[missing-import]
+    max_fout_heterogeen_SSO,
+)
 from auditstat.sso.plot_kanskromme_SSO import (  # pyrefly: ignore[missing-import]
     plot_kanskromme_SSO,
 )
 from auditstat.sso.plot_max_fout_vergelijking_SSO import (  # pyrefly: ignore[missing-import]
     plot_max_fout_vergelijking_SSO,
+)
+from auditstat.sso.plot_posterior_heterogeen_SSO import (  # pyrefly: ignore[missing-import]
+    plot_posterior_heterogeen_SSO,
 )
 from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
@@ -146,6 +152,16 @@ def _parse_nl(waarde) -> float | None:
 def _parse_nl_kolom(series: pd.Series) -> pd.Series:
     """Pas de Nederlandstalige parsing toe op een pandas Series kolom."""
     return series.apply(_parse_nl)
+
+
+def _parse_nl_lijst(tekst: str) -> list[float]:
+    """Parseer een puntkomma-gescheiden lijst van Nederlandstalige getallen
+    (bijv. "0,5; 0,1; 0,02") naar een lijst van floats. Lege/onparseerbare
+    items worden overgeslagen."""
+    if tekst is None:
+        return []
+    waarden = [_parse_nl(item) for item in str(tekst).split(";")]
+    return [w for w in waarden if w is not None]
 
 
 def _format_nl_auto(waarde, min_decimalen: int = 0) -> str:
@@ -1311,6 +1327,27 @@ with tab_sso:
         sso_N_klant = _parse_nl(sso_N_klant_text)
         sso_zekerheid = _parse_nl(sso_zekerheid_text)
 
+        st.markdown("—")
+        sso_f_text = st.text_input(
+            "f (relatief aandeel klant in de SSO-populatie, optioneel)",
+            value="",
+            key="sso_f_text",
+            help=(
+                "Aandeel van de klant in de totale SSO-populatie (in "
+                "posten én waarde), tussen 0 en 1. Leeg laten om het "
+                "heterogene model over te slaan. Bij f = 1 komt het "
+                "heterogene model exact overeen met het uitwisselbare "
+                "model hierboven (exact/exact-continu/benaderd)."
+            ),
+        )
+        sso_f_extra_text = st.text_input(
+            "extra f-waarden voor vergelijkingsplot (optioneel, puntkomma-gescheiden)",
+            value="0,5; 0,1; 0,02",
+            key="sso_f_extra_text",
+        )
+
+        sso_f = _parse_nl(sso_f_text) if sso_f_text.strip() != "" else None
+
     with col_hoofd:
         st.subheader("Resultaat")
 
@@ -1328,6 +1365,8 @@ with tab_sso:
             sso_fouten.append(
                 "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
             )
+        if sso_f_text.strip() != "" and (sso_f is None or not (0.0 <= sso_f <= 1.0)):
+            sso_fouten.append("f moet tussen 0 en 1 liggen (of leeg zijn).")
 
         if sso_fouten:
             for sso_msg in sso_fouten:
@@ -1350,7 +1389,15 @@ with tab_sso:
             except ValueError as e:
                 st.error(f"Fout bij berekening: {e}")
             else:
-                sso_metric_col1, sso_metric_col2, sso_metric_col3 = st.columns(3)
+                if sso_f is None:
+                    sso_metric_col1, sso_metric_col2, sso_metric_col3 = st.columns(3)
+                else:
+                    (
+                        sso_metric_col1,
+                        sso_metric_col2,
+                        sso_metric_col3,
+                        sso_metric_col4,
+                    ) = st.columns(4)
                 sso_metric_col1.metric(
                     "Maximale foutfractie (exact)", _nl(sso_exact, 4)
                 )
@@ -1371,11 +1418,56 @@ with tab_sso:
                     "samenvoegt."
                 )
 
+                if sso_f is not None:
+                    try:
+                        sso_heterogeen = max_fout_heterogeen_SSO(
+                            sso_n_int, sso_k_int, sso_f, sso_zekerheid, sso_verdeling
+                        )
+                    except ValueError as e:
+                        st.error(f"Fout bij berekening (heterogeen model): {e}")
+                    else:
+                        sso_metric_col4.metric(
+                            "Maximale foutfractie (heterogeen)", _nl(sso_heterogeen, 4)
+                        )
+                        st.caption(
+                            "Heterogeen: klant heeft een eigen foutkans, los van de "
+                            "rest van de SSO-populatie (geen uitwisselbaarheid). "
+                            "Gebruikt alleen f = N_klant / N_totaal; de populaties "
+                            "worden verondersteld zeer groot te zijn. Bij een klein "
+                            "aandeel f bevat de SSO-brede steekproef nauwelijks "
+                            "klant-specifieke informatie, dus is de maximale "
+                            "foutfractie dan veel hoger dan bij het uitwisselbare "
+                            "model (exact/exact-continu/benaderd hierboven, dat "
+                            "impliciet f = 1 aanneemt)."
+                        )
+
                 st.subheader("Kanskromme: exact vs. benaderd")
                 sso_fig_kans = plot_kanskromme_SSO(
                     sso_n_int, sso_k_int, sso_N_klant_int, sso_zekerheid, sso_verdeling
                 )
                 st.pyplot(sso_fig_kans)
+
+                if sso_f is not None:
+                    st.subheader("Uitwisselbaar vs. heterogeen model")
+                    sso_f_waarden_plot = sorted(
+                        set([sso_f] + _parse_nl_lijst(sso_f_extra_text)),
+                        reverse=True,
+                    )
+                    sso_f_waarden_plot = [
+                        f for f in sso_f_waarden_plot if 0.0 <= f <= 1.0
+                    ]
+                    try:
+                        sso_fig_heterogeen = plot_posterior_heterogeen_SSO(
+                            sso_n_int,
+                            sso_k_int,
+                            f_waarden=sso_f_waarden_plot,
+                            zekerheid=sso_zekerheid,
+                            verdeling=sso_verdeling,
+                        )
+                    except ValueError as e:
+                        st.error(f"Fout bij plotten (heterogeen model): {e}")
+                    else:
+                        st.pyplot(sso_fig_heterogeen)
 
         st.divider()
         st.subheader("Gevoeligheid over een bereik")
