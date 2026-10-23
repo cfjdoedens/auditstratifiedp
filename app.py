@@ -1470,10 +1470,11 @@ with tab_sso:
                 "Maximale fout (euro\u2019s)",
                 _nl(sso_strata_res["max_fout_convolutie_geld"], 2),
             )
-            st.table(
-                sso_strata_res["steekproeven"][
-                    ["naam", "waarde_laag", "n_laag", "k_laag"]
-                ]
+            sso_strata_steekproeven_tabel = sso_strata_res["steekproeven"][
+                ["naam", "waarde_laag", "n_laag", "k_laag"]
+            ].assign(
+                waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
             )
+            st.table(sso_strata_steekproeven_tabel)
             sso_strata_fig = plot_kanskromme(sso_strata_res)
             st.pyplot(sso_strata_fig)
