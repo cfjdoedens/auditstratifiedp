@@ -1480,6 +1480,13 @@ with tab_sso:
                         )
                         st.session_state.sso_strata_res = None
 
+            # De herformatteerde tabel (en een nieuwe data_editor-key) staan
+            # al in sessiestatus, maar de widget zelf is dit script-run al
+            # met de oude key gerenderd. Pas bij een nieuwe rerun leest
+            # st.data_editor de bijgewerkte waarde en key opnieuw in, dus
+            # forceer die rerun expliciet.
+            st.rerun()
+
         sso_strata_res = st.session_state.sso_strata_res
         if sso_strata_res is not None:
             st.subheader("Resultaat")
