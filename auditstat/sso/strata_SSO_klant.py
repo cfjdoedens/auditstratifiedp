@@ -82,6 +82,13 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
     'm opnieuw af met de naam van het type post ervoor (``"Type post
     '<naam>': ..."``), zodat een aanroeper per type post kan tonen voor
     welke een terugval is toegepast.
+
+    Bij een volledige blinde vlek (N_klant zo klein dat zelfs de exacte
+    grens al 0 is) weigert ``moment_match_SSO`` in plaats daarvan een
+    resultaat te geven en gooit een ``ValueError``. Deze functie vangt die
+    op en gooit 'm opnieuw met de naam van het type post ervoor, zodat de
+    hele gestratificeerde evaluatie voor deze klant stopt in plaats van
+    een (misleidend geruststellend) resultaat op te leveren.
     """
     if not post_typen:
         raise ValueError("Geef tenminste 1 type post (stratum) mee.")
@@ -104,11 +111,18 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
         # te weten bij welk type post (naam) dat hoort. Die context voegen
         # we hier toe, zodat een aanroeper (bijv. de SSO-tab in app.py) per
         # type post kan tonen voor welke een terugval is toegepast.
-        with warnings.catch_warnings(record=True) as gevangen:
-            warnings.simplefilter("always", RuntimeWarning)
-            n_eff, k_eff = moment_match_SSO(
-                post["n"], post["k"], post["N_klant"], verdeling=model
-            )
+        try:
+            with warnings.catch_warnings(record=True) as gevangen:
+                warnings.simplefilter("always", RuntimeWarning)
+                n_eff, k_eff = moment_match_SSO(
+                    post["n"], post["k"], post["N_klant"], verdeling=model
+                )
+        except ValueError as e:
+            # Zie moment_match_SSO: bij een volledige blinde vlek (N_klant
+            # zo klein dat zelfs de exacte grens al 0 is) weigert die
+            # functie een resultaat te geven. Die ValueError kent de naam
+            # van het type post niet; die context voegen we hier toe.
+            raise ValueError(f"Type post '{naam}': {e}") from e
         for w in gevangen:
             warnings.warn(
                 f"Type post '{naam}': {w.message}", RuntimeWarning, stacklevel=2

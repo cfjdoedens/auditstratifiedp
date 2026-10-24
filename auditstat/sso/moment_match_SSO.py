@@ -117,21 +117,26 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     steeds simpelweg geklemd op n_eff = k_eff, zonder deze exacte-grens-
     kalibratie.
 
-    Volledige blinde vlek bij extreem kleine N_klant
-    -------------------------------------------------
+    Volledige blinde vlek bij extreem kleine N_klant: geweigerd
+    -------------------------------------------------------------
     Als de werkelijke, exacte grens zelf al 0 is (``_max_fout_exact`` geeft
     0, wat gebeurt zodra P(0 fouten bij de klant) ≥ 95% — bij een zeer
     kleine N_klant en/of lage SSO-foutfractie), kan geen enkele continue
-    verdeling nog een reëel, positief foutscenario weergeven: k_eff = 0
-    met n_eff = n kent dan vrijwel 0 kans toe aan ieder foutscenario,
-    terwijl de werkelijke kans op minstens 1 fout (hoe klein ook) altijd
-    positief blijft. Dit is geen gradueel precisieverlies maar een
-    volledige blinde vlek. In dat geval wordt een explicietere
-    ``RuntimeWarning`` afgevuurd die aanraadt de posten van dit type bij
-    deze klant rechtstreeks (100%) te controleren in plaats van te
-    extrapoleren — in plaats van de mildere waarschuwing voor het gewone
-    klemgeval (waarin de exacte grens zelf wél positief is en de
-    kalibratie die nog altijd exact reproduceert).
+    verdeling nog een reëel, positief foutscenario weergeven: elk eindig,
+    niet-negatief (n_eff, k_eff)-paar zou dan vrijwel 0 kans toekennen aan
+    ieder foutscenario, terwijl de werkelijke kans op minstens 1 fout (hoe
+    klein ook) altijd positief blijft. Dit is geen gradueel
+    precisieverlies maar een volledige blinde vlek, en dus kwalitatief
+    anders dan het gewone klemgeval hierboven (waarin de exacte grens
+    zelf wél positief is en de kalibratie die nog altijd exact
+    reproduceert). In dit geval wordt daarom geen (misleidend
+    geruststellend) resultaat geretourneerd: ``moment_match_SSO`` gooit
+    een ``ValueError`` die aanraadt de posten van dit type bij deze klant
+    rechtstreeks (100%) te controleren in plaats van te extrapoleren.
+    ``bouw_strata_SSO_klant`` vangt deze op en vuurt 'm opnieuw af met de
+    naam van het type post ervoor; ``app.py`` toont 'm vervolgens als
+    foutmelding (net als elke andere ``ValueError`` uit de
+    gestratificeerde SSO-evaluatie).
 
     Parameters
     ----------
@@ -183,52 +188,40 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         raise ValueError("Kies 'binomiaal' of 'poisson'")
 
     geklemd = False
-    volledig_blinde_vlek = False
     if k_eff < 0:
         exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
         if exact_doel <= 0.0:
             # De exacte grens is hier zelf 0 (zeer kleine N_klant en/of
             # k = 0, zodat zelfs bij 95% zekerheid 0 fouten te verwachten
             # zijn). Een Beta/Gamma-verdeling heeft een strikt positieve
-            # drager en kan dus nooit exact kwantiel 0 weergeven; elk
-            # eindig, niet-negatief (n_eff, k_eff)-paar is dan al even
-            # conservatief als de exacte grens zelf. We kiezen k_eff = 0
-            # met n_eff = n, zodat niet meer precisie wordt geclaimd over
-            # de klant dan over de SSO-steekproef als geheel.
-            n_eff, k_eff = float(n), 0.0
-            volledig_blinde_vlek = True
-        else:
-            n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
-                exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+            # drager en kan dus nooit exact kwantiel 0 weergeven: elk
+            # eindig, niet-negatief (n_eff, k_eff)-paar zou dan
+            # noodzakelijkerwijs vrijwel 0 kans toekennen aan ieder
+            # foutscenario, terwijl de werkelijke kans op minstens 1 fout
+            # (hoe klein ook) altijd positief blijft. Dit is geen
+            # gradueel precisieverlies maar een volledige blinde vlek:
+            # statistische extrapolatie geeft hier helemaal geen houvast
+            # meer. In plaats van toch een (misleidend geruststellend)
+            # resultaat te retourneren, wordt de berekening geweigerd.
+            raise ValueError(
+                f"N_klant = {N_klant:g} is zo klein dat zelfs de werkelijke, "
+                "exacte grens bij 95% zekerheid al 0 fouten aangeeft: de "
+                "SSO-steekproef geeft dan geen enkel statistisch houvast "
+                "meer voor dit type post bij deze klant, ook al blijft de "
+                "kans op een fout (hoe klein ook) reëel. Een gekalibreerde "
+                "kanskromme zou dat risico dan ten onrechte verbergen. "
+                "Controleer deze posten rechtstreeks (100%) in plaats van "
+                "te extrapoleren."
             )
+        n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
+            exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+        )
         geklemd = True
     if n_eff < k_eff:
         n_eff = k_eff
         geklemd = True
 
-    if volledig_blinde_vlek:
-        # N_klant is hier zo klein dat zelfs de exacte, niet-benaderde
-        # grens al 0 is: elke continue verdeling (Beta of anderszins) kent
-        # dan noodzakelijkerwijs vrijwel 0 kans toe aan ieder fout-scenario,
-        # terwijl de werkelijke kans op minstens 1 fout (hoe klein ook)
-        # altijd positief blijft. Dit is geen gradueel precisieverlies maar
-        # een volledige blinde vlek: de getoonde uitkomst "ziet" geen enkel
-        # mogelijk foutscenario voor dit type post. Statistische
-        # extrapolatie is dan niet meer het juiste gereedschap; met zo
-        # weinig posten (N_klant) is rechtstreekse (100%-)controle van de
-        # klant eigen posten van dit type zowel betrouwbaarder als
-        # doorgaans goedkoper dan steekproefextrapolatie.
-        warnings.warn(
-            f"N_klant = {N_klant:g} is zo klein dat zelfs de werkelijke, "
-            "exacte grens bij 95% zekerheid al 0 fouten aangeeft: de SSO-"
-            "steekproef geeft dan geen enkel statistisch houvast meer voor "
-            "dit type post bij deze klant, ook al blijft de kans op een "
-            "fout (hoe klein ook) reëel. Overweeg deze posten rechtstreeks "
-            "(100%) te controleren in plaats van te extrapoleren.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-    elif geklemd:
+    if geklemd:
         warnings.warn(
             "De werkelijke spreiding van de foutfractie bij de klant kon niet "
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "

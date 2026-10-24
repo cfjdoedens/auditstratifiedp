@@ -94,6 +94,34 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
             bouw_strata_SSO_klant(post_typen)
         self.assertEqual(len(gevangen), 0)
 
+    def test_volledige_blinde_vlek_wordt_geweigerd_met_naam_van_type_post(self):
+        # N_klant=2 met k=0 is zo klein dat zelfs de exacte grens bij 95%
+        # zekerheid al 0 fouten aangeeft (volledige blinde vlek,
+        # moment_match_SSO). De hele gestratificeerde opbouw moet dan
+        # stoppen met een ValueError die de naam van het type post bevat,
+        # in plaats van door te gaan met een misleidend resultaat.
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=0, N_klant=2, waarde_laag=2_000_000.0),
+        ]
+        with self.assertRaises(ValueError) as ctx:
+            bouw_strata_SSO_klant(post_typen)
+        self.assertIn("Emolumenten", str(ctx.exception))
+        self.assertIn("100%", str(ctx.exception))
+
+    def test_volledige_blinde_vlek_stopt_ook_bij_meerdere_typen_posten(self):
+        # Zelfs als andere typen posten prima gekalibreerd kunnen worden,
+        # moet één type post met een volledige blinde vlek de hele
+        # opbouw laten stoppen (geen gedeeltelijk/stil resultaat).
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=0, N_klant=2, waarde_laag=2_000_000.0),
+            dict(
+                naam="Inkoopfacturen", n=200, k=1, N_klant=1500, waarde_laag=5_000_000.0
+            ),
+        ]
+        with self.assertRaises(ValueError) as ctx:
+            bouw_strata_SSO_klant(post_typen)
+        self.assertIn("Emolumenten", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
