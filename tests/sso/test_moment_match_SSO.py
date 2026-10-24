@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 from scipy.stats import beta, betabinom, gamma, nbinom
 
@@ -119,6 +120,33 @@ class TestMomentMatchSSO(unittest.TestCase):
             n_eff, k_eff = moment_match_SSO(n, k, N_klant, "poisson")
         self.assertEqual(k_eff, 0.0)
         self.assertEqual(n_eff, float(n))
+
+    def test_volledig_blinde_vlek_geeft_aanbeveling_tot_100_procent_controle(self):
+        # Als de exacte grens zelf al 0 is, moet de waarschuwing expliciet
+        # aanraden de posten rechtstreeks te controleren, niet de mildere
+        # standaard-klemmelding.
+        n, k, N_klant = 120, 0, 2
+        self.assertEqual(_max_fout_exact_binomiaal(n, k, N_klant), 0.0)
+        with warnings.catch_warnings(record=True) as gevangen:
+            warnings.simplefilter("always", RuntimeWarning)
+            moment_match_SSO(n, k, N_klant, "binomiaal")
+        self.assertEqual(len(gevangen), 1)
+        boodschap = str(gevangen[0].message)
+        self.assertIn("100%", boodschap)
+        self.assertIn(str(N_klant), boodschap)
+
+    def test_gewoon_klemgeval_geeft_niet_de_100_procent_aanbeveling(self):
+        # Bij klemming waarbij de exacte grens zelf wél positief is (en dus
+        # exact gereproduceerd wordt), moet de mildere standaardmelding
+        # verschijnen, niet de aanbeveling tot 100%-controle.
+        n, k, N_klant = 120, 1, 100
+        self.assertGreater(_max_fout_exact_binomiaal(n, k, N_klant), 0.0)
+        with warnings.catch_warnings(record=True) as gevangen:
+            warnings.simplefilter("always", RuntimeWarning)
+            moment_match_SSO(n, k, N_klant, "binomiaal")
+        self.assertEqual(len(gevangen), 1)
+        boodschap = str(gevangen[0].message)
+        self.assertNotIn("100%", boodschap)
 
 
 if __name__ == "__main__":

@@ -117,6 +117,22 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     steeds simpelweg geklemd op n_eff = k_eff, zonder deze exacte-grens-
     kalibratie.
 
+    Volledige blinde vlek bij extreem kleine N_klant
+    -------------------------------------------------
+    Als de werkelijke, exacte grens zelf al 0 is (``_max_fout_exact`` geeft
+    0, wat gebeurt zodra P(0 fouten bij de klant) ≥ 95% — bij een zeer
+    kleine N_klant en/of lage SSO-foutfractie), kan geen enkele continue
+    verdeling nog een reëel, positief foutscenario weergeven: k_eff = 0
+    met n_eff = n kent dan vrijwel 0 kans toe aan ieder foutscenario,
+    terwijl de werkelijke kans op minstens 1 fout (hoe klein ook) altijd
+    positief blijft. Dit is geen gradueel precisieverlies maar een
+    volledige blinde vlek. In dat geval wordt een explicietere
+    ``RuntimeWarning`` afgevuurd die aanraadt de posten van dit type bij
+    deze klant rechtstreeks (100%) te controleren in plaats van te
+    extrapoleren — in plaats van de mildere waarschuwing voor het gewone
+    klemgeval (waarin de exacte grens zelf wél positief is en de
+    kalibratie die nog altijd exact reproduceert).
+
     Parameters
     ----------
     n : int of float
@@ -167,6 +183,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         raise ValueError("Kies 'binomiaal' of 'poisson'")
 
     geklemd = False
+    volledig_blinde_vlek = False
     if k_eff < 0:
         exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
         if exact_doel <= 0.0:
@@ -179,6 +196,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             # met n_eff = n, zodat niet meer precisie wordt geclaimd over
             # de klant dan over de SSO-steekproef als geheel.
             n_eff, k_eff = float(n), 0.0
+            volledig_blinde_vlek = True
         else:
             n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
                 exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
@@ -188,7 +206,29 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         n_eff = k_eff
         geklemd = True
 
-    if geklemd:
+    if volledig_blinde_vlek:
+        # N_klant is hier zo klein dat zelfs de exacte, niet-benaderde
+        # grens al 0 is: elke continue verdeling (Beta of anderszins) kent
+        # dan noodzakelijkerwijs vrijwel 0 kans toe aan ieder fout-scenario,
+        # terwijl de werkelijke kans op minstens 1 fout (hoe klein ook)
+        # altijd positief blijft. Dit is geen gradueel precisieverlies maar
+        # een volledige blinde vlek: de getoonde uitkomst "ziet" geen enkel
+        # mogelijk foutscenario voor dit type post. Statistische
+        # extrapolatie is dan niet meer het juiste gereedschap; met zo
+        # weinig posten (N_klant) is rechtstreekse (100%-)controle van de
+        # klant eigen posten van dit type zowel betrouwbaarder als
+        # doorgaans goedkoper dan steekproefextrapolatie.
+        warnings.warn(
+            f"N_klant = {N_klant:g} is zo klein dat zelfs de werkelijke, "
+            "exacte grens bij 95% zekerheid al 0 fouten aangeeft: de SSO-"
+            "steekproef geeft dan geen enkel statistisch houvast meer voor "
+            "dit type post bij deze klant, ook al blijft de kans op een "
+            "fout (hoe klein ook) reëel. Overweeg deze posten rechtstreeks "
+            "(100%) te controleren in plaats van te extrapoleren.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    elif geklemd:
         warnings.warn(
             "De werkelijke spreiding van de foutfractie bij de klant kon niet "
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
