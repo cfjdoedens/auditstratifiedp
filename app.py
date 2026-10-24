@@ -94,6 +94,7 @@ for key, standaard in {
     "plan_error": None,
     "plan_tabel_key": 0,
     "sso_strata_tabel": LEGE_SSO_STRATA_DF.copy(),
+    "sso_strata_tabel_key": 0,
     "sso_strata_res": None,
     "sso_strata_error": None,
 }.items():
@@ -1307,7 +1308,7 @@ with tab_sso:
                 st.session_state.sso_strata_tabel,
                 width="stretch",
                 num_rows="dynamic",
-                key="sso_strata_tabel_editor",
+                key=f"sso_strata_tabel_editor_{st.session_state.sso_strata_tabel_key}",
                 column_config={
                     "naam": st.column_config.TextColumn(
                         "naam", help="Naam van het type post, bijv. Emolumenten."
@@ -1351,6 +1352,26 @@ with tab_sso:
             st.error(st.session_state.sso_strata_error)
 
         if sso_strata_bereken:
+            # Herformatteer geldige numerieke velden naar NL-notatie
+            # (duizendtalpunt, vaste decimalen) zodat de invoertabel na een
+            # berekening net zo leesbaar blijft als in de eval-/planningstab.
+            # Lege of onparseerbare cellen blijven ongewijzigd staan, zodat
+            # de gebruiker die kan corrigeren.
+            for _sso_kolom, _sso_min_dec in (
+                ("n", 0),
+                ("k", 0),
+                ("N_klant", 0),
+                ("waarde_laag", 2),
+                ("materialiteit", 2),
+            ):
+                sso_strata_tabel[_sso_kolom] = sso_strata_tabel[_sso_kolom].apply(
+                    lambda x, _d=_sso_min_dec: (
+                        _format_nl_auto(x, _d) if _parse_nl(x) is not None else x
+                    )
+                )
+            st.session_state.sso_strata_tabel = sso_strata_tabel
+            st.session_state.sso_strata_tabel_key += 1
+
             sso_strata_zekerheid = _parse_nl(sso_strata_zekerheid_text)
             sso_strata_rijen = sso_strata_tabel.dropna(how="all").to_dict("records")
             # Rijen zonder (geldige) naam worden als leeg beschouwd en
@@ -1474,6 +1495,8 @@ with tab_sso:
                 ["naam", "waarde_laag", "n_laag", "k_laag"]
             ].assign(
                 waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
+                n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 2)),
+                k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 2)),
             )
             st.table(sso_strata_steekproeven_tabel)
             sso_strata_fig = plot_kanskromme(sso_strata_res)
