@@ -13,11 +13,14 @@ _ZEKERHEID_VOOR_KLEMKALIBRATIE = 0.95
 
 
 def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE):
-    """De werkelijke, exacte maximale foutfractie bij ``zekerheid``, op basis
-    van de volledige samengestelde voorspellende verdeling van het aantal
-    fouten bij de klant — Beta-Binomiaal (binomiaal) resp. Negatief-Binomiaal
-    (poisson) — zonder de Beta/Gamma-benadering die ``moment_match_SSO``
-    verder in deze module gebruikt.
+    """De exacte maximale foutfractie bij ``zekerheid`` binnen het
+    samengestelde voorspellende model van het aantal fouten bij de klant —
+    Beta-Binomiaal (binomiaal) resp. Negatief-Binomiaal (poisson) — zonder
+    de Beta/Gamma-benadering die ``moment_match_SSO`` verder in deze module
+    gebruikt. "Exact" slaat dus op het ontbreken van die benadering, niet
+    op een absolute waarheid los van het model: dit model zelf steunt nog
+    altijd op aannames (vlakke prior, ``N_klant`` als een exact eindige
+    populatie).
 
     Dit is per definitie discreet (``N_klant`` is hier een eindig aantal
     posten), en daarom uitsluitend bedoeld als intern ijkpunt bij klemming
@@ -124,11 +127,11 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     zeker de SSO-foutkans zelf al is, een secundair effect). In dat
     geval is vasthouden aan het juiste gemiddelde sowieso niet meer
     houdbaar (zie hieronder), en wordt in plaats daarvan direct
-    gekalibreerd op de werkelijke, exacte grens: ``k_eff`` wordt op 0
-    gezet (geen fouten specifiek aan de klant toe te rekenen) en ``n_eff``
-    wordt zo gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij
-    95% zekerheid exact gelijk is aan de werkelijke Beta-Binomiale resp.
-    Negatief-Binomiale grens (``_max_fout_exact``) — zie
+    gekalibreerd op de exacte grens: ``k_eff`` wordt op 0 gezet (geen
+    fouten specifiek aan de klant toe te rekenen) en ``n_eff`` wordt zo
+    gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij 95%
+    zekerheid exact gelijk is aan de Beta-Binomiale resp. Negatief-
+    Binomiale grens (``_max_fout_exact``) — zie
     ``_kalibreer_k_eff_nul_op_exacte_grens``. Dit vervangt een eerdere
     aanpak die bij klemming vergeleek met een naïeve-poolingmethode: die
     vergelijking is overbodig zodra de werkelijke exacte grens zelf als
@@ -154,7 +157,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
 
     Volledige blinde vlek bij extreem kleine N_klant: geweigerd
     -------------------------------------------------------------
-    Als de werkelijke, exacte grens zelf al 0 is (``_max_fout_exact`` geeft
+    Als de exacte grens zelf al 0 is (``_max_fout_exact`` geeft
     0, wat gebeurt zodra P(0 fouten bij de klant) ≥ 95% — bij een zeer
     kleine N_klant en/of lage SSO-foutfractie), kan geen enkele continue
     verdeling nog een reëel, positief foutscenario weergeven: elk eindig,
@@ -246,8 +249,8 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             # meer. In plaats van toch een (misleidend geruststellend)
             # resultaat te retourneren, wordt de berekening geweigerd.
             raise ValueError(
-                f"N_klant = {N_klant:g} is zo klein dat zelfs de werkelijke, "
-                "exacte grens bij 95% zekerheid al 0 fouten aangeeft: de "
+                f"N_klant = {N_klant:g} is zo klein dat zelfs de exacte "
+                "grens bij 95% zekerheid al 0 fouten aangeeft: de "
                 "SSO-steekproef geeft dan geen enkel statistisch houvast "
                 "meer voor dit type post bij deze klant, ook al blijft de "
                 "kans op een fout (hoe klein ook) reëel. Een gekalibreerde "
@@ -277,9 +280,9 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
                 # resultaat te tonen.
                 raise ValueError(
                     f"N_klant = {N_klant:g} is zo klein, in combinatie met "
-                    "een zeer hoge SSO-foutfractie, dat zelfs de "
-                    "werkelijke, exacte grens bij 95% zekerheid al op "
-                    "(vrijwel) 100% fout uitkomt: de SSO-steekproef geeft "
+                    "een zeer hoge SSO-foutfractie, dat zelfs de exacte "
+                    "grens bij 95% zekerheid al op (vrijwel) 100% fout "
+                    "uitkomt: de SSO-steekproef geeft "
                     "dan geen enkel statistisch houvast meer voor dit type "
                     "post bij deze klant. Controleer deze posten "
                     "rechtstreeks (100%) in plaats van te extrapoleren."
@@ -305,7 +308,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
             "te klein om de steekproefvariabiliteit van de foutfractie bij de "
             "klant nog weer te geven). Het (n_eff, k_eff)-paar is in plaats "
-            "daarvan gekalibreerd op de werkelijke, exacte "
+            "daarvan gekalibreerd op de exacte "
             "Beta-Binomiale/Negatief-Binomiale grens bij 95% zekerheid.",
             RuntimeWarning,
             stacklevel=2,
