@@ -422,55 +422,115 @@ def on_plan_tabel_change():
 
 
 def on_sso_strata_tabel_change():
-    """Herformatteer geldige numerieke velden in de SSO-invoertabel direct na elke celbewerking.
+    """Verwerk wijzigingen in de SSO-invoertabel, inclusief harde rollback bij foute invoer.
 
-    In tegenstelling tot on_eval_tabel_change/on_plan_tabel_change wordt hier
-    niets weggepoetst: de SSO-tab valideert pas bij de "evalueer
-    gestratificeerd"-knop (met specifieke, veld-voor-veld foutmeldingen).
-    Deze callback formatteert alléén al geldig parseerbare cellen naar
-    NL-notatie, zodat de gebruiker direct ziet wat hij heeft ingevoerd.
+    Zelfde patroon als on_eval_tabel_change/on_plan_tabel_change: een
+    ongeldige waarde wordt direct teruggedraaid naar de vorige geldige
+    waarde (met een foutmelding), en geldige waarden worden meteen naar
+    NL-notatie geherformatteerd. De submit-validatie bij de "evalueer
+    gestratificeerd"-knop (met specifieke, veld-voor-veld foutmeldingen)
+    blijft daarnaast bestaan als vangnet, bijv. voor geplakte data.
     """
     state = st.session_state[
         f"sso_strata_tabel_editor_{st.session_state.sso_strata_tabel_key}"
     ]
     df = st.session_state.sso_strata_tabel.copy()
+    oude_df = (
+        st.session_state.sso_strata_tabel.copy()
+    )  # De ongewijzigde staat als veilige haven
+
+    weggepoetste_fouten = []
 
     # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst.
     for row_idx_raw, changes in state.get("edited_rows", {}).items():
         row_idx = int(row_idx_raw)
         if row_idx < len(df):
             for col, val in changes.items():
-                df.at[row_idx, col] = "" if val is None else val
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
 
-    # 2. Voeg nieuwe rijen onderaan toe.
+    # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df).
     for row in state.get("added_rows", []):
         new_row = {col: "" for col in df.columns}
         new_row.update({"ihr": "H", "ibr": "H", "car": "H", "materialiteit": "0,01"})
         for col, val in row.items():
             if val is not None:
-                new_row[col] = val
+                new_row[col] = str(val).strip()
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    # 3. Verwijder rijen.
+        base_row = {col: "" for col in df.columns}
+        base_row.update({"ihr": "H", "ibr": "H", "car": "H", "materialiteit": "0,01"})
+        oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
+
+    # 3. Voer één uniforme, waterdichte validatielus uit over álle rijen.
+    for idx in range(len(df)):
+        rij_data = df.iloc[idx]
+        naam_cel = str(rij_data.get("naam", "")).strip()
+        rij_naam = naam_cel if naam_cel else f"Type post {idx + 1}"
+
+        # Helpertje om foute invoer direct terug te draaien naar de oude waarde.
+        def revert_cel(kolom, foutmelding, current_idx=idx, current_rij_naam=rij_naam):
+            weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
+            df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        # Veld-voor-veld validatie van de verplichte numerieke velden.
+        for col in ("n", "k", "N_klant", "waarde_laag"):
+            val_str = str(df.at[idx, col]).strip()
+            if val_str == "":
+                continue
+
+            val_num = _parse_nl(val_str)
+            if val_num is None:
+                revert_cel(col, f'"{val_str}" is geen geldig getal voor {col}')
+                continue
+
+            if col in ("n", "N_klant") and val_num <= 0:
+                revert_cel(col, f"{col} moet groter zijn dan 0")
+            elif col == "k" and val_num < 0:
+                revert_cel(col, "k mag niet negatief zijn")
+            elif col == "waarde_laag" and val_num < 0:
+                revert_cel(col, "waarde_laag mag niet negatief zijn")
+            else:
+                df.at[idx, col] = _format_nl_auto(
+                    val_str, 0 if col != "waarde_laag" else 2
+                )
+
+        # materialiteit is optioneel: een lege waarde is geldig (gebruikt het
+        # standaardtarief bij submit), maar een ingevulde, onparseerbare of
+        # niet-positieve waarde wordt weggepoetst.
+        mat_str = str(df.at[idx, "materialiteit"]).strip()
+        if mat_str != "":
+            mat_num = _parse_nl(mat_str)
+            if mat_num is None:
+                revert_cel(
+                    "materialiteit",
+                    f'"{mat_str}" is geen geldig getal voor materialiteit',
+                )
+            elif mat_num <= 0:
+                revert_cel("materialiteit", "materialiteit moet groter zijn dan 0")
+            else:
+                df.at[idx, "materialiteit"] = _format_nl_auto(mat_str, 2)
+
+        # Relatieve controle ná correctie van de individuele velden.
+        n_val = _parse_nl(df.at[idx, "n"])
+        k_val = _parse_nl(df.at[idx, "k"])
+        if n_val is not None and k_val is not None and k_val > n_val:
+            edited_row_cols = state.get("edited_rows", {}).get(
+                idx, state.get("edited_rows", {}).get(str(idx), {})
+            )
+            col_weg = "k" if "k" in edited_row_cols else "n"
+            revert_cel(col_weg, "k mag niet groter zijn dan n")
+
+    # 4. Verwijder rijen nu de index-afhankelijke lussen klaar zijn.
     deleted_indices = state.get("deleted_rows", [])
     if deleted_indices:
         df = df.drop(index=deleted_indices).reset_index(drop=True)
 
-    # 4. Herformatteer geldige numerieke velden naar NL-notatie (duizendtalpunt,
-    # vaste decimalen). Lege of onparseerbare cellen blijven ongewijzigd staan,
-    # zodat de gebruiker ze kan corrigeren.
-    for kolom, min_decimalen in (
-        ("n", 0),
-        ("k", 0),
-        ("N_klant", 0),
-        ("waarde_laag", 2),
-        ("materialiteit", 2),
-    ):
-        df[kolom] = df[kolom].apply(
-            lambda x, _d=min_decimalen: (
-                _format_nl_auto(x, _d) if _parse_nl(x) is not None else x
-            )
+    if weggepoetste_fouten:
+        st.session_state.sso_strata_error = "Invoerfout: " + " ".join(
+            weggepoetste_fouten
         )
+    else:
+        st.session_state.sso_strata_error = None
 
     st.session_state.sso_strata_tabel = df
     st.session_state.sso_strata_tabel_key += 1
