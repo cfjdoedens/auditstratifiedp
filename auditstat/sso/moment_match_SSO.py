@@ -4,11 +4,12 @@ import warnings
 from scipy.stats import betabinom, nbinom
 
 # Referentiezekerheid waarop, uitsluitend bij klemming (k_eff < 0), het
-# vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de werkelijke,
-# exacte Beta-Binomiale/Negatief-Binomiale grens. Dit is noodzakelijkerwijs
-# een vaste keuze: moment_match_SSO kent de uiteindelijke, door de
-# gebruiker gekozen zekerheid van eval_stratified niet (die wordt pas later
-# toegepast).
+# vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de exacte
+# Beta-Binomiale/Negatief-Binomiale grens — "exact" voor het conservatieve
+# model dat elke post ofwel volledig goed, ofwel volledig fout is, zie
+# _max_fout_exact. Dit is noodzakelijkerwijs een vaste keuze:
+# moment_match_SSO kent de uiteindelijke, door de gebruiker gekozen
+# zekerheid van eval_stratified niet (die wordt pas later toegepast).
 _ZEKERHEID_VOOR_KLEMKALIBRATIE = 0.95
 
 
@@ -18,16 +19,30 @@ def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALI
     Beta-Binomiaal (binomiaal) resp. Negatief-Binomiaal (poisson) — zonder
     de Beta/Gamma-benadering die ``moment_match_SSO`` verder in deze module
     gebruikt. "Exact" slaat dus op het ontbreken van die benadering, niet
-    op een absolute waarheid los van het model: dit model zelf steunt nog
-    altijd op aannames (vlakke prior, ``N_klant`` als een exact eindige
-    populatie).
+    op een absolute waarheid los van het model.
 
-    Dit is per definitie discreet (``N_klant`` is hier een eindig aantal
-    posten), en daarom uitsluitend bedoeld als intern ijkpunt bij klemming
-    — niet als gebruikersgerichte uitkomst. Zie ``AGENTS.md`` onder
-    "Item-count-gebaseerd SSO-pad: verwijderd" voor de achtergrond waarom
-    dit soort getrapte, exacte berekening niet rechtstreeks aan gebruikers
-    wordt getoond.
+    Dit model steunt zelf op een vlakke prior en op ``N_klant`` als een
+    exact eindige populatie, maar bovenal op een conservatieve aanname op
+    het niveau van de individuele post: elke post van de klant wordt
+    behandeld als ófwel volledig goed, ófwel volledig fout (een
+    Binomiaal(N_klant, p)-telling). In een geldsteekproef is dat niet
+    realistisch — een post kan bijvoorbeeld voor 13% fout zijn (tainting).
+    Toch is dit geen willekeurige keuze maar de **maximaal conservatieve**:
+    voor elke grootheid X ∈ [0, 1] met gegeven gemiddelde p geldt
+    Var(X) ≤ p(1-p), met gelijkheid alleen in het binaire (Bernoulli)
+    geval. Posten die typisch gedeeltelijk (dus minder extreem) fout zijn,
+    hebben dus juist minder spreiding dan dit model aanneemt — dit model
+    overschat de werkelijke spreiding bij de klant eerder dan dat het 'm
+    onderschat. "Exact" betekent hier dus: exact voor dit bewust
+    worst-case per-post-model, niet een letterlijke weergave van hoe
+    tainting in de praktijk verdeeld is.
+
+    Dit is bovendien per definitie discreet (``N_klant`` is hier een
+    eindig aantal posten), en daarom uitsluitend bedoeld als intern
+    ijkpunt bij klemming — niet als gebruikersgerichte uitkomst. Zie
+    ``AGENTS.md`` onder "Item-count-gebaseerd SSO-pad: verwijderd" voor de
+    achtergrond waarom dit soort getrapte, exacte berekening niet
+    rechtstreeks aan gebruikers wordt getoond.
     """
     if verdeling == "binomiaal":
         x = betabinom.ppf(zekerheid, N_klant, k + 1, n - k + 1)
@@ -132,11 +147,16 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij 95%
     zekerheid exact gelijk is aan de Beta-Binomiale resp. Negatief-
     Binomiale grens (``_max_fout_exact``) — zie
-    ``_kalibreer_k_eff_nul_op_exacte_grens``. Dit vervangt een eerdere
-    aanpak die bij klemming vergeleek met een naïeve-poolingmethode: die
-    vergelijking is overbodig zodra de werkelijke exacte grens zelf als
-    ijkpunt beschikbaar is, en gaf bovendien bij een zeer kleine N_klant
-    nodeloos conservatieve uitkomsten (zie ``git log`` voor de
+    ``_kalibreer_k_eff_nul_op_exacte_grens``. "Exact" betekent hier: exact
+    voor het conservatieve model achter ``_max_fout_exact`` dat elke post
+    ofwel volledig goed, ofwel volledig fout is (zie de docstring daarvan
+    voor waarom dat de maximaal conservatieve, niet een willekeurige,
+    aanname is) — niet een letterlijke weergave van de werkelijke,
+    continue tainting-praktijk in een geldsteekproef. Dit vervangt een
+    eerdere aanpak die bij klemming vergeleek met een naïeve-
+    poolingmethode: die vergelijking is overbodig zodra deze exacte grens
+    zelf als ijkpunt beschikbaar is, en gaf bovendien bij een zeer kleine
+    N_klant nodeloos conservatieve uitkomsten (zie ``git log`` voor de
     voorganger van deze aanpak). Een ``RuntimeWarning`` wordt afgevuurd om
     te melden dat dit is gebeurd.
 
@@ -249,14 +269,15 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             # meer. In plaats van toch een (misleidend geruststellend)
             # resultaat te retourneren, wordt de berekening geweigerd.
             raise ValueError(
-                f"N_klant = {N_klant:g} is zo klein dat zelfs de exacte "
-                "grens bij 95% zekerheid al 0 fouten aangeeft: de "
-                "SSO-steekproef geeft dan geen enkel statistisch houvast "
-                "meer voor dit type post bij deze klant, ook al blijft de "
-                "kans op een fout (hoe klein ook) reëel. Een gekalibreerde "
-                "kanskromme zou dat risico dan ten onrechte verbergen. "
-                "Controleer deze posten rechtstreeks (100%) in plaats van "
-                "te extrapoleren."
+                f"N_klant = {N_klant:g} is zo klein dat zelfs de grens bij "
+                "de conservatieve aanname dat elke post volledig goed of "
+                "volledig fout is, bij 95% zekerheid, al 0 fouten aangeeft: "
+                "de SSO-steekproef geeft dan geen enkel statistisch "
+                "houvast meer voor dit type post bij deze klant, ook al "
+                "blijft de kans op een fout (hoe klein ook) reëel. Een "
+                "gekalibreerde kanskromme zou dat risico dan ten onrechte "
+                "verbergen. Controleer deze posten rechtstreeks (100%) in "
+                "plaats van te extrapoleren."
             )
         n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
             exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
@@ -280,9 +301,10 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
                 # resultaat te tonen.
                 raise ValueError(
                     f"N_klant = {N_klant:g} is zo klein, in combinatie met "
-                    "een zeer hoge SSO-foutfractie, dat zelfs de exacte "
-                    "grens bij 95% zekerheid al op (vrijwel) 100% fout "
-                    "uitkomt: de SSO-steekproef geeft "
+                    "een zeer hoge SSO-foutfractie, dat zelfs de grens bij "
+                    "de conservatieve aanname dat elke post volledig goed "
+                    "of volledig fout is, bij 95% zekerheid, al op "
+                    "(vrijwel) 100% fout uitkomt: de SSO-steekproef geeft "
                     "dan geen enkel statistisch houvast meer voor dit type "
                     "post bij deze klant. Controleer deze posten "
                     "rechtstreeks (100%) in plaats van te extrapoleren."
@@ -308,8 +330,9 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
             "te klein om de steekproefvariabiliteit van de foutfractie bij de "
             "klant nog weer te geven). Het (n_eff, k_eff)-paar is in plaats "
-            "daarvan gekalibreerd op de exacte "
-            "Beta-Binomiale/Negatief-Binomiale grens bij 95% zekerheid.",
+            "daarvan gekalibreerd op de grens bij de conservatieve aanname "
+            "dat elke post volledig goed of volledig fout is, bij 95% "
+            "zekerheid.",
             RuntimeWarning,
             stacklevel=2,
         )
