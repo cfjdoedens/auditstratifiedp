@@ -33,6 +33,27 @@ def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALI
     return x / N_klant
 
 
+def _kalibreer_n_eff_gelijk_k_eff_op_exacte_grens(doel_max_fout, zekerheid):
+    """Spiegelbeeld van ``_kalibreer_k_eff_nul_op_exacte_grens``, voor het
+    omgekeerde klemgeval (een zeer hoge SSO-foutfractie, waarbij het
+    benodigde n_eff kleiner dan k_eff zou zijn). Bepaalt ``n_eff = k_eff``
+    (de kleinst mogelijke ``beta``-parameter, ``n_eff - k_eff + 1 = 1``,
+    binnen eval_stratified's vereiste ``n_laag >= k_laag``) zodanig dat de
+    Beta(n_eff + 1, 1)-kwantiel bij ``zekerheid`` exact gelijk is aan
+    ``doel_max_fout``.
+
+    Gesloten vorm: Beta(a, 1).ppf(zekerheid) = zekerheid^(1/a) = doel, op
+    te lossen naar ``a = n_eff + 1 = ln(zekerheid) / ln(doel)``. Alleen
+    geldig (binnen ``a >= 1``, d.w.z. ``n_eff >= 0``) als
+    ``doel_max_fout >= zekerheid``; in het zeldzame geval dat dat niet zo
+    is, is de eenvoudige klem (ongewijzigde momentmatching-waarden) al
+    conservatiever dan nodig en wordt die aangehouden (zie aanroeper).
+    """
+    a = math.log(zekerheid) / math.log(doel_max_fout)
+    n_eff = a - 1.0
+    return n_eff, n_eff
+
+
 def _kalibreer_k_eff_nul_op_exacte_grens(doel_max_fout, verdeling, zekerheid):
     """Bepaalt ``n_eff`` bij vastgehouden ``k_eff = 0`` zodanig dat de
     Beta(1, n_eff + 1)- resp. Gamma(1, schaal=1/n_eff)-kwantiel bij
@@ -110,12 +131,20 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     voorganger van deze aanpak). Een ``RuntimeWarning`` wordt afgevuurd om
     te melden dat dit is gebeurd.
 
-    Deze exacte kalibratie geldt alleen voor de (in de praktijk verreweg
-    meest voorkomende) situatie waarin het benodigde k_eff negatief zou
-    zijn. Het zeldzame omgekeerde geval (een zeer hoge SSO-foutfractie,
-    waarbij het benodigde n_eff kleiner dan k_eff zou zijn) wordt nog
-    steeds simpelweg geklemd op n_eff = k_eff, zonder deze exacte-grens-
-    kalibratie.
+    Het zeldzame omgekeerde klemgeval — een zeer hoge SSO-foutfractie (k
+    dicht bij n) in combinatie met een kleine N_klant, waarbij het
+    benodigde n_eff kleiner dan k_eff zou zijn — krijgt analoog dezelfde
+    behandeling, maar gespiegeld: ``n_eff`` wordt op ``k_eff`` gezet (de
+    kleinst mogelijke ``beta``-parameter binnen de door ``eval_stratified``
+    vereiste ``n_laag >= k_laag``) en samen opgehoogd zodat de Beta(n_eff +
+    1, 1)-kwantiel bij 95% zekerheid exact gelijk is aan de werkelijke
+    grens (``_kalibreer_n_eff_gelijk_k_eff_op_exacte_grens``). Dit geval
+    komt alleen voor bij het binomiale model: bij poisson geldt n_eff >=
+    k_eff altijd (gegeven k <= n kan het benodigde gemiddelde daar nooit
+    ver genoeg boven 1 uitkomen om deze klem te bereiken — algebraïsch en
+    numeriek geverifieerd over een brede reeks (n, k, N_klant)), dus die
+    tak behoudt voor poisson de eenvoudige klem (n_eff = k_eff) als
+    defensieve terugval.
 
     Volledige blinde vlek bij extreem kleine N_klant: geweigerd
     -------------------------------------------------------------
@@ -137,6 +166,13 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     naam van het type post ervoor; ``app.py`` toont 'm vervolgens als
     foutmelding (net als elke andere ``ValueError`` uit de
     gestratificeerde SSO-evaluatie).
+
+    Het omgekeerde klemgeval (zie hierboven, alleen bij binomiaal) heeft
+    een spiegelbeeldige blinde vlek: als de exacte grens zelf al 1 is
+    (vrijwel zekere 100% fout), kan geen enkele continue verdeling een
+    kwantiel van exact 1 weergeven (strikt begrensde drager), en wordt om
+    dezelfde reden eveneens een ``ValueError`` gegooid in plaats van een
+    te optimistisch resultaat.
 
     Parameters
     ----------
@@ -217,8 +253,44 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
         )
         geklemd = True
-    if n_eff < k_eff:
-        n_eff = k_eff
+    elif n_eff < k_eff:
+        # Omgekeerd klemgeval: een zeer hoge SSO-foutfractie (k dicht bij
+        # n) in combinatie met een kleine N_klant. Alleen bij het
+        # binomiale model komt dit voor: bij poisson geldt n_eff >= k_eff
+        # altijd (het benodigde gemiddelde kan daar, gegeven k <= n,
+        # nooit ver genoeg boven 1 uitkomen om deze klem te bereiken), dus
+        # die tak behoudt de eenvoudige klem als defensieve terugval.
+        if verdeling == "binomiaal":
+            exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
+            if exact_doel >= 1.0:
+                # Spiegelbeeld van de blinde vlek hierboven: de exacte
+                # grens is hier zelf al 1 (vrijwel zekere 100% fout), en
+                # geen enkele continue verdeling kan kwantiel 1 exact
+                # weergeven (strikt begrensde drager). Ook hier wordt de
+                # berekening geweigerd in plaats van een te optimistisch
+                # resultaat te tonen.
+                raise ValueError(
+                    f"N_klant = {N_klant:g} is zo klein, in combinatie met "
+                    "een zeer hoge SSO-foutfractie, dat zelfs de "
+                    "werkelijke, exacte grens bij 95% zekerheid al op "
+                    "(vrijwel) 100% fout uitkomt: de SSO-steekproef geeft "
+                    "dan geen enkel statistisch houvast meer voor dit type "
+                    "post bij deze klant. Controleer deze posten "
+                    "rechtstreeks (100%) in plaats van te extrapoleren."
+                )
+            if exact_doel >= _ZEKERHEID_VOOR_KLEMKALIBRATIE:
+                n_eff, k_eff = _kalibreer_n_eff_gelijk_k_eff_op_exacte_grens(
+                    exact_doel, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+                )
+            else:
+                # Zeldzaam randgeval: de exacte grens is lager dan de
+                # referentiezekerheid zelf, zodat zelfs de minst
+                # geconcentreerde optie binnen deze familie (n_eff=k_eff=0)
+                # al conservatiever is dan nodig. De eenvoudige klem
+                # (oorspronkelijke momentmatching-waarden) volstaat dan.
+                n_eff = k_eff
+        else:
+            n_eff = k_eff
         geklemd = True
 
     if geklemd:

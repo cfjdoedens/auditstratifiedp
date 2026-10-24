@@ -36,10 +36,14 @@ class TestMomentMatchSSO(unittest.TestCase):
         self.assertGreaterEqual(k_eff, 0.0)
         self.assertGreaterEqual(n_eff, k_eff)
 
-    def test_k_gelijk_aan_n_wordt_geklemd_indien_nodig(self):
-        with self.assertWarns(RuntimeWarning):
-            n_eff, k_eff = moment_match_SSO(20, 20, 20, "binomiaal")
-        self.assertGreaterEqual(n_eff, k_eff)
+    def test_k_gelijk_aan_n_is_een_volledige_blinde_vlek(self):
+        # n=20, k=20, N_klant=20 blijkt een zeer hoge SSO-foutfractie te
+        # combineren met een exacte grens van precies 1 (vrijwel zekere
+        # 100% fout) -- dit is het spiegelbeeld van de blinde vlek bij
+        # exact_doel=0, en moet dus ook geweigerd worden.
+        with self.assertRaises(ValueError) as ctx:
+            moment_match_SSO(20, 20, 20, "binomiaal")
+        self.assertIn("100%", str(ctx.exception))
 
     def test_ongeldige_verdeling(self):
         with self.assertRaises(ValueError):
@@ -120,6 +124,45 @@ class TestMomentMatchSSO(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             moment_match_SSO(n, k, N_klant, "poisson")
         self.assertIn("100%", str(ctx.exception))
+
+    def test_omgekeerd_klemgeval_matcht_exacte_grens(self):
+        # Een zeer hoge SSO-foutfractie (k dicht bij n) met een niet al te
+        # kleine N_klant: de exacte grens is hier < 1, dus moet exact
+        # gereproduceerd worden i.p.v. onderschat (zoals de oude, simpele
+        # klem n_eff=k_eff deed).
+        n, k, N_klant = 10, 10, 500
+        exact = _max_fout_exact_binomiaal(n, k, N_klant)
+        self.assertLess(exact, 1.0)
+        with self.assertWarns(RuntimeWarning):
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
+        self.assertAlmostEqual(n_eff, k_eff, places=6)
+        self.assertAlmostEqual(_max_fout_95(n_eff, k_eff), exact, places=6)
+
+    def test_omgekeerd_klemgeval_volledige_blinde_vlek_geeft_value_error(self):
+        # n=20, k=19, N_klant=5: zeer hoge SSO-foutfractie + kleine
+        # N_klant, exacte grens is hier precies 1 (vrijwel zekere 100%
+        # fout). Geen continue verdeling kan kwantiel 1 exact weergeven,
+        # dus moet dit geweigerd worden i.p.v. een te optimistisch
+        # resultaat (de oude klem gaf hier ten onrechte 0,98).
+        n, k, N_klant = 20, 19, 5
+        exact = _max_fout_exact_binomiaal(n, k, N_klant)
+        self.assertEqual(exact, 1.0)
+        with self.assertRaises(ValueError) as ctx:
+            moment_match_SSO(n, k, N_klant, "binomiaal")
+        self.assertIn("100%", str(ctx.exception))
+        self.assertIn(str(N_klant), str(ctx.exception))
+
+    def test_omgekeerd_klemgeval_komt_niet_voor_bij_poisson(self):
+        # Voor poisson geldt n_eff >= k_eff altijd (gegeven k <= n), dus
+        # dit scenario (hoge foutfractie, kleine N_klant) moet gewoon de
+        # normale (milde) klemmelding geven, geen 100%-weigering.
+        n, k, N_klant = 20, 20, 5
+        with warnings.catch_warnings(record=True) as gevangen:
+            warnings.simplefilter("always", RuntimeWarning)
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "poisson")
+        self.assertGreaterEqual(n_eff, k_eff)
+        if gevangen:
+            self.assertNotIn("100%", str(gevangen[0].message))
 
     def test_gewoon_klemgeval_geeft_niet_de_100_procent_weigering(self):
         # Bij klemming waarbij de exacte grens zelf wél positief is (en dus
