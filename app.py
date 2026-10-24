@@ -110,7 +110,6 @@ for key, standaard in {
     "sso_klanten_res": {},
     "sso_klanten_waarschuwingen": {},
     "sso_error": None,
-    "sso_klant_getoond": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
@@ -1677,9 +1676,7 @@ with tab_sso:
                 waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
 
                 if not type_post:
-                    klanten_fouten.append(
-                        f"Klant '{klant}': veld 'type_post' is leeg."
-                    )
+                    klanten_fouten.append(f"Klant '{klant}': veld 'type_post' is leeg.")
                     continue
                 if type_post not in sso_typen_posten_per_naam:
                     klanten_fouten.append(
@@ -1748,9 +1745,6 @@ with tab_sso:
                 st.session_state.sso_error = (
                     "\n".join(berekenings_fouten) if berekenings_fouten else None
                 )
-                st.session_state.sso_klant_getoond = (
-                    next(iter(sso_klanten_res), None) if sso_klanten_res else None
-                )
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
@@ -1773,31 +1767,23 @@ with tab_sso:
             ]
             st.warning("\n\n".join(alle_waarschuwingen))
 
-        sso_klanten_namen = list(sso_klanten_res.keys())
-        if st.session_state.sso_klant_getoond not in sso_klanten_namen:
-            st.session_state.sso_klant_getoond = sso_klanten_namen[0]
-        sso_klant_getoond = st.selectbox(
-            "Toon details voor klant",
-            sso_klanten_namen,
-            key="sso_klant_getoond",
-        )
-
-        sso_klant_res = sso_klanten_res[sso_klant_getoond]
-        sso_klant_col1, sso_klant_col2 = st.columns(2)
-        sso_klant_col1.metric(
-            "Maximale fout (fractie)", _nl(sso_klant_res["max_fout_convolutie"], 4)
-        )
-        sso_klant_col2.metric(
-            "Maximale fout (euro\u2019s)",
-            _nl(sso_klant_res["max_fout_convolutie_geld"], 2),
-        )
-        sso_klant_steekproeven_tabel = sso_klant_res["steekproeven"][
-            ["naam", "waarde_laag", "n_laag", "k_laag"]
-        ].assign(
-            waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
-            n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 2)),
-            k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 2)),
-        )
-        st.table(sso_klant_steekproeven_tabel)
-        sso_klant_fig = plot_kanskromme(sso_klant_res)
-        st.pyplot(sso_klant_fig)
+        for sso_klant_getoond, sso_klant_res in sso_klanten_res.items():
+            st.markdown(f"#### {sso_klant_getoond}")
+            sso_klant_col1, sso_klant_col2 = st.columns(2)
+            sso_klant_col1.metric(
+                "Maximale fout (fractie)", _nl(sso_klant_res["max_fout_convolutie"], 4)
+            )
+            sso_klant_col2.metric(
+                "Maximale fout (euro\u2019s)",
+                _nl(sso_klant_res["max_fout_convolutie_geld"], 2),
+            )
+            sso_klant_steekproeven_tabel = sso_klant_res["steekproeven"][
+                ["naam", "waarde_laag", "n_laag", "k_laag"]
+            ].assign(
+                waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
+                n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 2)),
+                k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 2)),
+            )
+            st.table(sso_klant_steekproeven_tabel)
+            sso_klant_fig = plot_kanskromme(sso_klant_res)
+            st.pyplot(sso_klant_fig)
