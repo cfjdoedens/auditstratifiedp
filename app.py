@@ -60,18 +60,27 @@ LEGE_PLAN_DF = pd.DataFrame({
     "n_laag_tot": [None] * 8,
 })
 
-# Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de
-# gestratificeerde SSO-klantevaluatie te initialiseren (één rij per type post).
-LEGE_SSO_STRATA_DF = pd.DataFrame({
+# Bereid lege sjabloon-dataframes voor om de invoertabellen voor de
+# gestratificeerde SSO-evaluatie te initialiseren. De SSO-brede typen posten
+# (n, k, risico-inschatting, materialiteit) worden één keer ingevuld en
+# gelden voor alle klanten; de klantentabel koppelt daar per klant alleen
+# nog N_klant en waarde_laag aan (lang/tidy-formaat: één rij per
+# klant×type-post-combinatie).
+LEGE_SSO_TYPEN_POSTEN_DF = pd.DataFrame({
     "naam": [""] * 4,
     "n": [""] * 4,
     "k": [""] * 4,
-    "N_klant": [""] * 4,
-    "waarde_laag": [""] * 4,
     "ihr": ["H"] * 4,
     "ibr": ["H"] * 4,
     "car": ["H"] * 4,
     "materialiteit": ["0,01"] * 4,
+})
+
+LEGE_SSO_KLANTEN_DF = pd.DataFrame({
+    "klant": [""] * 6,
+    "type_post": [""] * 6,
+    "N_klant": [""] * 6,
+    "waarde_laag": [""] * 6,
 })
 
 # Initialiseer de sessiestatus met standaardwaarden voor de plannings- en evaluatieberekening.
@@ -94,11 +103,14 @@ for key, standaard in {
     "eval_tabel_key": 0,
     "plan_error": None,
     "plan_tabel_key": 0,
-    "sso_strata_tabel": LEGE_SSO_STRATA_DF.copy(),
-    "sso_strata_tabel_key": 0,
-    "sso_strata_res": None,
-    "sso_strata_error": None,
-    "sso_strata_waarschuwingen": [],
+    "sso_typen_posten_tabel": LEGE_SSO_TYPEN_POSTEN_DF.copy(),
+    "sso_typen_posten_tabel_key": 0,
+    "sso_klanten_tabel": LEGE_SSO_KLANTEN_DF.copy(),
+    "sso_klanten_tabel_key": 0,
+    "sso_klanten_res": {},
+    "sso_klanten_waarschuwingen": {},
+    "sso_error": None,
+    "sso_klant_getoond": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
@@ -423,22 +435,25 @@ def on_plan_tabel_change():
     st.session_state.plan_tabel = df
 
 
-def on_sso_strata_tabel_change():
-    """Verwerk wijzigingen in de SSO-invoertabel, inclusief harde rollback bij foute invoer.
+def on_sso_typen_posten_tabel_change():
+    """Verwerk wijzigingen in de SSO-brede typen-posten-tabel, met harde rollback.
 
     Zelfde patroon als on_eval_tabel_change/on_plan_tabel_change: een
     ongeldige waarde wordt direct teruggedraaid naar de vorige geldige
     waarde (met een foutmelding), en geldige waarden worden meteen naar
-    NL-notatie geherformatteerd. De submit-validatie bij de "evalueer
-    gestratificeerd"-knop (met specifieke, veld-voor-veld foutmeldingen)
-    blijft daarnaast bestaan als vangnet, bijv. voor geplakte data.
+    NL-notatie geherformatteerd. Deze tabel bevat alleen de SSO-brede
+    velden (naam, n, k, ihr, ibr, car, materialiteit) — N_klant en
+    waarde_laag zijn per-klant en staan in `sso_klanten_tabel`. De
+    submit-validatie bij de "evalueer alle klanten"-knop (met specifieke,
+    veld-voor-veld foutmeldingen) blijft daarnaast bestaan als vangnet,
+    bijv. voor geplakte data.
     """
     state = st.session_state[
-        f"sso_strata_tabel_editor_{st.session_state.sso_strata_tabel_key}"
+        f"sso_typen_posten_tabel_editor_{st.session_state.sso_typen_posten_tabel_key}"
     ]
-    df = st.session_state.sso_strata_tabel.copy()
+    df = st.session_state.sso_typen_posten_tabel.copy()
     oude_df = (
-        st.session_state.sso_strata_tabel.copy()
+        st.session_state.sso_typen_posten_tabel.copy()
     )  # De ongewijzigde staat als veilige haven
 
     weggepoetste_fouten = []
@@ -475,7 +490,7 @@ def on_sso_strata_tabel_change():
             df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
 
         # Veld-voor-veld validatie van de verplichte numerieke velden.
-        for col in ("n", "k", "N_klant", "waarde_laag"):
+        for col in ("n", "k"):
             val_str = str(df.at[idx, col]).strip()
             if val_str == "":
                 continue
@@ -485,16 +500,12 @@ def on_sso_strata_tabel_change():
                 revert_cel(col, f'"{val_str}" is geen geldig getal voor {col}')
                 continue
 
-            if col in ("n", "N_klant") and val_num <= 0:
+            if col == "n" and val_num <= 0:
                 revert_cel(col, f"{col} moet groter zijn dan 0")
             elif col == "k" and val_num < 0:
                 revert_cel(col, "k mag niet negatief zijn")
-            elif col == "waarde_laag" and val_num < 0:
-                revert_cel(col, "waarde_laag mag niet negatief zijn")
             else:
-                df.at[idx, col] = _format_nl_auto(
-                    val_str, 0 if col != "waarde_laag" else 2
-                )
+                df.at[idx, col] = _format_nl_auto(val_str, 0)
 
         # materialiteit is optioneel: een lege waarde is geldig (gebruikt het
         # standaardtarief bij submit), maar een ingevulde, onparseerbare of
@@ -528,14 +539,94 @@ def on_sso_strata_tabel_change():
         df = df.drop(index=deleted_indices).reset_index(drop=True)
 
     if weggepoetste_fouten:
-        st.session_state.sso_strata_error = "Invoerfout: " + " ".join(
-            weggepoetste_fouten
-        )
+        st.session_state.sso_error = "Invoerfout: " + " ".join(weggepoetste_fouten)
     else:
-        st.session_state.sso_strata_error = None
+        st.session_state.sso_error = None
 
-    st.session_state.sso_strata_tabel = df
-    st.session_state.sso_strata_tabel_key += 1
+    st.session_state.sso_typen_posten_tabel = df
+    st.session_state.sso_typen_posten_tabel_key += 1
+
+
+def on_sso_klanten_tabel_change():
+    """Verwerk wijzigingen in de klantentabel, met dezelfde harde-rollback-stijl.
+
+    Deze tabel koppelt per klant × type post alleen nog N_klant en
+    waarde_laag (lang/tidy-formaat: één rij per combinatie). `type_post`
+    wordt hier alleen op "niet leeg" gecontroleerd — of de waarde ook
+    daadwerkelijk overeenkomt met een naam uit `sso_typen_posten_tabel`
+    wordt pas bij de submit-validatie gecontroleerd, omdat die tabel kan
+    wijzigen nadat een rij hier al is ingevuld.
+    """
+    state = st.session_state[
+        f"sso_klanten_tabel_editor_{st.session_state.sso_klanten_tabel_key}"
+    ]
+    df = st.session_state.sso_klanten_tabel.copy()
+    oude_df = st.session_state.sso_klanten_tabel.copy()
+
+    weggepoetste_fouten = []
+
+    # 1. Pas directe bewerkingen op bestaande rijen toe als ruwe tekst.
+    for row_idx_raw, changes in state.get("edited_rows", {}).items():
+        row_idx = int(row_idx_raw)
+        if row_idx < len(df):
+            for col, val in changes.items():
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
+
+    # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df).
+    for row in state.get("added_rows", []):
+        new_row = {col: "" for col in df.columns}
+        for col, val in row.items():
+            if val is not None:
+                new_row[col] = str(val).strip()
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+        base_row = {col: "" for col in df.columns}
+        oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
+
+    # 3. Voer één uniforme, waterdichte validatielus uit over álle rijen.
+    for idx in range(len(df)):
+        rij_data = df.iloc[idx]
+        klant_cel = str(rij_data.get("klant", "")).strip()
+        type_post_cel = str(rij_data.get("type_post", "")).strip()
+        rij_naam = (
+            f"klant '{klant_cel}', type post '{type_post_cel}'"
+            if klant_cel or type_post_cel
+            else f"rij {idx + 1}"
+        )
+
+        def revert_cel(kolom, foutmelding, current_idx=idx, current_rij_naam=rij_naam):
+            weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
+            df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        for col in ("N_klant", "waarde_laag"):
+            val_str = str(df.at[idx, col]).strip()
+            if val_str == "":
+                continue
+
+            val_num = _parse_nl(val_str)
+            if val_num is None:
+                revert_cel(col, f'"{val_str}" is geen geldig getal voor {col}')
+                continue
+
+            if col == "N_klant" and val_num <= 0:
+                revert_cel(col, "N_klant moet groter zijn dan 0")
+            elif col == "waarde_laag" and val_num < 0:
+                revert_cel(col, "waarde_laag mag niet negatief zijn")
+            else:
+                df.at[idx, col] = _format_nl_auto(val_str, 0 if col == "N_klant" else 2)
+
+    # 4. Verwijder rijen nu de index-afhankelijke lussen klaar zijn.
+    deleted_indices = state.get("deleted_rows", [])
+    if deleted_indices:
+        df = df.drop(index=deleted_indices).reset_index(drop=True)
+
+    if weggepoetste_fouten:
+        st.session_state.sso_error = "Invoerfout: " + " ".join(weggepoetste_fouten)
+    else:
+        st.session_state.sso_error = None
+
+    st.session_state.sso_klanten_tabel = df
+    st.session_state.sso_klanten_tabel_key += 1
 
 
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
@@ -1385,46 +1476,50 @@ with tab_plan:
 
 # Configureer het vijfde tabblad voor de maximale foutfractie bij een SSO-klant.
 with tab_sso:
-    st.subheader("Gestratificeerde evaluatie van een klant (meerdere typen posten)")
+    st.subheader("Gestratificeerde evaluatie van meerdere SSO-klanten")
     st.caption(
-        "Verschillende klanten maken in verschillende mate gebruik van diverse "
-        "typen posten (bijv. emolumenten, inkoopfacturen), met een eigen "
-        "risico-inschatting per type. Voer per type post de steekproef bij de "
-        "SSO in (n, k) en het aantal posten van dat type bij de klant (N_klant), "
-        "plus de geldwaarde van dat type bij de klant. Elk type post wordt "
-        "vervolgens als een apart stratum voor de klant behandeld en "
-        "gezamenlijk geëvalueerd."
+        "Typen posten (bijv. emolumenten, inkoopfacturen) worden met hun "
+        "SSO-brede steekproef (n, k), risico-inschatting en materialiteit "
+        "één keer ingevuld hieronder, en gelden voor alle klanten. Voer "
+        "daarna per klant alleen nog aan welke typen posten die klant "
+        "gebruikt, hoeveel posten van dat type de klant heeft (N_klant) en "
+        "de bijbehorende geldwaarde (waarde_laag). Elk type post wordt per "
+        "klant als een apart stratum behandeld en gezamenlijk geëvalueerd; "
+        "alle klanten worden in één keer berekend."
     )
 
-    # Geen st.form: de data_editor gebruikt on_change om elke celbewerking
-    # direct (bij focusverlies) te herformatteren naar NL-notatie, zodat de
-    # gebruiker meteen ziet wat hij heeft ingevoerd — ook vóórdat op
-    # "evalueer gestratificeerd" wordt geklikt.
-    col_strata_inst, col_strata_hoofd = st.columns([1, 3])
+    # Geen st.form: beide data_editors gebruiken on_change om elke
+    # celbewerking direct (bij focusverlies) te herformatteren naar
+    # NL-notatie, zodat de gebruiker meteen ziet wat hij heeft ingevoerd —
+    # ook vóórdat op "evalueer alle klanten" wordt geklikt.
+    col_sso_inst, col_sso_hoofd = st.columns([1, 3])
 
-    with col_strata_inst:
+    with col_sso_inst:
         st.subheader("instellingen")
-        sso_strata_model = st.radio(
+        sso_model = st.radio(
             "model",
             ["binomiaal", "poisson"],
             horizontal=True,
-            key="sso_strata_model",
+            key="sso_model",
         )
-        sso_strata_zekerheid_text = st.text_input(
-            "zekerheid", value="0,95", key="sso_strata_zekerheid_text"
+        sso_zekerheid_text = st.text_input(
+            "zekerheid", value="0,95", key="sso_zekerheid_text"
         )
-        sso_strata_bereken = st.button(
-            "evalueer gestratificeerd", type="primary", key="sso_strata_bereken"
+        sso_bereken = st.button(
+            "evalueer alle klanten", type="primary", key="sso_bereken"
         )
 
-    with col_strata_hoofd:
-        st.subheader("typen posten")
-        sso_strata_tabel = st.data_editor(
-            st.session_state.sso_strata_tabel,
+    with col_sso_hoofd:
+        st.subheader("typen posten bij de SSO")
+        sso_typen_posten_tabel = st.data_editor(
+            st.session_state.sso_typen_posten_tabel,
             width="stretch",
             num_rows="dynamic",
-            key=f"sso_strata_tabel_editor_{st.session_state.sso_strata_tabel_key}",
-            on_change=on_sso_strata_tabel_change,
+            key=(
+                "sso_typen_posten_tabel_editor_"
+                f"{st.session_state.sso_typen_posten_tabel_key}"
+            ),
+            on_change=on_sso_typen_posten_tabel_change,
             column_config={
                 "naam": st.column_config.TextColumn(
                     "naam", help="Naam van het type post, bijv. Emolumenten."
@@ -1435,13 +1530,6 @@ with tab_sso:
                 "k": st.column_config.TextColumn(
                     "k",
                     help="Aantal fouten in de SSO-steekproef voor dit type post.",
-                ),
-                "N_klant": st.column_config.TextColumn(
-                    "N_klant", help="Aantal posten van dit type bij de klant."
-                ),
-                "waarde_laag": st.column_config.TextColumn(
-                    "waarde_laag",
-                    help="Totale geldwaarde van dit type post bij de klant.",
                 ),
                 "ihr": st.column_config.SelectboxColumn(
                     "ihr", options=RISK_OPTIES, help="InHerent Risico."
@@ -1462,143 +1550,254 @@ with tab_sso:
                 ),
             },
         )
-        st.session_state.sso_strata_tabel = sso_strata_tabel
+        st.session_state.sso_typen_posten_tabel = sso_typen_posten_tabel
 
-    if st.session_state.sso_strata_error:
-        st.error(st.session_state.sso_strata_error)
+        st.subheader("klanten")
+        sso_typen_posten_namen = [
+            str(n).strip()
+            for n in sso_typen_posten_tabel.get("naam", [])
+            if n is not None and not pd.isna(n) and str(n).strip()
+        ]
+        sso_klanten_tabel = st.data_editor(
+            st.session_state.sso_klanten_tabel,
+            width="stretch",
+            num_rows="dynamic",
+            key=f"sso_klanten_tabel_editor_{st.session_state.sso_klanten_tabel_key}",
+            on_change=on_sso_klanten_tabel_change,
+            column_config={
+                "klant": st.column_config.TextColumn(
+                    "klant", help="Naam van de klant."
+                ),
+                "type_post": st.column_config.SelectboxColumn(
+                    "type_post",
+                    options=sso_typen_posten_namen,
+                    help="Type post (moet overeenkomen met een naam hierboven).",
+                ),
+                "N_klant": st.column_config.TextColumn(
+                    "N_klant", help="Aantal posten van dit type bij de klant."
+                ),
+                "waarde_laag": st.column_config.TextColumn(
+                    "waarde_laag",
+                    help="Totale geldwaarde van dit type post bij de klant.",
+                ),
+            },
+        )
+        st.session_state.sso_klanten_tabel = sso_klanten_tabel
 
-    if sso_strata_bereken:
-        sso_strata_zekerheid = _parse_nl(sso_strata_zekerheid_text)
-        sso_strata_rijen = sso_strata_tabel.dropna(how="all").to_dict("records")
-        # Rijen zonder (geldige) naam worden als leeg beschouwd en
-        # genegeerd. Let op: een leeggemaakte cel levert hier None of
-        # NaN op, waarvan str(...) "None"/"nan" oplevert — niet filteren
-        # op de string-weergave, maar expliciet op pd.isna/None.
-        sso_strata_rijen = [
+    if st.session_state.sso_error:
+        st.error(st.session_state.sso_error)
+
+    if sso_bereken:
+        sso_zekerheid = _parse_nl(sso_zekerheid_text)
+
+        # Typen posten indexeren op naam voor de koppeling met de klantentabel.
+        sso_typen_posten_rijen = sso_typen_posten_tabel.dropna(how="all").to_dict(
+            "records"
+        )
+        sso_typen_posten_rijen = [
             r
-            for r in sso_strata_rijen
+            for r in sso_typen_posten_rijen
             if r.get("naam") is not None
             and not pd.isna(r.get("naam"))
             and str(r.get("naam")).strip()
         ]
+        sso_typen_posten_per_naam = {}
+        typen_posten_fouten = []
+        for rij in sso_typen_posten_rijen:
+            naam = str(rij.get("naam", "")).strip()
+            n_val = _parse_nl(rij.get("n"))
+            k_val = _parse_nl(rij.get("k"))
+            materialiteit_ruw = rij.get("materialiteit")
+            materialiteit_val = _parse_nl(materialiteit_ruw)
 
-        if sso_strata_zekerheid is None or not (0.0 < sso_strata_zekerheid < 1.0):
-            st.session_state.sso_strata_error = (
+            for veld_naam, veld_waarde in (("n", n_val), ("k", k_val)):
+                if veld_waarde is None:
+                    typen_posten_fouten.append(
+                        f"Type post '{naam}': veld '{veld_naam}' "
+                        f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                    )
+            materialiteit_tekst = (
+                "" if materialiteit_ruw is None else str(materialiteit_ruw).strip()
+            )
+            if materialiteit_tekst != "" and materialiteit_val is None:
+                typen_posten_fouten.append(
+                    f"Type post '{naam}': veld 'materialiteit' "
+                    f'("{materialiteit_ruw}") is geen geldig getal.'
+                )
+
+            if naam in sso_typen_posten_per_naam:
+                typen_posten_fouten.append(
+                    f"Type post '{naam}' komt meerdere keren voor; namen "
+                    "moeten uniek zijn."
+                )
+            elif n_val is not None and k_val is not None:
+                sso_typen_posten_per_naam[naam] = dict(
+                    naam=naam,
+                    n=n_val,
+                    k=k_val,
+                    ihr=rij.get("ihr", "H"),
+                    ibr=rij.get("ibr", "H"),
+                    car=rij.get("car", "H"),
+                    materialiteit=(
+                        materialiteit_val if materialiteit_val is not None else 0.01
+                    ),
+                )
+
+        # Klantenrijen groeperen per klant.
+        sso_klanten_rijen = sso_klanten_tabel.dropna(how="all").to_dict("records")
+        sso_klanten_rijen = [
+            r
+            for r in sso_klanten_rijen
+            if r.get("klant") is not None
+            and not pd.isna(r.get("klant"))
+            and str(r.get("klant")).strip()
+        ]
+
+        if sso_zekerheid is None or not (0.0 < sso_zekerheid < 1.0):
+            st.session_state.sso_error = (
                 "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
             )
-            st.session_state.sso_strata_res = None
-        elif not sso_strata_rijen:
-            st.session_state.sso_strata_error = "Voer tenminste 1 type post (rij) in."
-            st.session_state.sso_strata_res = None
+            st.session_state.sso_klanten_res = {}
+            st.session_state.sso_klanten_waarschuwingen = {}
+        elif not sso_typen_posten_per_naam and not typen_posten_fouten:
+            st.session_state.sso_error = "Voer tenminste 1 type post (rij) in."
+            st.session_state.sso_klanten_res = {}
+            st.session_state.sso_klanten_waarschuwingen = {}
+        elif not sso_klanten_rijen:
+            st.session_state.sso_error = "Voer tenminste 1 klant (rij) in."
+            st.session_state.sso_klanten_res = {}
+            st.session_state.sso_klanten_waarschuwingen = {}
         else:
-            post_typen = []
-            parse_fouten = []
-            for rij in sso_strata_rijen:
-                naam = str(rij.get("naam", "")).strip()
-                n_val = _parse_nl(rij.get("n"))
-                k_val = _parse_nl(rij.get("k"))
+            klanten_rijen_per_klant = {}
+            klanten_fouten = []
+            for rij in sso_klanten_rijen:
+                klant = str(rij.get("klant", "")).strip()
+                type_post = str(rij.get("type_post", "")).strip()
                 N_klant_val = _parse_nl(rij.get("N_klant"))
                 waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
-                materialiteit_ruw = rij.get("materialiteit")
-                materialiteit_val = _parse_nl(materialiteit_ruw)
 
-                # Eén aparte, specifieke boodschap per veld met een
-                # ongeldige waarde (niet één verzamelboodschap per rij).
+                if not type_post:
+                    klanten_fouten.append(
+                        f"Klant '{klant}': veld 'type_post' is leeg."
+                    )
+                    continue
+                if type_post not in sso_typen_posten_per_naam:
+                    klanten_fouten.append(
+                        f"Klant '{klant}': type post '{type_post}' komt niet "
+                        "voor in de typen-posten-tabel hierboven."
+                    )
+                    continue
                 for veld_naam, veld_waarde in (
-                    ("n", n_val),
-                    ("k", k_val),
                     ("N_klant", N_klant_val),
                     ("waarde_laag", waarde_laag_val),
                 ):
                     if veld_waarde is None:
-                        parse_fouten.append(
-                            f"Type post '{naam}': veld '{veld_naam}' "
-                            f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                        klanten_fouten.append(
+                            f"Klant '{klant}': type post '{type_post}': veld "
+                            f"'{veld_naam}' (\"{rij.get(veld_naam)}\") is geen "
+                            "geldig getal."
                         )
-                # materialiteit is optioneel: een lege waarde is geldig
-                # (gebruikt het standaardtarief), maar een ingevulde,
-                # onparseerbare waarde is dat niet.
-                materialiteit_tekst = (
-                    "" if materialiteit_ruw is None else str(materialiteit_ruw).strip()
-                )
-                if materialiteit_tekst != "" and materialiteit_val is None:
-                    parse_fouten.append(
-                        f"Type post '{naam}': veld 'materialiteit' "
-                        f'("{materialiteit_ruw}") is geen geldig getal.'
-                    )
-
-                if None in (n_val, k_val, N_klant_val, waarde_laag_val):
+                if N_klant_val is None or waarde_laag_val is None:
                     continue
 
-                # Monetaire materialiteit (> 1) omrekenen naar fractie, net
-                # als in de overige tabbladen.
-                if materialiteit_val is not None and materialiteit_val > 1:
-                    materialiteit_val = materialiteit_val / waarde_laag_val
-
-                post_typen.append(
-                    dict(
-                        naam=naam,
-                        n=n_val,
-                        k=k_val,
-                        N_klant=N_klant_val,
-                        waarde_laag=waarde_laag_val,
-                        ihr=rij.get("ihr", "H"),
-                        ibr=rij.get("ibr", "H"),
-                        car=rij.get("car", "H"),
-                        materialiteit=(
-                            materialiteit_val if materialiteit_val is not None else 0.01
-                        ),
+                klant_rijen = klanten_rijen_per_klant.setdefault(klant, {})
+                if type_post in klant_rijen:
+                    klanten_fouten.append(
+                        f"Klant '{klant}': type post '{type_post}' komt "
+                        "meerdere keren voor voor dezelfde klant."
                     )
+                    continue
+                klant_rijen[type_post] = dict(
+                    sso_typen_posten_per_naam[type_post],
+                    N_klant=N_klant_val,
+                    waarde_laag=waarde_laag_val,
                 )
 
-            if parse_fouten:
-                st.session_state.sso_strata_error = "\n".join(parse_fouten)
-                st.session_state.sso_strata_res = None
-                st.session_state.sso_strata_waarschuwingen = []
+            alle_fouten = typen_posten_fouten + klanten_fouten
+            if alle_fouten:
+                st.session_state.sso_error = "\n".join(alle_fouten)
+                st.session_state.sso_klanten_res = {}
+                st.session_state.sso_klanten_waarschuwingen = {}
             else:
-                try:
-                    with warnings.catch_warnings(record=True) as gevangen:
-                        warnings.simplefilter("always", RuntimeWarning)
-                        st.session_state.sso_strata_res = (
-                            evalueer_SSO_klant_gestratificeerd(
+                sso_klanten_res = {}
+                sso_klanten_waarschuwingen = {}
+                berekenings_fouten = []
+                for klant, type_post_dict in klanten_rijen_per_klant.items():
+                    post_typen = list(type_post_dict.values())
+                    try:
+                        with warnings.catch_warnings(record=True) as gevangen:
+                            warnings.simplefilter("always", RuntimeWarning)
+                            resultaat = evalueer_SSO_klant_gestratificeerd(
                                 post_typen,
-                                model=sso_strata_model,
-                                zekerheid=sso_strata_zekerheid,
+                                model=sso_model,
+                                zekerheid=sso_zekerheid,
                             )
-                        )
-                    st.session_state.sso_strata_waarschuwingen = [
-                        str(w.message)
-                        for w in gevangen
-                        if issubclass(w.category, RuntimeWarning)
-                    ]
-                    st.session_state.sso_strata_error = None
-                except ValueError as e:
-                    st.session_state.sso_strata_error = (
-                        f"Fout bij gestratificeerde evaluatie: {e}"
-                    )
-                    st.session_state.sso_strata_res = None
-                    st.session_state.sso_strata_waarschuwingen = []
+                        sso_klanten_res[klant] = resultaat
+                        klant_waarschuwingen = [
+                            str(w.message)
+                            for w in gevangen
+                            if issubclass(w.category, RuntimeWarning)
+                        ]
+                        if klant_waarschuwingen:
+                            sso_klanten_waarschuwingen[klant] = klant_waarschuwingen
+                    except ValueError as e:
+                        berekenings_fouten.append(f"Klant '{klant}': {e}")
 
-    sso_strata_res = st.session_state.sso_strata_res
-    if sso_strata_res is not None:
+                st.session_state.sso_klanten_res = sso_klanten_res
+                st.session_state.sso_klanten_waarschuwingen = sso_klanten_waarschuwingen
+                st.session_state.sso_error = (
+                    "\n".join(berekenings_fouten) if berekenings_fouten else None
+                )
+                st.session_state.sso_klant_getoond = (
+                    next(iter(sso_klanten_res), None) if sso_klanten_res else None
+                )
+
+    sso_klanten_res = st.session_state.sso_klanten_res
+    if sso_klanten_res:
         st.subheader("Resultaat")
-        sso_strata_col1, sso_strata_col2 = st.columns(2)
-        sso_strata_col1.metric(
-            "Maximale fout (fractie)", _nl(sso_strata_res["max_fout_convolutie"], 4)
+        sso_samenvatting = pd.DataFrame([
+            {
+                "klant": klant,
+                "max_fout_fractie": _nl(res["max_fout_convolutie"], 4),
+                "max_fout_euro": _nl(res["max_fout_convolutie_geld"], 2),
+            }
+            for klant, res in sso_klanten_res.items()
+        ])
+        st.table(sso_samenvatting)
+
+        if st.session_state.sso_klanten_waarschuwingen:
+            alle_waarschuwingen = [
+                f"Klant '{klant}': {w}"
+                for klant, ws in st.session_state.sso_klanten_waarschuwingen.items()
+                for w in ws
+            ]
+            st.warning("\n\n".join(alle_waarschuwingen))
+
+        sso_klanten_namen = list(sso_klanten_res.keys())
+        if st.session_state.sso_klant_getoond not in sso_klanten_namen:
+            st.session_state.sso_klant_getoond = sso_klanten_namen[0]
+        sso_klant_getoond = st.selectbox(
+            "Toon details voor klant",
+            sso_klanten_namen,
+            key="sso_klant_getoond",
         )
-        sso_strata_col2.metric(
+
+        sso_klant_res = sso_klanten_res[sso_klant_getoond]
+        sso_klant_col1, sso_klant_col2 = st.columns(2)
+        sso_klant_col1.metric(
+            "Maximale fout (fractie)", _nl(sso_klant_res["max_fout_convolutie"], 4)
+        )
+        sso_klant_col2.metric(
             "Maximale fout (euro\u2019s)",
-            _nl(sso_strata_res["max_fout_convolutie_geld"], 2),
+            _nl(sso_klant_res["max_fout_convolutie_geld"], 2),
         )
-        sso_strata_steekproeven_tabel = sso_strata_res["steekproeven"][
+        sso_klant_steekproeven_tabel = sso_klant_res["steekproeven"][
             ["naam", "waarde_laag", "n_laag", "k_laag"]
         ].assign(
             waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
             n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 2)),
             k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 2)),
         )
-        st.table(sso_strata_steekproeven_tabel)
-        if st.session_state.sso_strata_waarschuwingen:
-            st.warning("\n\n".join(st.session_state.sso_strata_waarschuwingen))
-        sso_strata_fig = plot_kanskromme(sso_strata_res)
-        st.pyplot(sso_strata_fig)
+        st.table(sso_klant_steekproeven_tabel)
+        sso_klant_fig = plot_kanskromme(sso_klant_res)
+        st.pyplot(sso_klant_fig)
