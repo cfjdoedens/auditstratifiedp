@@ -169,9 +169,20 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     geklemd = False
     if k_eff < 0:
         exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
-        n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
-            exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
-        )
+        if exact_doel <= 0.0:
+            # De exacte grens is hier zelf 0 (zeer kleine N_klant en/of
+            # k = 0, zodat zelfs bij 95% zekerheid 0 fouten te verwachten
+            # zijn). Een Beta/Gamma-verdeling heeft een strikt positieve
+            # drager en kan dus nooit exact kwantiel 0 weergeven; elk
+            # eindig, niet-negatief (n_eff, k_eff)-paar is dan al even
+            # conservatief als de exacte grens zelf. We kiezen k_eff = 0
+            # met n_eff = n, zodat niet meer precisie wordt geclaimd over
+            # de klant dan over de SSO-steekproef als geheel.
+            n_eff, k_eff = float(n), 0.0
+        else:
+            n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
+                exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+            )
         geklemd = True
     if n_eff < k_eff:
         n_eff = k_eff

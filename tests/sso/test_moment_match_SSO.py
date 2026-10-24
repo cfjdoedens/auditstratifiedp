@@ -99,6 +99,27 @@ class TestMomentMatchSSO(unittest.TestCase):
         exact = _max_fout_exact_binomiaal(n, k, N_klant)
         self.assertGreaterEqual(_max_fout_95(n_eff, k_eff) + 1e-9, min(exact, 0.95))
 
+    def test_geklemd_bij_exacte_grens_nul_geeft_geen_deling_door_nul(self):
+        # Bij een zeer kleine N_klant met k=0 kan de exacte grens zelf
+        # precies 0 zijn (zelfs bij 95% zekerheid worden 0 fouten verwacht).
+        # Een Beta/Gamma-verdeling kan dat nooit exact weergeven (strikt
+        # positieve drager); dit mag geen ZeroDivisionError geven en moet
+        # een eindig, niet-negatief (n_eff, k_eff)-paar opleveren.
+        n, k, N_klant = 120, 0, 2
+        self.assertEqual(_max_fout_exact_binomiaal(n, k, N_klant), 0.0)
+        with self.assertWarns(RuntimeWarning):
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
+        self.assertEqual(k_eff, 0.0)
+        self.assertEqual(n_eff, float(n))
+
+    def test_geklemd_bij_exacte_grens_nul_poisson_geeft_geen_deling_door_nul(self):
+        n, k, N_klant = 120, 0, 2
+        self.assertEqual(_max_fout_exact_poisson(n, k, N_klant), 0.0)
+        with self.assertWarns(RuntimeWarning):
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "poisson")
+        self.assertEqual(k_eff, 0.0)
+        self.assertEqual(n_eff, float(n))
+
 
 if __name__ == "__main__":
     unittest.main()
