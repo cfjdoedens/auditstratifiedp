@@ -1,4 +1,5 @@
 import math
+import warnings
 
 import pandas as pd
 
@@ -75,6 +76,12 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
     kleiner is dan ``k_laag``, terwijl (n_eff, k_eff) reële, gekalibreerde
     waarden zijn. ``n_laag`` wordt daarom naar boven afgerond tot
     tenminste ``ceil(k_eff)``; ``k_laag`` (= k_eff) blijft ongeafrond.
+
+    Als ``moment_match_SSO`` voor een type post moet klemmen, vuurt die
+    functie een ``RuntimeWarning`` af; deze functie vangt die op en vuurt
+    'm opnieuw af met de naam van het type post ervoor (``"Type post
+    '<naam>': ..."``), zodat een aanroeper per type post kan tonen voor
+    welke een terugval is toegepast.
     """
     if not post_typen:
         raise ValueError("Geef tenminste 1 type post (stratum) mee.")
@@ -93,9 +100,19 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
                 f"Type post '{naam}' mist verplicht(e) veld(en): {', '.join(ontbrekend)}."
             )
 
-        n_eff, k_eff = moment_match_SSO(
-            post["n"], post["k"], post["N_klant"], verdeling=model
-        )
+        # moment_match_SSO vuurt bij klemming een RuntimeWarning af zonder
+        # te weten bij welk type post (naam) dat hoort. Die context voegen
+        # we hier toe, zodat een aanroeper (bijv. de SSO-tab in app.py) per
+        # type post kan tonen voor welke een terugval is toegepast.
+        with warnings.catch_warnings(record=True) as gevangen:
+            warnings.simplefilter("always", RuntimeWarning)
+            n_eff, k_eff = moment_match_SSO(
+                post["n"], post["k"], post["N_klant"], verdeling=model
+            )
+        for w in gevangen:
+            warnings.warn(
+                f"Type post '{naam}': {w.message}", RuntimeWarning, stacklevel=2
+            )
         n_laag = max(round(n_eff), math.ceil(k_eff))
 
         rij = {

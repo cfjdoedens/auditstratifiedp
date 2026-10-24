@@ -1,5 +1,6 @@
 import math
 import unittest
+import warnings
 
 from auditstat.sso.moment_match_SSO import moment_match_SSO
 from auditstat.sso.strata_SSO_klant import bouw_strata_SSO_klant
@@ -72,6 +73,26 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
             bouw_strata_SSO_klant([
                 dict(naam="Emolumenten", n=120, k=1, waarde_laag=2_000_000.0)
             ])
+
+    def test_klem_waarschuwing_bevat_naam_van_type_post(self):
+        # N_klant=5 t.o.v. n=120 triggert klemming in moment_match_SSO; de
+        # waarschuwing moet hier de naam van het type post bevatten, zodat
+        # een aanroeper kan tonen voor welk type post is teruggevallen.
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=1, N_klant=5, waarde_laag=2_000_000.0),
+        ]
+        with self.assertWarns(RuntimeWarning) as gevangen:
+            bouw_strata_SSO_klant(post_typen)
+        self.assertTrue(any("Emolumenten" in str(w.message) for w in gevangen.warnings))
+
+    def test_geen_waarschuwing_zonder_klemming(self):
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=1, N_klant=5000, waarde_laag=2_000_000.0),
+        ]
+        with warnings.catch_warnings(record=True) as gevangen:
+            warnings.simplefilter("always", RuntimeWarning)
+            bouw_strata_SSO_klant(post_typen)
+        self.assertEqual(len(gevangen), 0)
 
 
 if __name__ == "__main__":

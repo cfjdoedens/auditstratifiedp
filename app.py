@@ -1,4 +1,5 @@
 import time
+import warnings
 
 import pandas as pd
 import streamlit as st
@@ -97,6 +98,7 @@ for key, standaard in {
     "sso_strata_tabel_key": 0,
     "sso_strata_res": None,
     "sso_strata_error": None,
+    "sso_strata_waarschuwingen": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
@@ -1552,21 +1554,30 @@ with tab_sso:
             if parse_fouten:
                 st.session_state.sso_strata_error = "\n".join(parse_fouten)
                 st.session_state.sso_strata_res = None
+                st.session_state.sso_strata_waarschuwingen = []
             else:
                 try:
-                    st.session_state.sso_strata_res = (
-                        evalueer_SSO_klant_gestratificeerd(
-                            post_typen,
-                            model=sso_strata_model,
-                            zekerheid=sso_strata_zekerheid,
+                    with warnings.catch_warnings(record=True) as gevangen:
+                        warnings.simplefilter("always", RuntimeWarning)
+                        st.session_state.sso_strata_res = (
+                            evalueer_SSO_klant_gestratificeerd(
+                                post_typen,
+                                model=sso_strata_model,
+                                zekerheid=sso_strata_zekerheid,
+                            )
                         )
-                    )
+                    st.session_state.sso_strata_waarschuwingen = [
+                        str(w.message)
+                        for w in gevangen
+                        if issubclass(w.category, RuntimeWarning)
+                    ]
                     st.session_state.sso_strata_error = None
                 except ValueError as e:
                     st.session_state.sso_strata_error = (
                         f"Fout bij gestratificeerde evaluatie: {e}"
                     )
                     st.session_state.sso_strata_res = None
+                    st.session_state.sso_strata_waarschuwingen = []
 
     sso_strata_res = st.session_state.sso_strata_res
     if sso_strata_res is not None:
@@ -1587,5 +1598,13 @@ with tab_sso:
             k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 2)),
         )
         st.table(sso_strata_steekproeven_tabel)
+        if st.session_state.sso_strata_waarschuwingen:
+            st.warning(
+                "Voor de volgende typen posten kon de werkelijke spreiding "
+                "van de foutfractie niet exact gekalibreerd worden (N_klant "
+                "te klein t.o.v. de SSO-steekproef); er is teruggevallen op "
+                "de conservatiefste van momentmatching en naïeve pooling:\n\n"
+                + "\n\n".join(st.session_state.sso_strata_waarschuwingen)
+            )
         sso_strata_fig = plot_kanskromme(sso_strata_res)
         st.pyplot(sso_strata_fig)
