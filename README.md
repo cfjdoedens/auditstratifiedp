@@ -501,7 +501,7 @@ print(plan[["naam", "kosten", "n_basis", "n_laag"]])
 print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}\n")
 ```
 
-       Klaar met plannen in 0.1 seconden.
+       Klaar met plannen in 0.0 seconden.
             naam  kosten  n_basis  n_laag
     0  Subsidies     5.0       56      56
     1     Inkoop     1.0        1       1

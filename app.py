@@ -1599,12 +1599,6 @@ with tab_sso:
         )
         st.table(sso_strata_steekproeven_tabel)
         if st.session_state.sso_strata_waarschuwingen:
-            st.warning(
-                "Voor de volgende typen posten kon de werkelijke spreiding "
-                "van de foutfractie niet exact gekalibreerd worden (N_klant "
-                "te klein t.o.v. de SSO-steekproef); er is teruggevallen op "
-                "de conservatiefste van momentmatching en naïeve pooling:\n\n"
-                + "\n\n".join(st.session_state.sso_strata_waarschuwingen)
-            )
+            st.warning("\n\n".join(st.session_state.sso_strata_waarschuwingen))
         sso_strata_fig = plot_kanskromme(sso_strata_res)
         st.pyplot(sso_strata_fig)
