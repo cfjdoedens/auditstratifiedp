@@ -114,8 +114,14 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     variantie van de werkelijke tweelagen-onzekerheid.
 
     Omdat de Beta- en Gamma-familie een beperkte spreiding kunnen
-    weergeven bij een gegeven gemiddelde, kan dit bij een kleine N_klant
-    (t.o.v. de SSO-steekproef) resulteren in een negatieve k_eff. In dat
+    weergeven bij een gegeven gemiddelde, kan dit bij een absoluut kleine
+    N_klant resulteren in een negatieve k_eff — niet omdat N_klant klein
+    is *ten opzichte van* de SSO-steekproef n, maar omdat de
+    steekproefvariabiliteit van de foutfractie bij de klant zelf schaalt
+    met 1/N_klant: bij een vaste (bijna-bekende) foutkans kan zelfs een
+    N_klant die veel groter is dan n nog tot klemming leiden, en een
+    N_klant die veel kleiner is dan n soms net niet (n bepaalt vooral hoe
+    zeker de SSO-foutkans zelf al is, een secundair effect). In dat
     geval is vasthouden aan het juiste gemiddelde sowieso niet meer
     houdbaar (zie hieronder), en wordt in plaats daarvan direct
     gekalibreerd op de werkelijke, exacte grens: ``k_eff`` wordt op 0
@@ -297,8 +303,9 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         warnings.warn(
             "De werkelijke spreiding van de foutfractie bij de klant kon niet "
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
-            "klein t.o.v. de SSO-steekproef n). Het (n_eff, k_eff)-paar is in "
-            "plaats daarvan gekalibreerd op de werkelijke, exacte "
+            "te klein om de steekproefvariabiliteit van de foutfractie bij de "
+            "klant nog weer te geven). Het (n_eff, k_eff)-paar is in plaats "
+            "daarvan gekalibreerd op de werkelijke, exacte "
             "Beta-Binomiale/Negatief-Binomiale grens bij 95% zekerheid.",
             RuntimeWarning,
             stacklevel=2,
