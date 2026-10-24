@@ -5,6 +5,52 @@ import numpy as np
 from auditstat._formatting import nl_getal
 
 
+def _gekleurde_subtitel(
+    ax, segmenten: list[tuple[str, str]], y: float = 1.04, fontsize: int = 10
+):
+    """Teken een subtitel boven ``ax`` opgebouwd uit meerdere, los gekleurde tekststukken.
+
+    Matplotlib ondersteunt geen kleurwisseling binnen één tekststring (ook niet via
+    mathtext, dat geen ``\\color``-commando kent), dus elk stuk wordt als los
+    ``Text``-object getekend en op basis van de werkelijk gerenderde breedte
+    (via de canvas-renderer) tegen elkaar aan gepositioneerd en gezamenlijk
+    gecentreerd boven de as.
+    """
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+
+    teksten = [
+        ax.text(
+            0,
+            y,
+            tekst,
+            fontsize=fontsize,
+            color=kleur,
+            ha="left",
+            va="bottom",
+            transform=ax.transAxes,
+        )
+        for tekst, kleur in segmenten
+    ]
+
+    fig.canvas.draw()
+    breedtes = [t.get_window_extent(renderer=renderer).width for t in teksten]
+    totale_breedte = sum(breedtes)
+
+    as_bbox = ax.get_window_extent(renderer=renderer)
+    start_x = as_bbox.x0 + (as_bbox.width - totale_breedte) / 2
+
+    inv = ax.transAxes.inverted()
+    cum_x = start_x
+    for t, breedte in zip(teksten, breedtes, strict=True):
+        x_frac, _ = inv.transform((cum_x, 0))
+        t.set_position((x_frac, y))
+        cum_x += breedte
+
+    return teksten
+
+
 def plot_kanskromme(res: dict) -> plt.Figure:
     """Teken de kanskromme van de evaluatie.
 
@@ -114,12 +160,6 @@ def plot_kanskromme(res: dict) -> plt.Figure:
         "kanskromme van de geprojecteerde fout", fontweight="bold", fontsize=14
     )
 
-    subtitle = (
-        f"blauwe lijn = meest waarschijnlijke fout  |  "
-        f"rode lijn = maximale fout ({zekerheid_pct:.0f}% zekerheid)"
-    )
-    ax.set_title(subtitle, fontsize=10, loc="center", pad=10)
-
     # --- NIEUW: Schaal X-as ---
     # Zoom in zodat de grafiek geen 'naald' wordt.
     # We pakken de maximale fout * 2.5, maar we maximeren dit op de omvang van de totale populatie.
@@ -145,5 +185,22 @@ def plot_kanskromme(res: dict) -> plt.Figure:
         ncol=2,
     )
 
+    # Layout eerst vastzetten: de gekleurde subtitel hieronder positioneert zijn
+    # tekststukken op basis van de uiteindelijke, gerenderde as-afmetingen, dus
+    # een latere tight_layout/subplots_adjust zou die positionering weer verstoren.
     fig.tight_layout()
+    fig.subplots_adjust(top=0.88)
+
+    # Subtitel: "blauwe lijn"/"rode lijn" in de bijpassende kleur, zodat de tekst
+    # overeenkomt met wat ze beschrijft (zie _gekleurde_subtitel hierboven).
+    _gekleurde_subtitel(
+        ax,
+        [
+            ("blauwe lijn", "blue"),
+            (" = meest waarschijnlijke fout   |   ", "#2c3e50"),
+            ("rode lijn", "red"),
+            (f" = maximale fout ({zekerheid_pct:.0f}% zekerheid)", "#2c3e50"),
+        ],
+    )
+
     return fig
