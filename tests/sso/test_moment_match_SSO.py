@@ -1,12 +1,20 @@
 import unittest
 
-from scipy.stats import beta
+from scipy.stats import beta, betabinom, gamma, nbinom
 
-from auditstat.sso.moment_match_SSO import _naieve_pooling, moment_match_SSO
+from auditstat.sso.moment_match_SSO import moment_match_SSO
 
 
 def _max_fout_95(n_eff, k_eff):
     return beta.ppf(0.95, k_eff + 1, n_eff - k_eff + 1)
+
+
+def _max_fout_exact_binomiaal(n, k, N_klant, zekerheid=0.95):
+    return betabinom.ppf(zekerheid, N_klant, k + 1, n - k + 1) / N_klant
+
+
+def _max_fout_exact_poisson(n, k, N_klant, zekerheid=0.95):
+    return nbinom.ppf(zekerheid, k + 1, n / (n + N_klant)) / N_klant
 
 
 class TestMomentMatchSSO(unittest.TestCase):
@@ -52,45 +60,44 @@ class TestMomentMatchSSO(unittest.TestCase):
         with self.assertRaises(ValueError):
             moment_match_SSO(100, 101, 100, "binomiaal")
 
-    def test_geklemd_resultaat_is_minstens_zo_conservatief_als_naief(self):
-        # Bij klemming wordt vergeleken met de naïeve-poolingmethode en de
-        # conservatiefste (hoogste maximale foutfractie bij 95% zekerheid)
-        # van de twee aangehouden: het resultaat mag dus nooit minder
-        # conservatief zijn dan de naïeve pooling zelf.
+    def test_geklemd_binomiaal_matcht_exacte_grens(self):
+        # Bij klemming (k_eff < 0) wordt k_eff op 0 gezet en n_eff zo
+        # gekozen dat de 95%-kwantiel van de resulterende Beta-verdeling
+        # exact gelijk is aan de werkelijke Beta-Binomiale grens.
         n, k, N_klant = 120, 1, 100
+        exact = _max_fout_exact_binomiaal(n, k, N_klant)
         with self.assertWarns(RuntimeWarning):
             n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
-        n_naief, k_naief = _naieve_pooling(n, k, N_klant)
-        self.assertGreaterEqual(
-            _max_fout_95(n_eff, k_eff), _max_fout_95(n_naief, k_naief)
-        )
+        self.assertEqual(k_eff, 0.0)
+        self.assertAlmostEqual(_max_fout_95(n_eff, k_eff), exact, places=6)
 
-    def test_geklemd_kiest_naieve_pooling_bij_matig_kleine_N_klant(self):
-        # Bij een matig kleine N_klant (klem treedt op, maar niet extreem)
-        # is naïeve pooling de conservatievere van de twee kandidaten.
-        n, k, N_klant = 120, 1, 100
-        n_naief, k_naief = _naieve_pooling(n, k, N_klant)
-        with self.assertWarns(RuntimeWarning):
-            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
-        self.assertAlmostEqual(n_eff, n_naief, places=6)
-        self.assertAlmostEqual(k_eff, k_naief, places=6)
-
-    def test_geklemd_behoudt_momentmatching_bij_zeer_kleine_N_klant(self):
-        # Bij een zeer kleine N_klant (extreme klem) is de geklemde
-        # momentmatching zelf juist conservatiever dan naïeve pooling, en
-        # moet die dus behouden blijven in plaats van overschreven te worden.
+    def test_geklemd_binomiaal_matcht_exacte_grens_bij_zeer_kleine_N_klant(self):
         n, k, N_klant = 120, 1, 5
+        exact = _max_fout_exact_binomiaal(n, k, N_klant)
         with self.assertWarns(RuntimeWarning):
             n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
-        n_naief, k_naief = _naieve_pooling(n, k, N_klant)
-        self.assertGreater(_max_fout_95(n_eff, k_eff), _max_fout_95(n_naief, k_naief))
+        self.assertEqual(k_eff, 0.0)
+        self.assertAlmostEqual(_max_fout_95(n_eff, k_eff), exact, places=6)
 
-    def test_geklemde_fallback_ook_voor_poisson(self):
+    def test_geklemd_poisson_matcht_exacte_grens(self):
+        n, k, N_klant = 120, 1, 5
+        exact = _max_fout_exact_poisson(n, k, N_klant)
         with self.assertWarns(RuntimeWarning):
-            n_eff, k_eff = moment_match_SSO(120, 1, 5, "poisson")
-        self.assertGreaterEqual(k_eff, 0.0)
-        self.assertGreaterEqual(n_eff, k_eff)
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "poisson")
+        self.assertEqual(k_eff, 0.0)
+        mf = gamma.ppf(0.95, a=k_eff + 1, scale=1.0 / n_eff)
+        self.assertAlmostEqual(mf, exact, places=6)
         self.assertGreater(n_eff, 0.0)
+
+    def test_geklemd_binomiaal_is_minstens_zo_conservatief_als_exact(self):
+        # Ook in het extreme randgeval (exacte grens zelf dicht bij of
+        # boven de haalbare Beta-kwantiel) mag het resultaat de werkelijke
+        # grens niet onderschatten.
+        n, k, N_klant = 120, 5, 2
+        with self.assertWarns(RuntimeWarning):
+            n_eff, k_eff = moment_match_SSO(n, k, N_klant, "binomiaal")
+        exact = _max_fout_exact_binomiaal(n, k, N_klant)
+        self.assertGreaterEqual(_max_fout_95(n_eff, k_eff) + 1e-9, min(exact, 0.95))
 
 
 if __name__ == "__main__":

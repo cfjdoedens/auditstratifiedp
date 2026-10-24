@@ -1,39 +1,66 @@
+import math
 import warnings
 
-from scipy.stats import beta, gamma
+from scipy.stats import betabinom, nbinom
 
-# Referentiezekerheid waarop, uitsluitend bij klemming, wordt beoordeeld welke
-# van de twee methodes (geklemde momentmatching vs. naïeve pooling) de hoogste
-# (dus veiligste) maximale foutfractie oplevert. Dit is noodzakelijkerwijs een
-# vaste keuze: moment_match_SSO kent de uiteindelijke, door de gebruiker
-# gekozen zekerheid van eval_stratified niet (die wordt pas later toegepast).
-_ZEKERHEID_VOOR_CONSERVATISME_VERGELIJKING = 0.95
-
-
-def _naieve_pooling(n, k, N_klant):
-    """Herleidt (n_klant, k_klant) door de SSO-steekproef en de klantpopulatie
-    naar rato te poolen tot één kleinere "as-if"-steekproef (de vóór
-    ``moment_match_SSO`` gebruikte aanpak, zie ``git log`` commit
-    "Vervang naïeve pooling door momentmatching in SSO->gestratificeerde brug").
-    """
-    n_klant = (n * N_klant) / (n + N_klant)
-    k_klant = (n_klant / n) * k
-    return n_klant, k_klant
+# Referentiezekerheid waarop, uitsluitend bij klemming (k_eff < 0), het
+# vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de werkelijke,
+# exacte Beta-Binomiale/Negatief-Binomiale grens. Dit is noodzakelijkerwijs
+# een vaste keuze: moment_match_SSO kent de uiteindelijke, door de
+# gebruiker gekozen zekerheid van eval_stratified niet (die wordt pas later
+# toegepast).
+_ZEKERHEID_VOOR_KLEMKALIBRATIE = 0.95
 
 
-def _max_fout_referentie(n_eff, k_eff, verdeling):
-    """Maximale foutfractie bij ``_ZEKERHEID_VOOR_CONSERVATISME_VERGELIJKING``,
-    volgens dezelfde Beta- resp. Gamma-parametrisatie als ``eval_stratified``
-    gebruikt. Uitsluitend bedoeld om twee (n_eff, k_eff)-kandidaten onderling
-    te vergelijken op conservatisme, niet als eindresultaat.
+def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE):
+    """De werkelijke, exacte maximale foutfractie bij ``zekerheid``, op basis
+    van de volledige samengestelde voorspellende verdeling van het aantal
+    fouten bij de klant — Beta-Binomiaal (binomiaal) resp. Negatief-Binomiaal
+    (poisson) — zonder de Beta/Gamma-benadering die ``moment_match_SSO``
+    verder in deze module gebruikt.
+
+    Dit is per definitie discreet (``N_klant`` is hier een eindig aantal
+    posten), en daarom uitsluitend bedoeld als intern ijkpunt bij klemming
+    — niet als gebruikersgerichte uitkomst. Zie ``AGENTS.md`` onder
+    "Item-count-gebaseerd SSO-pad: verwijderd" voor de achtergrond waarom
+    dit soort getrapte, exacte berekening niet rechtstreeks aan gebruikers
+    wordt getoond.
     """
     if verdeling == "binomiaal":
-        return beta.ppf(
-            _ZEKERHEID_VOOR_CONSERVATISME_VERGELIJKING, k_eff + 1, n_eff - k_eff + 1
-        )
-    return gamma.ppf(
-        _ZEKERHEID_VOOR_CONSERVATISME_VERGELIJKING, a=k_eff + 1, scale=1.0 / n_eff
-    )
+        x = betabinom.ppf(zekerheid, N_klant, k + 1, n - k + 1)
+    else:
+        x = nbinom.ppf(zekerheid, k + 1, n / (n + N_klant))
+    return x / N_klant
+
+
+def _kalibreer_k_eff_nul_op_exacte_grens(doel_max_fout, verdeling, zekerheid):
+    """Bepaalt ``n_eff`` bij vastgehouden ``k_eff = 0`` zodanig dat de
+    Beta(1, n_eff + 1)- resp. Gamma(1, schaal=1/n_eff)-kwantiel bij
+    ``zekerheid`` exact gelijk is aan ``doel_max_fout``.
+
+    Dit heeft een gesloten vorm:
+
+    - Binomiaal: Beta(1, b).ppf(zekerheid) = 1 − (1 − zekerheid)^(1/b), op
+      te lossen naar ``b = n_eff + 1``.
+    - Poisson: Gamma(1, schaal=1/n_eff) is een Exponentiële verdeling met
+      rate ``n_eff``; de ppf daarvan is eenvoudig naar ``n_eff`` te
+      herleiden.
+
+    Bij een zeer kleine ``N_klant`` kan ``doel_max_fout`` zelf hoger liggen
+    dan wat deze (binomiale) familie ooit kan weergeven, ongeacht ``n_eff``
+    (het maximum wordt bereikt bij ``n_eff = 0``, d.w.z. een uniforme
+    verdeling, met kwantiel gelijk aan ``zekerheid`` zelf). In dat geval
+    wordt ``n_eff = 0`` aangehouden als beste, nog altijd geldige, keuze.
+    """
+    if verdeling == "binomiaal":
+        if doel_max_fout >= zekerheid:
+            n_eff = 0.0
+        else:
+            b = math.log(1.0 - zekerheid) / math.log(1.0 - doel_max_fout)
+            n_eff = max(b - 1.0, 0.0)
+    else:
+        n_eff = -math.log(1.0 - zekerheid) / doel_max_fout
+    return n_eff, 0.0
 
 
 def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
@@ -66,21 +93,29 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     variantie van de werkelijke tweelagen-onzekerheid.
 
     Omdat de Beta- en Gamma-familie een beperkte spreiding kunnen
-    weergeven bij een gegeven gemiddelde, kan dit bij een kleine
-    N_klant (t.o.v. de SSO-steekproef) resulteren in een (n_eff, k_eff)
-    buiten het toegestane bereik (k_eff < 0 of k_eff > n_eff). In dat
-    geval wordt eerst geklemd aan de dichtstbijzijnde geldige grens.
-    Vervolgens wordt, uitsluitend in dit klemgeval, ook de (oudere,
-    eenvoudiger) naïeve-poolingmethode berekend (``_naieve_pooling``) en
-    wordt van de twee kandidaten — geklemde momentmatching vs. naïeve
-    pooling — degene met de hoogste (dus veiligste) maximale foutfractie
-    bij 95% zekerheid aangehouden. Dit is nodig omdat gebleken is dat
-    geen van beide methodes in het klemgebied stelselmatig conservatiever
-    is dan de ander: bij een matig kleine N_klant is naïeve pooling vaak
-    conservatiever, maar bij een zeer kleine N_klant (waar de klem het
-    hardst toeslaat) kan de geklemde momentmatching júist conservatiever
-    uitpakken. Er wordt een ``RuntimeWarning`` afgevuurd om te melden dat
-    dit is gebeurd.
+    weergeven bij een gegeven gemiddelde, kan dit bij een kleine N_klant
+    (t.o.v. de SSO-steekproef) resulteren in een negatieve k_eff. In dat
+    geval is vasthouden aan het juiste gemiddelde sowieso niet meer
+    houdbaar (zie hieronder), en wordt in plaats daarvan direct
+    gekalibreerd op de werkelijke, exacte grens: ``k_eff`` wordt op 0
+    gezet (geen fouten specifiek aan de klant toe te rekenen) en ``n_eff``
+    wordt zo gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij
+    95% zekerheid exact gelijk is aan de werkelijke Beta-Binomiale resp.
+    Negatief-Binomiale grens (``_max_fout_exact``) — zie
+    ``_kalibreer_k_eff_nul_op_exacte_grens``. Dit vervangt een eerdere
+    aanpak die bij klemming vergeleek met een naïeve-poolingmethode: die
+    vergelijking is overbodig zodra de werkelijke exacte grens zelf als
+    ijkpunt beschikbaar is, en gaf bovendien bij een zeer kleine N_klant
+    nodeloos conservatieve uitkomsten (zie ``git log`` voor de
+    voorganger van deze aanpak). Een ``RuntimeWarning`` wordt afgevuurd om
+    te melden dat dit is gebeurd.
+
+    Deze exacte kalibratie geldt alleen voor de (in de praktijk verreweg
+    meest voorkomende) situatie waarin het benodigde k_eff negatief zou
+    zijn. Het zeldzame omgekeerde geval (een zeer hoge SSO-foutfractie,
+    waarbij het benodigde n_eff kleiner dan k_eff zou zijn) wordt nog
+    steeds simpelweg geklemd op n_eff = k_eff, zonder deze exacte-grens-
+    kalibratie.
 
     Parameters
     ----------
@@ -133,35 +168,22 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
 
     geklemd = False
     if k_eff < 0:
-        k_eff = 0.0
+        exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
+        n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
+            exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+        )
         geklemd = True
     if n_eff < k_eff:
         n_eff = k_eff
         geklemd = True
 
     if geklemd:
-        n_naief, k_naief = _naieve_pooling(n, k, N_klant)
-        if n_eff > 0:
-            mf_geklemd = _max_fout_referentie(n_eff, k_eff, verdeling)
-            mf_naief = _max_fout_referentie(n_naief, k_naief, verdeling)
-            gebruik_naief = mf_naief > mf_geklemd
-        else:
-            # (n_eff, k_eff) is gedegenereerd (n_eff = 0, geen bruikbare
-            # Gamma/Beta-parametrisatie); de naïeve pooling is dan sowieso
-            # de enige bruikbare kandidaat.
-            gebruik_naief = True
-
-        if gebruik_naief:
-            n_eff, k_eff = n_naief, k_naief
-
         warnings.warn(
             "De werkelijke spreiding van de foutfractie bij de klant kon niet "
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
-            "klein t.o.v. de SSO-steekproef n). Het (n_eff, k_eff)-paar is "
-            "geklemd aan de dichtstbijzijnde geldige grens, en er is "
-            "vergeleken met de naïeve-poolingmethode; de conservatiefste "
-            "(hoogste maximale foutfractie bij 95% zekerheid) van de twee is "
-            f"aangehouden ({'naïeve pooling' if gebruik_naief else 'geklemde momentmatching'}).",
+            "klein t.o.v. de SSO-steekproef n). Het (n_eff, k_eff)-paar is in "
+            "plaats daarvan gekalibreerd op de werkelijke, exacte "
+            "Beta-Binomiale/Negatief-Binomiale grens bij 95% zekerheid.",
             RuntimeWarning,
             stacklevel=2,
         )
