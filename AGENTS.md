@@ -292,6 +292,81 @@ git push origin main   # geen tag → alleen test-workflow
 
 **Huidige PyPI-status:** `auditstat` 0.1.9 is live (gepubliceerd 2026-10-23). Tags `v0.1.8` (publish gefaald, nooit gepubliceerd, overruled door 0.1.9) en `v0.1.9` (gepubliceerd na een `gh run rerun` nadat de trusted publisher was geregistreerd) staan beide op GitHub.
 
+## SSO-tab herontwerp (2026-10-27): geleide flow, theorie, methodekeuze, consistentiechecks
+
+Naar aanleiding van een eerste gebruikerssessie met de live Streamlit-app is de SSO-tab verder
+herontworpen (bovenop de 2026-10-24-herstructurering naar SSO-brede typen posten + meerdere
+klanten tegelijk, zie hierboven). Vijf losse verbeterpunten, alle doorgevoerd:
+
+**Geleide flow (vervangt het "meteen twee tabellen"-scherm als standaardpad).** De SSO-tab
+begint nu met (1) een invoerblok voor de SSO-brede totalen (`n`, `k`, `N totaal`, `totale massa`,
+`ihr`/`ibr`/`car`, `materialiteit` — losse tekstvelden/selectboxen, geen tabel), gevolgd door (2)
+een vereenvoudigde klantentabel (`klant`, `N_klant`, `waarde_laag`, nieuwe sessiestatus
+`sso_klanten_totaal_tabel`/`-_key`, eigen `on_sso_klanten_totaal_tabel_change`-callback met
+hetzelfde harde-rollback-patroon als de andere SSO-tabellen), en dan (3) een radio "onderscheid
+naar typen posten?" (`sso_onderscheid`, "nee"/"ja"). Bij "nee" wordt per klant één synthetisch
+type post `"totaal"` gebouwd met de SSO-brede (n,k,risico,materialiteit) en de per-klant
+(N_klant, waarde_laag) uit stap 2, en rechtstreeks door de bestaande
+`evalueer_SSO_klant_gestratificeerd`-pijplijn gehaald — geen backend-wijziging nodig voor dit
+pad. Bij "ja" worden de twee bestaande tabellen (`sso_typen_posten_tabel` met `n`/`k` per type
+post, `sso_klanten_tabel` in lang/tidy-formaat) getoond en werkt het precies als vóór dit
+herontwerp. `N_totaal` is een nieuw veld (niet expliciet door de gebruiker genoemd in de
+oorspronkelijke vraag, maar nodig om de consistentiecheck tussen de klantentotalen en de
+SSO-brede populatieomvang mogelijk te maken).
+
+**Theoretische achtergrond.** Nieuw tabblad "Theorie" met vier `st.expander`-secties (two-stage
+sampling-idee, de naïeve n_klant-poolingformule met randgevallenargument, de
+momentmatching-kalibratie met de Var(X)≤p(1-p)-redenering, en een aankondiging van de nog niet
+geïmplementeerde FFT-exacte methode), plus korte contextuele `st.expander("Hoe werkt dit?")`-
+uitklappers bij de SSO-totalen-sectie in de werktab zelf, die naar het Theorie-tabblad
+verwijzen. Uitdrukkelijk **geen** formeel Lean-bewijs in deze slag — alleen de gewone
+wiskundige afleiding/redenering in LaTeX (`st.latex`/`st.markdown`); een Lean-bewijs is een
+apart, mogelijk toekomstig traject.
+
+**Voorbeeldinvoer.** Omdat `st.data_editor` geen per-cel "grijze suggestiewaarde die je
+overtypt" ondersteunt (een cel is leeg of ingevuld, geen placeholder-concept zoals bij
+`st.text_input`), zijn alle SSO-invoertabellen vooraf gevuld met realistische voorbeeldcijfers
+in plaats van lege rijen, duidelijk gelabeld ("Onderstaande cijfers zijn een voorbeeld —
+overschrijf of verwijder de rijen"). De voorbeeldcijfers zijn bewust onderling consistent (zie
+hieronder) zodat de consistentiecontrole bij het eerste gebruik al "klopt": SSO-totalen
+n=200/k=4/N=5.000/massa=2.500.000; typen posten Emolumenten (n=120,k=1) + Inkoopfacturen
+(n=80,k=3) tellen op tot die SSO-totalen; Klant A (N=3.000, €1.500.000) + Klant B (N=2.000,
+€1.000.000) tellen op tot de SSO-totalen; en de klant×type-post-opsplitsing telt op tot de
+respectievelijke klanttotalen.
+
+**Consistentiechecks.** Niet-blokkerend, puur informatief (`st.info`, geen `st.error`): (a) som
+van `N_klant`/`waarde_laag` over de klantentabel (stap 2) wordt vergeleken met de SSO-brede
+`N totaal`/`totale massa` (stap 1); (b) bij "ja" (onderscheid naar typen posten): som van
+`n`/`k` over de typen-posten-tabel wordt vergeleken met de SSO-brede `n`/`k`, én voor elke klant
+wordt de som van `N_klant`/`waarde_laag` over zijn typen-posten-rijen vergeleken met zijn rij in
+de klantentotaaltabel. Vergelijkingen gebruiken `_sso_ongeveer_gelijk` (`math.isclose`,
+`rel_tol=1e-6`), en slaan een check over (geen melding) zodra een van beide te vergelijken
+waarden niet parseerbaar is — dat wordt al apart afgevangen door de bestaande
+veld-voor-veld-validatie bij submit. Bewust niet-blokkerend gehouden: dit zijn
+totaalconsistenties over meerdere rijen/tabellen heen, geen enkele-celfout, en de gebruiker kan
+legitieme redenen hebben om tijdelijk inconsistent te zijn tijdens het invullen.
+
+**Methodekeuze: `kalibratiemethode`-parameter (momentmatching / naïef), FFT-exact nog niet
+geïmplementeerd.** `bouw_strata_SSO_klant` en `evalueer_SSO_klant_gestratificeerd` hebben een
+nieuwe parameter `kalibratiemethode` (`"momentmatching"` default, of `"naief"`), onafhankelijk
+van de bestaande `methode`-parameter (die de *convolutie*-methode kiest: "FFT samen", "FFT
+paarsgewijs", "direct", "Monte Carlo" — een andere as). Nieuw: `auditstat/sso/naief_SSO.py` met
+`naief_match_SSO(n, k, N_klant)`, een eenvoudige, nadrukkelijk niet-statistisch-onderbouwde
+poolingheuristiek: `n_eff = n·N_klant/(n+N_klant)` (parallelformule, analoog aan weerstanden in
+parallel), `k_eff = k·n_eff/n` (foutfractie behouden). Gemotiveerd via twee grensgevallen
+(N_klant≫n → n_eff→n; N_klant≪n → n_eff→N_klant), niet via een afleiding uit een kansmodel —
+expliciet een vergelijkingsmethode naast `moment_match_SSO`, geen vervanging. Anders dan
+`moment_match_SSO` kent `naief_match_SSO` geen klemming/blinde-vlek-afhandeling (geen
+`RuntimeWarning`/`ValueError` bij een extreem kleine `N_klant`) — simpelweg de formule, altijd.
+In de app is dit een radio "berekeningsmethode" naast model/zekerheid in het instellingenblok.
+De FFT-exacte methode (directe convolutie van de twee-traps posterior, zonder de Beta/Gamma-
+benadering van `moment_match_SSO` als tussenstap) is **niet geïmplementeerd** in deze slag —
+dit vereist een fundamenteel andere manier van samenvoegen van strata en is bewust als eigen
+vervolgtraject/apart ontwerpgesprek afgebakend (zie ook het Theorie-tabblad, dat dit al wel
+aankondigt).
+
+Plan vastgelegd in `.posit/assistant/plans/2026-10-27-sso-tab-herontwerp-geleide-flow-theorie-methodekeuze.md`.
+
 ## Beveiligingsonderhoud
 
 Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op MITM voor tools met eigen CA-store zoals `pip`/`uv`/`certifi`) zijn volgende acties ondernomen: `uv self update` (0.11.28 → 0.13.5, bevat afwijzing van de gecompromitteerde keten), en `uv lock --upgrade-package certifi` + `uv sync` om `certifi` in `uv.lock` bij te werken naar 2026.10.19 (was transitief gepind via streamlit/requests op een kwetsbare versie). GitHub Actions-runners zijn niet getroffen (altijd verse images met actuele `pip`/`certifi`). Check bij toekomstige soortgelijke incidenten `uv.lock` op verouderde `certifi`-pins.

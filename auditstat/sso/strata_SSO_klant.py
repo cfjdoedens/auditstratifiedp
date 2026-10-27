@@ -4,6 +4,7 @@ import warnings
 import pandas as pd
 
 from auditstat.sso.moment_match_SSO import moment_match_SSO
+from auditstat.sso.naief_SSO import naief_match_SSO
 
 # Optionele kolommen die, indien aanwezig, worden doorgegeven aan
 # eval_stratified (dat zelf standaardwaarden invult als ze ontbreken).
@@ -17,7 +18,9 @@ _OPTIONELE_KOLOMMEN = (
 )
 
 
-def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
+def bouw_strata_SSO_klant(
+    post_typen, model="binomiaal", kalibratiemethode="momentmatching"
+):
     """
     Bouwt een stratatabel voor één klant op basis van SSO-steekproeven per
     type post, geschikt als invoer voor ``auditstat.stratified.eval_stratified``.
@@ -61,6 +64,18 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
         Kansmodel waarop gekalibreerd wordt. Moet overeenkomen met het
         ``model``-argument dat straks aan ``eval_stratified`` wordt
         doorgegeven (zie ``evalueer_SSO_klant_gestratificeerd``).
+    kalibratiemethode : {"momentmatching", "naief"}, standaard "momentmatching"
+        Welke functie per type post (n_eff, k_eff) berekent:
+
+        - ``"momentmatching"``: ``moment_match_SSO`` (aanbevolen; matcht
+          gemiddelde én variantie van de werkelijke compound-verdeling).
+        - ``"naief"``: ``naief_match_SSO`` (eenvoudige poolingheuristiek,
+          ter vergelijking — zie die functie voor de onderbouwing en de
+          beperkingen ervan).
+
+        De waarschuwings-/foutafhandeling bij klemming resp. een
+        volledige blinde vlek (zie hieronder) is alleen van toepassing op
+        ``"momentmatching"``; ``"naief"`` kent dat onderscheid niet.
 
     Returns
     -------
@@ -92,6 +107,11 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
     """
     if not post_typen:
         raise ValueError("Geef tenminste 1 type post (stratum) mee.")
+    if kalibratiemethode not in ("momentmatching", "naief"):
+        raise ValueError(
+            "kalibratiemethode moet 'momentmatching' of 'naief' zijn, "
+            f"kreeg {kalibratiemethode!r}."
+        )
 
     rijen = []
     for post in post_typen:
@@ -107,26 +127,31 @@ def bouw_strata_SSO_klant(post_typen, model="binomiaal"):
                 f"Type post '{naam}' mist verplicht(e) veld(en): {', '.join(ontbrekend)}."
             )
 
-        # moment_match_SSO vuurt bij klemming een RuntimeWarning af zonder
-        # te weten bij welk type post (naam) dat hoort. Die context voegen
-        # we hier toe, zodat een aanroeper (bijv. de SSO-tab in app.py) per
-        # type post kan tonen voor welke een terugval is toegepast.
-        try:
-            with warnings.catch_warnings(record=True) as gevangen:
-                warnings.simplefilter("always", RuntimeWarning)
-                n_eff, k_eff = moment_match_SSO(
-                    post["n"], post["k"], post["N_klant"], verdeling=model
+        if kalibratiemethode == "naief":
+            n_eff, k_eff = naief_match_SSO(post["n"], post["k"], post["N_klant"])
+        else:
+            # moment_match_SSO vuurt bij klemming een RuntimeWarning af
+            # zonder te weten bij welk type post (naam) dat hoort. Die
+            # context voegen we hier toe, zodat een aanroeper (bijv. de
+            # SSO-tab in app.py) per type post kan tonen voor welke een
+            # terugval is toegepast.
+            try:
+                with warnings.catch_warnings(record=True) as gevangen:
+                    warnings.simplefilter("always", RuntimeWarning)
+                    n_eff, k_eff = moment_match_SSO(
+                        post["n"], post["k"], post["N_klant"], verdeling=model
+                    )
+            except ValueError as e:
+                # Zie moment_match_SSO: bij een volledige blinde vlek
+                # (N_klant zo klein dat zelfs de exacte grens al 0 is)
+                # weigert die functie een resultaat te geven. Die
+                # ValueError kent de naam van het type post niet; die
+                # context voegen we hier toe.
+                raise ValueError(f"Type post '{naam}': {e}") from e
+            for w in gevangen:
+                warnings.warn(
+                    f"Type post '{naam}': {w.message}", RuntimeWarning, stacklevel=2
                 )
-        except ValueError as e:
-            # Zie moment_match_SSO: bij een volledige blinde vlek (N_klant
-            # zo klein dat zelfs de exacte grens al 0 is) weigert die
-            # functie een resultaat te geven. Die ValueError kent de naam
-            # van het type post niet; die context voegen we hier toe.
-            raise ValueError(f"Type post '{naam}': {e}") from e
-        for w in gevangen:
-            warnings.warn(
-                f"Type post '{naam}': {w.message}", RuntimeWarning, stacklevel=2
-            )
         n_laag = max(round(n_eff), math.ceil(k_eff))
 
         rij = {

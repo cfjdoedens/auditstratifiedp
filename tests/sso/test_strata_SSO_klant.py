@@ -122,6 +122,26 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
             bouw_strata_SSO_klant(post_typen)
         self.assertIn("Emolumenten", str(ctx.exception))
 
+    def test_kalibratiemethode_naief_gebruikt_geen_moment_match(self):
+        # Bij kalibratiemethode="naief" moet het resultaat overeenkomen met
+        # de parallelformule, niet met moment_match_SSO — en een geval dat
+        # bij momentmatching een volledige blinde vlek (ValueError) zou
+        # geven, moet bij "naief" gewoon een resultaat opleveren.
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=0, N_klant=2, waarde_laag=2_000_000.0),
+        ]
+        df = bouw_strata_SSO_klant(post_typen, kalibratiemethode="naief")
+        n_eff_verwacht = 120 * 2 / (120 + 2)
+        self.assertAlmostEqual(df.loc[0, "k_laag"], 0.0)
+        self.assertGreaterEqual(df.loc[0, "n_laag"], n_eff_verwacht)
+
+    def test_ongeldige_kalibratiemethode_geeft_value_error(self):
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=1, N_klant=100, waarde_laag=2_000_000.0),
+        ]
+        with self.assertRaises(ValueError):
+            bouw_strata_SSO_klant(post_typen, kalibratiemethode="onbekend")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,7 @@ def evalueer_SSO_klant_gestratificeerd(
     zekerheid=0.95,
     methode="FFT samen",
     granulariteit=None,
+    kalibratiemethode="momentmatching",
 ):
     """
     Evalueert een klant gestratificeerd (één stratum per type post), op
@@ -38,6 +39,8 @@ def evalueer_SSO_klant_gestratificeerd(
         Methode voor de convolutieberekening.
     granulariteit : int, optioneel
         Zie ``eval_stratified``; standaard ``None`` (automatisch bepaald).
+    kalibratiemethode : {"momentmatching", "naief"}, standaard "momentmatching"
+        Zie ``bouw_strata_SSO_klant``.
 
     Returns
     -------
@@ -46,7 +49,9 @@ def evalueer_SSO_klant_gestratificeerd(
         (bruikbaar met ``auditstat.stratified.plot_kanskromme.plot_kanskromme``)
         en de opgebouwde stratatabel onder ``"steekproeven"``.
     """
-    steekproeven = bouw_strata_SSO_klant(post_typen, model=model)
+    steekproeven = bouw_strata_SSO_klant(
+        post_typen, model=model, kalibratiemethode=kalibratiemethode
+    )
     return eval_stratified(
         steekproeven=steekproeven,
         model=model,

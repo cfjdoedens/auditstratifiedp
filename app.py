@@ -1,3 +1,4 @@
+import math
 import time
 import warnings
 
@@ -67,21 +68,44 @@ LEGE_PLAN_DF = pd.DataFrame({
 # nog N_klant en waarde_laag aan (lang/tidy-formaat: één rij per
 # klant×type-post-combinatie).
 LEGE_SSO_TYPEN_POSTEN_DF = pd.DataFrame({
-    "naam": [""] * 4,
-    "n": [""] * 4,
-    "k": [""] * 4,
-    "ihr": ["H"] * 4,
-    "ibr": ["H"] * 4,
-    "car": ["H"] * 4,
-    "materialiteit": ["0,01"] * 4,
+    "naam": ["Emolumenten", "Inkoopfacturen"],
+    "n": ["120", "80"],
+    "k": ["1", "3"],
+    "ihr": ["H", "H"],
+    "ibr": ["H", "H"],
+    "car": ["H", "H"],
+    "materialiteit": ["0,01", "0,01"],
 })
 
 LEGE_SSO_KLANTEN_DF = pd.DataFrame({
-    "klant": [""] * 6,
-    "type_post": [""] * 6,
-    "N_klant": [""] * 6,
-    "waarde_laag": [""] * 6,
+    "klant": ["Klant A", "Klant A", "Klant B", "Klant B"],
+    "type_post": ["Emolumenten", "Inkoopfacturen", "Emolumenten", "Inkoopfacturen"],
+    "N_klant": ["1.800", "1.200", "1.200", "800"],
+    "waarde_laag": ["900.000,00", "600.000,00", "600.000,00", "400.000,00"],
 })
+
+# Vereenvoudigde klantentabel (stap 5.2 in de geleide flow): alleen gebruikt
+# als de gebruiker ervoor kiest om géén onderscheid te maken naar typen
+# posten. De voorbeeldcijfers tellen bewust op tot de voorbeeldtotalen van
+# LEGE_SSO_TOTALEN hieronder, én tot de som van LEGE_SSO_KLANTEN_DF per
+# klant, zodat de consistentiechecks bij de voorbeelddata al kloppen.
+LEGE_SSO_KLANTEN_TOTAAL_DF = pd.DataFrame({
+    "klant": ["Klant A", "Klant B"],
+    "N_klant": ["3.000", "2.000"],
+    "waarde_laag": ["1.500.000,00", "1.000.000,00"],
+})
+
+# Voorbeeldwaarden voor de SSO-brede totalen (stap 5.1). Som van n/k over de
+# typen posten in LEGE_SSO_TYPEN_POSTEN_DF komt hiermee overeen (120+80=200,
+# 1+3=4), evenals de som van N_klant/waarde_laag in LEGE_SSO_KLANTEN_TOTAAL_DF
+# (3.000+2.000=5.000, 1.500.000+1.000.000=2.500.000).
+SSO_TOTAAL_VOORBEELD = {
+    "n": "200",
+    "k": "4",
+    "N_totaal": "5.000",
+    "massa": "2.500.000,00",
+    "materialiteit": "0,01",
+}
 
 # Initialiseer de sessiestatus met standaardwaarden voor de plannings- en evaluatieberekening.
 for key, standaard in {
@@ -107,6 +131,8 @@ for key, standaard in {
     "sso_typen_posten_tabel_key": 0,
     "sso_klanten_tabel": LEGE_SSO_KLANTEN_DF.copy(),
     "sso_klanten_tabel_key": 0,
+    "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
+    "sso_klanten_totaal_tabel_key": 0,
     "sso_klanten_res": {},
     "sso_klanten_waarschuwingen": {},
     "sso_error": None,
@@ -157,6 +183,17 @@ def _format_nl_auto(waarde, min_decimalen: int = 0) -> str:
     else:
         decimalen = 0
     return _nl(getal, decimalen)
+
+
+def _sso_ongeveer_gelijk(
+    a: float | None, b: float | None, rel_tol: float = 1e-6
+) -> bool:
+    """Vergelijk twee sommen met een kleine tolerantie (afrondingsverschillen)."""
+    if a is None or b is None:
+        return (
+            True  # Onvergelijkbaar (ontbrekende/onparseerbare waarde) -> geen melding.
+        )
+    return math.isclose(a, b, rel_tol=rel_tol, abs_tol=1e-6)
 
 
 def on_eval_tabel_change():
@@ -628,15 +665,88 @@ def on_sso_klanten_tabel_change():
     st.session_state.sso_klanten_tabel_key += 1
 
 
+def on_sso_klanten_totaal_tabel_change():
+    """Verwerk wijzigingen in de vereenvoudigde klantentabel (stap 5.2).
+
+    Zelfde harde-rollback-patroon als de andere SSO-tabellen, maar dan
+    voor de vereenvoudigde tabel zonder `type_post`-kolom (klant, N_klant,
+    waarde_laag) — gebruikt wanneer de gebruiker geen onderscheid naar
+    typen posten maakt.
+    """
+    state = st.session_state[
+        "sso_klanten_totaal_tabel_editor_"
+        f"{st.session_state.sso_klanten_totaal_tabel_key}"
+    ]
+    df = st.session_state.sso_klanten_totaal_tabel.copy()
+    oude_df = st.session_state.sso_klanten_totaal_tabel.copy()
+
+    weggepoetste_fouten = []
+
+    for row_idx_raw, changes in state.get("edited_rows", {}).items():
+        row_idx = int(row_idx_raw)
+        if row_idx < len(df):
+            for col, val in changes.items():
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
+
+    for row in state.get("added_rows", []):
+        new_row = {col: "" for col in df.columns}
+        for col, val in row.items():
+            if val is not None:
+                new_row[col] = str(val).strip()
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+        base_row = {col: "" for col in df.columns}
+        oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
+
+    for idx in range(len(df)):
+        rij_data = df.iloc[idx]
+        klant_cel = str(rij_data.get("klant", "")).strip()
+        rij_naam = f"klant '{klant_cel}'" if klant_cel else f"rij {idx + 1}"
+
+        def revert_cel(kolom, foutmelding, current_idx=idx, current_rij_naam=rij_naam):
+            weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
+            df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        for col in ("N_klant", "waarde_laag"):
+            val_str = str(df.at[idx, col]).strip()
+            if val_str == "":
+                continue
+
+            val_num = _parse_nl(val_str)
+            if val_num is None:
+                revert_cel(col, f'"{val_str}" is geen geldig getal voor {col}')
+                continue
+
+            if col == "N_klant" and val_num <= 0:
+                revert_cel(col, "N_klant moet groter zijn dan 0")
+            elif col == "waarde_laag" and val_num < 0:
+                revert_cel(col, "waarde_laag mag niet negatief zijn")
+            else:
+                df.at[idx, col] = _format_nl_auto(val_str, 0 if col == "N_klant" else 2)
+
+    deleted_indices = state.get("deleted_rows", [])
+    if deleted_indices:
+        df = df.drop(index=deleted_indices).reset_index(drop=True)
+
+    if weggepoetste_fouten:
+        st.session_state.sso_error = "Invoerfout: " + " ".join(weggepoetste_fouten)
+    else:
+        st.session_state.sso_error = None
+
+    st.session_state.sso_klanten_totaal_tabel = df
+    st.session_state.sso_klanten_totaal_tabel_key += 1
+
+
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
 st.title("auditstat")
 
-tab_nnz, tab_fpe, tab_eval, tab_plan, tab_sso = st.tabs([
+tab_nnz, tab_fpe, tab_eval, tab_plan, tab_sso, tab_theorie = st.tabs([
     "nog nodige zekerheid",
     "foutlozepostenequivalent",
     "evaluatie gestratificeerd",
     "planning gestratificeerd",
     "SSO",
+    "Theorie",
 ])
 
 # Configureer het eerste tabblad voor de berekening van de nog nodige zekerheid.
@@ -1477,17 +1587,15 @@ with tab_plan:
 with tab_sso:
     st.subheader("Gestratificeerde evaluatie van meerdere SSO-klanten")
     st.caption(
-        "Typen posten (bijv. emolumenten, inkoopfacturen) worden met hun "
-        "SSO-brede steekproef (n, k), risico-inschatting en materialiteit "
-        "één keer ingevuld hieronder, en gelden voor alle klanten. Voer "
-        "daarna per klant alleen nog aan welke typen posten die klant "
-        "gebruikt, hoeveel posten van dat type de klant heeft (N_klant) en "
-        "de bijbehorende geldwaarde (waarde_laag). Elk type post wordt per "
-        "klant als een apart stratum behandeld en gezamenlijk geëvalueerd; "
-        "alle klanten worden in één keer berekend."
+        "Vul eerst de totalen voor de SSO als geheel in (stap 1), "
+        "vervolgens de klanten (stap 2). Kies daarna of je per klant nog "
+        "onderscheid wilt maken naar verschillende typen posten (bijv. "
+        "emolumenten, inkoopfacturen), of dat de totalen volstaan (stap "
+        "3). Alle klanten worden in één keer berekend. Zie tabblad "
+        "\u2018Theorie\u2019 voor de onderbouwing van de gebruikte methoden."
     )
 
-    # Geen st.form: beide data_editors gebruiken on_change om elke
+    # Geen st.form: alle data_editors gebruiken on_change om elke
     # celbewerking direct (bij focusverlies) te herformatteren naar
     # NL-notatie, zodat de gebruiker meteen ziet wat hij heeft ingevoerd —
     # ook vóórdat op "evalueer alle klanten" wordt geklikt.
@@ -1504,171 +1612,476 @@ with tab_sso:
         sso_zekerheid_text = st.text_input(
             "zekerheid", value="0,95", key="sso_zekerheid_text"
         )
+        sso_kalibratiemethode = st.radio(
+            "berekeningsmethode",
+            ["momentmatching", "naief"],
+            format_func=lambda m: {
+                "momentmatching": "Momentmatching (aanbevolen)",
+                "naief": "Naïef (benadering, ter vergelijking)",
+            }[m],
+            key="sso_kalibratiemethode",
+        )
+        st.caption(
+            "Een exacte FFT-gebaseerde methode is in ontwikkeling \u2014 "
+            "zie tabblad \u2018Theorie\u2019."
+        )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"
         )
 
     with col_sso_hoofd:
-        st.subheader("typen posten bij de SSO")
-        sso_typen_posten_tabel = st.data_editor(
-            st.session_state.sso_typen_posten_tabel,
+        st.subheader("1. Totalen voor de SSO als geheel")
+        with st.expander("Hoe werkt dit?"):
+            st.markdown(
+                "`n` en `k` zijn de omvang en het aantal fouten van de "
+                "ene, gezamenlijke SSO-brede steekproef; `N totaal` is het "
+                "totaal aantal posten in de hele SSO-populatie en `totale "
+                "massa` de bijbehorende geldwaarde. Zie tabblad "
+                "\u2018Theorie\u2019, sectie 1 voor de achtergrond."
+            )
+        c_n, c_k, c_N, c_massa = st.columns(4)
+        sso_totaal_n_text = c_n.text_input(
+            "n (steekproefomvang)",
+            value=SSO_TOTAAL_VOORBEELD["n"],
+            key="sso_totaal_n_text",
+        )
+        sso_totaal_k_text = c_k.text_input(
+            "k (fouten in steekproef)",
+            value=SSO_TOTAAL_VOORBEELD["k"],
+            key="sso_totaal_k_text",
+        )
+        sso_totaal_N_text = c_N.text_input(
+            "N totaal (aantal posten)",
+            value=SSO_TOTAAL_VOORBEELD["N_totaal"],
+            key="sso_totaal_N_text",
+        )
+        sso_totaal_massa_text = c_massa.text_input(
+            "totale massa (euro\u2019s)",
+            value=SSO_TOTAAL_VOORBEELD["massa"],
+            key="sso_totaal_massa_text",
+        )
+        c_ihr, c_ibr, c_car, c_mat = st.columns(4)
+        sso_totaal_ihr = c_ihr.selectbox(
+            "ihr",
+            RISK_OPTIES,
+            format_func=lambda k: RISK_LABELS.get(k, k),
+            key="sso_totaal_ihr",
+        )
+        sso_totaal_ibr = c_ibr.selectbox(
+            "ibr",
+            RISK_OPTIES,
+            format_func=lambda k: RISK_LABELS.get(k, k),
+            key="sso_totaal_ibr",
+        )
+        sso_totaal_car = c_car.selectbox(
+            "car",
+            RISK_OPTIES,
+            format_func=lambda k: RISK_LABELS.get(k, k),
+            key="sso_totaal_car",
+        )
+        sso_totaal_materialiteit_text = c_mat.text_input(
+            "materialiteit",
+            value=SSO_TOTAAL_VOORBEELD["materialiteit"],
+            key="sso_totaal_materialiteit_text",
+        )
+
+        st.subheader("2. Klanten")
+        st.caption(
+            "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf of "
+            "verwijder de rijen."
+        )
+        sso_klanten_totaal_tabel = st.data_editor(
+            st.session_state.sso_klanten_totaal_tabel,
             width="stretch",
             num_rows="dynamic",
             key=(
-                "sso_typen_posten_tabel_editor_"
-                f"{st.session_state.sso_typen_posten_tabel_key}"
+                "sso_klanten_totaal_tabel_editor_"
+                f"{st.session_state.sso_klanten_totaal_tabel_key}"
             ),
-            on_change=on_sso_typen_posten_tabel_change,
-            column_config={
-                "naam": st.column_config.TextColumn(
-                    "naam", help="Naam van het type post, bijv. Emolumenten."
-                ),
-                "n": st.column_config.TextColumn(
-                    "n", help="Steekproefomvang bij de SSO voor dit type post."
-                ),
-                "k": st.column_config.TextColumn(
-                    "k",
-                    help="Aantal fouten in de SSO-steekproef voor dit type post.",
-                ),
-                "ihr": st.column_config.SelectboxColumn(
-                    "ihr", options=RISK_OPTIES, help="InHerent Risico."
-                ),
-                "ibr": st.column_config.SelectboxColumn(
-                    "ibr", options=RISK_OPTIES, help="Interne BeheersingsRisico."
-                ),
-                "car": st.column_config.SelectboxColumn(
-                    "car", options=RISK_OPTIES, help="CijferAnalyseRisico."
-                ),
-                "materialiteit": st.column_config.TextColumn(
-                    "materialiteit",
-                    help=(
-                        "Materialiteit voor dit type post. Opgevat als "
-                        "fractie als \u2264 1 (bijv. 0,01) anders als "
-                        "bedrag in euro\u2019s."
-                    ),
-                ),
-            },
-        )
-        st.session_state.sso_typen_posten_tabel = sso_typen_posten_tabel
-
-        st.subheader("klanten")
-        sso_typen_posten_namen = [
-            str(n).strip()
-            for n in sso_typen_posten_tabel.get("naam", [])
-            if n is not None and not pd.isna(n) and str(n).strip()
-        ]
-        sso_klanten_tabel = st.data_editor(
-            st.session_state.sso_klanten_tabel,
-            width="stretch",
-            num_rows="dynamic",
-            key=f"sso_klanten_tabel_editor_{st.session_state.sso_klanten_tabel_key}",
-            on_change=on_sso_klanten_tabel_change,
+            on_change=on_sso_klanten_totaal_tabel_change,
             column_config={
                 "klant": st.column_config.TextColumn(
                     "klant", help="Naam van de klant."
                 ),
-                "type_post": st.column_config.SelectboxColumn(
-                    "type_post",
-                    options=sso_typen_posten_namen,
-                    help="Type post (moet overeenkomen met een naam hierboven).",
-                ),
                 "N_klant": st.column_config.TextColumn(
-                    "N_klant", help="Aantal posten van dit type bij de klant."
+                    "N_klant", help="Totaal aantal posten bij de klant."
                 ),
                 "waarde_laag": st.column_config.TextColumn(
                     "waarde_laag",
-                    help="Totale geldwaarde van dit type post bij de klant.",
+                    help="Totale geldwaarde van de posten bij de klant.",
                 ),
             },
         )
-        st.session_state.sso_klanten_tabel = sso_klanten_tabel
+        st.session_state.sso_klanten_totaal_tabel = sso_klanten_totaal_tabel
+
+        st.subheader("3. Onderscheid naar typen posten?")
+        sso_onderscheid = st.radio(
+            "Wil je per klant onderscheid maken naar verschillende typen "
+            "posten (bijv. emolumenten, inkoopfacturen)?",
+            ["nee", "ja"],
+            format_func=lambda v: {
+                "nee": "Nee \u2014 reken met de totalen hierboven",
+                "ja": "Ja \u2014 ik vul per type post aparte gegevens in",
+            }[v],
+            key="sso_onderscheid",
+        )
+
+        sso_typen_posten_tabel = None
+        sso_klanten_tabel = None
+        if sso_onderscheid == "ja":
+            st.subheader("typen posten bij de SSO")
+            st.caption(
+                "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf "
+                "of verwijder de rijen. De som van n en k over de typen "
+                "posten moet overeenkomen met de SSO-brede totalen "
+                "hierboven."
+            )
+            sso_typen_posten_tabel = st.data_editor(
+                st.session_state.sso_typen_posten_tabel,
+                width="stretch",
+                num_rows="dynamic",
+                key=(
+                    "sso_typen_posten_tabel_editor_"
+                    f"{st.session_state.sso_typen_posten_tabel_key}"
+                ),
+                on_change=on_sso_typen_posten_tabel_change,
+                column_config={
+                    "naam": st.column_config.TextColumn(
+                        "naam", help="Naam van het type post, bijv. Emolumenten."
+                    ),
+                    "n": st.column_config.TextColumn(
+                        "n", help="Steekproefomvang bij de SSO voor dit type post."
+                    ),
+                    "k": st.column_config.TextColumn(
+                        "k",
+                        help="Aantal fouten in de SSO-steekproef voor dit type post.",
+                    ),
+                    "ihr": st.column_config.SelectboxColumn(
+                        "ihr", options=RISK_OPTIES, help="InHerent Risico."
+                    ),
+                    "ibr": st.column_config.SelectboxColumn(
+                        "ibr", options=RISK_OPTIES, help="Interne BeheersingsRisico."
+                    ),
+                    "car": st.column_config.SelectboxColumn(
+                        "car", options=RISK_OPTIES, help="CijferAnalyseRisico."
+                    ),
+                    "materialiteit": st.column_config.TextColumn(
+                        "materialiteit",
+                        help=(
+                            "Materialiteit voor dit type post. Opgevat als "
+                            "fractie als \u2264 1 (bijv. 0,01) anders als "
+                            "bedrag in euro\u2019s."
+                        ),
+                    ),
+                },
+            )
+            st.session_state.sso_typen_posten_tabel = sso_typen_posten_tabel
+
+            st.subheader("klanten \u00d7 typen posten")
+            st.caption(
+                "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf "
+                "of verwijder de rijen. Voor elke klant moet de som van "
+                "N_klant en waarde_laag over de typen posten overeenkomen "
+                "met de klanttotalen hierboven."
+            )
+            sso_typen_posten_namen = [
+                str(n).strip()
+                for n in sso_typen_posten_tabel.get("naam", [])
+                if n is not None and not pd.isna(n) and str(n).strip()
+            ]
+            sso_klanten_tabel = st.data_editor(
+                st.session_state.sso_klanten_tabel,
+                width="stretch",
+                num_rows="dynamic",
+                key=f"sso_klanten_tabel_editor_{st.session_state.sso_klanten_tabel_key}",
+                on_change=on_sso_klanten_tabel_change,
+                column_config={
+                    "klant": st.column_config.TextColumn(
+                        "klant", help="Naam van de klant."
+                    ),
+                    "type_post": st.column_config.SelectboxColumn(
+                        "type_post",
+                        options=sso_typen_posten_namen,
+                        help="Type post (moet overeenkomen met een naam hierboven).",
+                    ),
+                    "N_klant": st.column_config.TextColumn(
+                        "N_klant", help="Aantal posten van dit type bij de klant."
+                    ),
+                    "waarde_laag": st.column_config.TextColumn(
+                        "waarde_laag",
+                        help="Totale geldwaarde van dit type post bij de klant.",
+                    ),
+                },
+            )
+            st.session_state.sso_klanten_tabel = sso_klanten_tabel
+
+        # --- Consistentiecontrole (niet-blokkerend, puur informatief) ---
+        sso_consistentie_meldingen = []
+        sso_totaal_n_chk = _parse_nl(sso_totaal_n_text)
+        sso_totaal_k_chk = _parse_nl(sso_totaal_k_text)
+        sso_totaal_N_chk = _parse_nl(sso_totaal_N_text)
+        sso_totaal_massa_chk = _parse_nl(sso_totaal_massa_text)
+
+        sso_klanten_totaal_rijen_chk = [
+            r
+            for r in sso_klanten_totaal_tabel.dropna(how="all").to_dict("records")
+            if r.get("klant") is not None
+            and not pd.isna(r.get("klant"))
+            and str(r.get("klant")).strip()
+        ]
+        som_N_klanten = sum(
+            v
+            for v in (_parse_nl(r.get("N_klant")) for r in sso_klanten_totaal_rijen_chk)
+            if v is not None
+        )
+        som_waarde_klanten = sum(
+            v
+            for v in (
+                _parse_nl(r.get("waarde_laag")) for r in sso_klanten_totaal_rijen_chk
+            )
+            if v is not None
+        )
+        if not _sso_ongeveer_gelijk(som_N_klanten, sso_totaal_N_chk):
+            sso_consistentie_meldingen.append(
+                f"Som van N_klant over klanten ({_nl(som_N_klanten, 0)}) komt "
+                "niet overeen met het SSO-brede totaal N "
+                f"({_nl(sso_totaal_N_chk, 0) if sso_totaal_N_chk is not None else '?'})."
+            )
+        if not _sso_ongeveer_gelijk(som_waarde_klanten, sso_totaal_massa_chk):
+            sso_consistentie_meldingen.append(
+                f"Som van waarde_laag over klanten ({_nl(som_waarde_klanten, 2)}) "
+                "komt niet overeen met de SSO-brede totale massa "
+                f"({_nl(sso_totaal_massa_chk, 2) if sso_totaal_massa_chk is not None else '?'})."
+            )
+
+        if sso_onderscheid == "ja":
+            typen_posten_rijen_chk = [
+                r
+                for r in sso_typen_posten_tabel.dropna(how="all").to_dict("records")
+                if r.get("naam") is not None
+                and not pd.isna(r.get("naam"))
+                and str(r.get("naam")).strip()
+            ]
+            som_n_typen = sum(
+                v
+                for v in (_parse_nl(r.get("n")) for r in typen_posten_rijen_chk)
+                if v is not None
+            )
+            som_k_typen = sum(
+                v
+                for v in (_parse_nl(r.get("k")) for r in typen_posten_rijen_chk)
+                if v is not None
+            )
+            if not _sso_ongeveer_gelijk(som_n_typen, sso_totaal_n_chk):
+                sso_consistentie_meldingen.append(
+                    f"Som van n over typen posten ({_nl(som_n_typen, 0)}) komt "
+                    "niet overeen met het SSO-brede totaal n "
+                    f"({_nl(sso_totaal_n_chk, 0) if sso_totaal_n_chk is not None else '?'})."
+                )
+            if not _sso_ongeveer_gelijk(som_k_typen, sso_totaal_k_chk):
+                sso_consistentie_meldingen.append(
+                    f"Som van k over typen posten ({_nl(som_k_typen, 0)}) komt "
+                    "niet overeen met het SSO-brede totaal k "
+                    f"({_nl(sso_totaal_k_chk, 0) if sso_totaal_k_chk is not None else '?'})."
+                )
+
+            som_per_klant = {}
+            for r in sso_klanten_tabel.dropna(how="all").to_dict("records"):
+                klant_cel = r.get("klant")
+                if (
+                    klant_cel is None
+                    or pd.isna(klant_cel)
+                    or not str(klant_cel).strip()
+                ):
+                    continue
+                klant = str(klant_cel).strip()
+                sommen = som_per_klant.setdefault(
+                    klant, {"N_klant": 0.0, "waarde_laag": 0.0}
+                )
+                n_klant_val = _parse_nl(r.get("N_klant"))
+                waarde_val = _parse_nl(r.get("waarde_laag"))
+                if n_klant_val is not None:
+                    sommen["N_klant"] += n_klant_val
+                if waarde_val is not None:
+                    sommen["waarde_laag"] += waarde_val
+
+            totaal_per_klant = {
+                str(r.get("klant", "")).strip(): r for r in sso_klanten_totaal_rijen_chk
+            }
+            for klant, sommen in som_per_klant.items():
+                totaal_rij = totaal_per_klant.get(klant)
+                if totaal_rij is None:
+                    continue  # Geen klanttotaalregel om tegen te vergelijken.
+                totaal_N = _parse_nl(totaal_rij.get("N_klant"))
+                totaal_waarde = _parse_nl(totaal_rij.get("waarde_laag"))
+                if not _sso_ongeveer_gelijk(sommen["N_klant"], totaal_N):
+                    sso_consistentie_meldingen.append(
+                        f"Klant '{klant}': som van N_klant over typen posten "
+                        f"({_nl(sommen['N_klant'], 0)}) komt niet overeen met "
+                        "de klanttotaalregel "
+                        f"({_nl(totaal_N, 0) if totaal_N is not None else '?'})."
+                    )
+                if not _sso_ongeveer_gelijk(sommen["waarde_laag"], totaal_waarde):
+                    sso_consistentie_meldingen.append(
+                        f"Klant '{klant}': som van waarde_laag over typen "
+                        f"posten ({_nl(sommen['waarde_laag'], 2)}) komt niet "
+                        "overeen met de klanttotaalregel "
+                        f"({_nl(totaal_waarde, 2) if totaal_waarde is not None else '?'})."
+                    )
+
+        if sso_consistentie_meldingen:
+            st.info(
+                "Consistentiecontrole \u2014 dit blokkeert de berekening niet, "
+                "maar controleer of dit klopt:\n\n"
+                + "\n\n".join(sso_consistentie_meldingen)
+            )
 
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
 
     if sso_bereken:
         sso_zekerheid = _parse_nl(sso_zekerheid_text)
+        klanten_fouten = []
+        klanten_rijen_per_klant = {}
 
-        # Typen posten indexeren op naam voor de koppeling met de klantentabel.
-        sso_typen_posten_rijen = sso_typen_posten_tabel.dropna(how="all").to_dict(
-            "records"
-        )
-        sso_typen_posten_rijen = [
-            r
-            for r in sso_typen_posten_rijen
-            if r.get("naam") is not None
-            and not pd.isna(r.get("naam"))
-            and str(r.get("naam")).strip()
-        ]
-        sso_typen_posten_per_naam = {}
-        typen_posten_fouten = []
-        for rij in sso_typen_posten_rijen:
-            naam = str(rij.get("naam", "")).strip()
-            n_val = _parse_nl(rij.get("n"))
-            k_val = _parse_nl(rij.get("k"))
-            materialiteit_ruw = rij.get("materialiteit")
-            materialiteit_val = _parse_nl(materialiteit_ruw)
+        if sso_onderscheid == "nee":
+            sso_totaal_n_val = _parse_nl(sso_totaal_n_text)
+            sso_totaal_k_val = _parse_nl(sso_totaal_k_text)
+            sso_totaal_materialiteit_val = _parse_nl(sso_totaal_materialiteit_text)
 
-            for veld_naam, veld_waarde in (("n", n_val), ("k", k_val)):
+            for veld_naam, veld_waarde, veld_ruw in (
+                ("n", sso_totaal_n_val, sso_totaal_n_text),
+                ("k", sso_totaal_k_val, sso_totaal_k_text),
+            ):
                 if veld_waarde is None:
-                    typen_posten_fouten.append(
-                        f"Type post '{naam}': veld '{veld_naam}' "
-                        f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                    klanten_fouten.append(
+                        f"SSO-totalen: veld '{veld_naam}' (\"{veld_ruw}\") is "
+                        "geen geldig getal."
                     )
-            materialiteit_tekst = (
-                "" if materialiteit_ruw is None else str(materialiteit_ruw).strip()
-            )
-            if materialiteit_tekst != "" and materialiteit_val is None:
-                typen_posten_fouten.append(
-                    f"Type post '{naam}': veld 'materialiteit' "
-                    f'("{materialiteit_ruw}") is geen geldig getal.'
+            materialiteit_tekst_totaal = str(sso_totaal_materialiteit_text).strip()
+            if (
+                materialiteit_tekst_totaal != ""
+                and sso_totaal_materialiteit_val is None
+            ):
+                klanten_fouten.append(
+                    "SSO-totalen: veld 'materialiteit' "
+                    f'("{sso_totaal_materialiteit_text}") is geen geldig getal.'
                 )
 
-            if naam in sso_typen_posten_per_naam:
-                typen_posten_fouten.append(
-                    f"Type post '{naam}' komt meerdere keren voor; namen "
-                    "moeten uniek zijn."
-                )
-            elif n_val is not None and k_val is not None:
-                sso_typen_posten_per_naam[naam] = dict(
-                    naam=naam,
-                    n=n_val,
-                    k=k_val,
-                    ihr=rij.get("ihr", "H"),
-                    ibr=rij.get("ibr", "H"),
-                    car=rij.get("car", "H"),
-                    materialiteit=(
-                        materialiteit_val if materialiteit_val is not None else 0.01
-                    ),
-                )
+            sso_klanten_totaal_rijen = [
+                r
+                for r in sso_klanten_totaal_tabel.dropna(how="all").to_dict("records")
+                if r.get("klant") is not None
+                and not pd.isna(r.get("klant"))
+                and str(r.get("klant")).strip()
+            ]
+            for rij in sso_klanten_totaal_rijen:
+                klant = str(rij.get("klant", "")).strip()
+                N_klant_val = _parse_nl(rij.get("N_klant"))
+                waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
+                for veld_naam, veld_waarde in (
+                    ("N_klant", N_klant_val),
+                    ("waarde_laag", waarde_laag_val),
+                ):
+                    if veld_waarde is None:
+                        klanten_fouten.append(
+                            f"Klant '{klant}': veld '{veld_naam}' "
+                            f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                        )
+                if N_klant_val is None or waarde_laag_val is None:
+                    continue
+                if klant in klanten_rijen_per_klant:
+                    klanten_fouten.append(
+                        f"Klant '{klant}' komt meerdere keren voor; namen "
+                        "moeten uniek zijn."
+                    )
+                    continue
+                if sso_totaal_n_val is None or sso_totaal_k_val is None:
+                    continue
+                klanten_rijen_per_klant[klant] = {
+                    "totaal": dict(
+                        naam="totaal",
+                        n=sso_totaal_n_val,
+                        k=sso_totaal_k_val,
+                        ihr=sso_totaal_ihr,
+                        ibr=sso_totaal_ibr,
+                        car=sso_totaal_car,
+                        materialiteit=(
+                            sso_totaal_materialiteit_val
+                            if sso_totaal_materialiteit_val is not None
+                            else 0.01
+                        ),
+                        N_klant=N_klant_val,
+                        waarde_laag=waarde_laag_val,
+                    )
+                }
 
-        # Klantenrijen groeperen per klant.
-        sso_klanten_rijen = sso_klanten_tabel.dropna(how="all").to_dict("records")
-        sso_klanten_rijen = [
-            r
-            for r in sso_klanten_rijen
-            if r.get("klant") is not None
-            and not pd.isna(r.get("klant"))
-            and str(r.get("klant")).strip()
-        ]
-
-        if sso_zekerheid is None or not (0.0 < sso_zekerheid < 1.0):
-            st.session_state.sso_error = (
-                "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
-            )
-            st.session_state.sso_klanten_res = {}
-            st.session_state.sso_klanten_waarschuwingen = {}
-        elif not sso_typen_posten_per_naam and not typen_posten_fouten:
-            st.session_state.sso_error = "Voer tenminste 1 type post (rij) in."
-            st.session_state.sso_klanten_res = {}
-            st.session_state.sso_klanten_waarschuwingen = {}
-        elif not sso_klanten_rijen:
-            st.session_state.sso_error = "Voer tenminste 1 klant (rij) in."
-            st.session_state.sso_klanten_res = {}
-            st.session_state.sso_klanten_waarschuwingen = {}
+            if not sso_klanten_totaal_rijen:
+                klanten_fouten.append("Voer tenminste 1 klant (rij) in.")
         else:
-            klanten_rijen_per_klant = {}
-            klanten_fouten = []
+            # Typen posten indexeren op naam voor de koppeling met de klantentabel.
+            sso_typen_posten_rijen = [
+                r
+                for r in sso_typen_posten_tabel.dropna(how="all").to_dict("records")
+                if r.get("naam") is not None
+                and not pd.isna(r.get("naam"))
+                and str(r.get("naam")).strip()
+            ]
+            sso_typen_posten_per_naam = {}
+            for rij in sso_typen_posten_rijen:
+                naam = str(rij.get("naam", "")).strip()
+                n_val = _parse_nl(rij.get("n"))
+                k_val = _parse_nl(rij.get("k"))
+                materialiteit_ruw = rij.get("materialiteit")
+                materialiteit_val = _parse_nl(materialiteit_ruw)
+
+                for veld_naam, veld_waarde in (("n", n_val), ("k", k_val)):
+                    if veld_waarde is None:
+                        klanten_fouten.append(
+                            f"Type post '{naam}': veld '{veld_naam}' "
+                            f'("{rij.get(veld_naam)}") is geen geldig getal.'
+                        )
+                materialiteit_tekst = (
+                    "" if materialiteit_ruw is None else str(materialiteit_ruw).strip()
+                )
+                if materialiteit_tekst != "" and materialiteit_val is None:
+                    klanten_fouten.append(
+                        f"Type post '{naam}': veld 'materialiteit' "
+                        f'("{materialiteit_ruw}") is geen geldig getal.'
+                    )
+
+                if naam in sso_typen_posten_per_naam:
+                    klanten_fouten.append(
+                        f"Type post '{naam}' komt meerdere keren voor; namen "
+                        "moeten uniek zijn."
+                    )
+                elif n_val is not None and k_val is not None:
+                    sso_typen_posten_per_naam[naam] = dict(
+                        naam=naam,
+                        n=n_val,
+                        k=k_val,
+                        ihr=rij.get("ihr", "H"),
+                        ibr=rij.get("ibr", "H"),
+                        car=rij.get("car", "H"),
+                        materialiteit=(
+                            materialiteit_val if materialiteit_val is not None else 0.01
+                        ),
+                    )
+
+            if not sso_typen_posten_per_naam and not klanten_fouten:
+                klanten_fouten.append("Voer tenminste 1 type post (rij) in.")
+
+            # Klantenrijen groeperen per klant.
+            sso_klanten_rijen = [
+                r
+                for r in sso_klanten_tabel.dropna(how="all").to_dict("records")
+                if r.get("klant") is not None
+                and not pd.isna(r.get("klant"))
+                and str(r.get("klant")).strip()
+            ]
+            if not sso_klanten_rijen:
+                klanten_fouten.append("Voer tenminste 1 klant (rij) in.")
+
             for rij in sso_klanten_rijen:
                 klant = str(rij.get("klant", "")).strip()
                 type_post = str(rij.get("type_post", "")).strip()
@@ -1710,41 +2123,47 @@ with tab_sso:
                     waarde_laag=waarde_laag_val,
                 )
 
-            alle_fouten = typen_posten_fouten + klanten_fouten
-            if alle_fouten:
-                st.session_state.sso_error = "\n".join(alle_fouten)
-                st.session_state.sso_klanten_res = {}
-                st.session_state.sso_klanten_waarschuwingen = {}
-            else:
-                sso_klanten_res = {}
-                sso_klanten_waarschuwingen = {}
-                berekenings_fouten = []
-                for klant, type_post_dict in klanten_rijen_per_klant.items():
-                    post_typen = list(type_post_dict.values())
-                    try:
-                        with warnings.catch_warnings(record=True) as gevangen:
-                            warnings.simplefilter("always", RuntimeWarning)
-                            resultaat = evalueer_SSO_klant_gestratificeerd(
-                                post_typen,
-                                model=sso_model,
-                                zekerheid=sso_zekerheid,
-                            )
-                        sso_klanten_res[klant] = resultaat
-                        klant_waarschuwingen = [
-                            str(w.message)
-                            for w in gevangen
-                            if issubclass(w.category, RuntimeWarning)
-                        ]
-                        if klant_waarschuwingen:
-                            sso_klanten_waarschuwingen[klant] = klant_waarschuwingen
-                    except ValueError as e:
-                        berekenings_fouten.append(f"Klant '{klant}': {e}")
+        if sso_zekerheid is None or not (0.0 < sso_zekerheid < 1.0):
+            st.session_state.sso_error = (
+                "Voer een geldige zekerheid in tussen 0 en 1 (bijv. 0,95)."
+            )
+            st.session_state.sso_klanten_res = {}
+            st.session_state.sso_klanten_waarschuwingen = {}
+        elif klanten_fouten:
+            st.session_state.sso_error = "\n".join(klanten_fouten)
+            st.session_state.sso_klanten_res = {}
+            st.session_state.sso_klanten_waarschuwingen = {}
+        else:
+            sso_klanten_res = {}
+            sso_klanten_waarschuwingen = {}
+            berekenings_fouten = []
+            for klant, type_post_dict in klanten_rijen_per_klant.items():
+                post_typen = list(type_post_dict.values())
+                try:
+                    with warnings.catch_warnings(record=True) as gevangen:
+                        warnings.simplefilter("always", RuntimeWarning)
+                        resultaat = evalueer_SSO_klant_gestratificeerd(
+                            post_typen,
+                            model=sso_model,
+                            zekerheid=sso_zekerheid,
+                            kalibratiemethode=sso_kalibratiemethode,
+                        )
+                    sso_klanten_res[klant] = resultaat
+                    klant_waarschuwingen = [
+                        str(w.message)
+                        for w in gevangen
+                        if issubclass(w.category, RuntimeWarning)
+                    ]
+                    if klant_waarschuwingen:
+                        sso_klanten_waarschuwingen[klant] = klant_waarschuwingen
+                except ValueError as e:
+                    berekenings_fouten.append(f"Klant '{klant}': {e}")
 
-                st.session_state.sso_klanten_res = sso_klanten_res
-                st.session_state.sso_klanten_waarschuwingen = sso_klanten_waarschuwingen
-                st.session_state.sso_error = (
-                    "\n".join(berekenings_fouten) if berekenings_fouten else None
-                )
+            st.session_state.sso_klanten_res = sso_klanten_res
+            st.session_state.sso_klanten_waarschuwingen = sso_klanten_waarschuwingen
+            st.session_state.sso_error = (
+                "\n".join(berekenings_fouten) if berekenings_fouten else None
+            )
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
@@ -1787,3 +2206,131 @@ with tab_sso:
             st.table(sso_klant_steekproeven_tabel)
             sso_klant_fig = plot_kanskromme(sso_klant_res)
             st.pyplot(sso_klant_fig)
+
+# Theorie-tabblad: de wiskundige onderbouwing per deelonderwerp, apart van
+# de werktabbladen zodat een gebruiker die er niet in geïnteresseerd is er
+# niet doorheen hoeft te scrollen. Dit is een eerste versie: alleen de
+# gewone wiskundige afleiding/redenering, nog geen formeel Lean-bewijs (dat
+# is een apart, toekomstig traject — zie AGENTS.md).
+with tab_theorie:
+    st.subheader("Theoretische achtergrond")
+    st.caption(
+        "Dit tabblad legt per deelonderwerp de onderliggende redenering "
+        "uit. Dit zijn (nog) gewone wiskundige afleidingen, geen formeel "
+        "geverifieerde bewijzen — een Lean-bewijs is een mogelijk "
+        "vervolgtraject."
+    )
+
+    with st.expander(
+        "1. Het idee achter de SSO-steekproef in twee trappen", expanded=True
+    ):
+        st.markdown(
+            "Een shared service organisatie (SSO) verwerkt posten voor "
+            "meerdere klanten tegelijk, en trekt daar **één gezamenlijke "
+            "steekproef** uit: een steekproef van omvang $n$ uit de totale "
+            "SSO-populatie, met $k$ geconstateerde fouten. Om iets te "
+            "zeggen over **één specifieke klant**, moet je er rekening mee "
+            "houden dat die klant maar een deel ($N_\\text{klant}$ posten) "
+            "van die totale populatie vormt. Dat geeft twee lagen van "
+            "onzekerheid:"
+        )
+        st.markdown(
+            "- **Laag 1 — de ware SSO-brede foutkans** $p$: gegeven $(n,k)$ "
+            "is $p$ zelf onzeker; de posterior-verdeling is "
+            "$\\mathrm{Beta}(k+1,\\,n-k+1)$ (bij een vlakke prior)."
+        )
+        st.markdown(
+            "- **Laag 2 — hoeveel van de $N_\\text{klant}$ posten van déze "
+            "klant fout zijn**, *gegeven* $p$: dat is zelf weer onzeker, "
+            "bijvoorbeeld binomiaal verdeeld met kans $p$ over "
+            "$N_\\text{klant}$ posten."
+        )
+        st.markdown(
+            "De uiteindelijke verdeling van de foutfractie bij de klant is "
+            "dus een **mengsel (compound distribution)** over beide lagen: "
+            "eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij "
+            "de klant op zijn beurt weer onzeker. Beide methoden hieronder "
+            "(momentmatching en de naïeve benadering) proberen deze "
+            "samengestelde verdeling op een andere manier te benaderen."
+        )
+
+    with st.expander("2. De naïeve n_klant-poolingformule"):
+        st.markdown(
+            "Een eenvoudige benadering kent de klant een **effectieve "
+            "steekproefomvang** $n_\\text{eff}$ toe, gebaseerd op een "
+            "parallelformule (vergelijkbaar met weerstanden in parallel):"
+        )
+        st.latex(
+            r"n_\text{eff} = \frac{n \cdot N_\text{klant}}{n + N_\text{klant}}"
+            r"\,,\qquad k_\text{eff} = k \cdot \frac{n_\text{eff}}{n}"
+        )
+        st.markdown(
+            "Deze formule is **niet afgeleid uit een kansmodel** — het is "
+            "een plausibiliteitsargument op basis van twee grensgevallen:"
+        )
+        st.markdown(
+            "- Is $N_\\text{klant}$ veel groter dan $n$ (een grote klant "
+            "binnen een kleine SSO-steekproef), dan nadert $n_\\text{eff}$ "
+            "tot $n$: de SSO-steekproef zelf blijft dan de beperkende "
+            "factor.\n"
+            "- Is $N_\\text{klant}$ veel kleiner dan $n$ (een kleine klant "
+            "binnen een grote SSO-steekproef), dan nadert $n_\\text{eff}$ "
+            "tot $N_\\text{klant}$: bij een (vrijwel) volledige controle "
+            "van een kleine populatie kan de effectieve steekproefomvang "
+            "nooit groter zijn dan die populatie zelf."
+        )
+        st.markdown(
+            "$k_\\text{eff}$ wordt proportioneel meegeschaald, zodat de "
+            "geschatte foutfractie $k/n$ behouden blijft. Deze methode "
+            'heet in de app "naïef": ze is eenvoudig te doorzien, maar '
+            "— anders dan momentmatching hieronder — niet gekalibreerd op "
+            "de werkelijke variantie van de samengestelde verdeling. Ze "
+            "dient als vergelijkingsmethode, niet als aanbevolen "
+            "standaard. Een formeel bewijs (of weerlegging) van de "
+            "kwaliteit van deze benadering, bijvoorbeeld in Lean, is een "
+            "mogelijk vervolgtraject."
+        )
+
+    with st.expander("3. Momentmatching-kalibratie (de aanbevolen methode)"):
+        st.markdown(
+            "In plaats van de twee onzekerheidslagen uit punt 1 te "
+            "benaderen met een vuistregel, kalibreert momentmatching een "
+            "effectieve $(n_\\text{eff}, k_\\text{eff})$ zodanig dat de "
+            "resulterende Beta- (binomiaal model) of Gamma-verdeling "
+            "(poisson model) precies **hetzelfde gemiddelde én dezelfde "
+            "variantie** heeft als de werkelijke, continue samengestelde "
+            "verdeling van de foutfractie bij de klant (wet van de totale "
+            "variantie):"
+        )
+        st.latex(
+            r"\mathrm{Var}(X) = \mathbb{E}_p\!\left[\mathrm{Var}(X \mid p)\right]"
+            r" + \mathrm{Var}_p\!\left(\mathbb{E}[X \mid p]\right)"
+        )
+        st.markdown(
+            "Dit behoudt beide onzekerheidslagen voor zover dat binnen één "
+            "Beta/Gamma-verdeling mogelijk is. Bij een absoluut te kleine "
+            "$N_\\text{klant}$ kan het benodigde gemiddelde niet meer "
+            "gecombineerd worden met de juiste variantie binnen die "
+            'familie ("klemming"); de app valt dan terug op een '
+            "kalibratie die exact aansluit bij de grens onder de "
+            "**conservatieve aanname dat elke post volledig goed of "
+            "volledig fout is** — voor elke grootheid $X \\in [0,1]$ met "
+            "gegeven gemiddelde $p$ geldt immers $\\mathrm{Var}(X) \\le "
+            "p(1-p)$, met gelijkheid alleen in dat binaire geval. Zie "
+            "AGENTS.md in de broncode voor de volledige onderbouwing en "
+            "de randgevallen."
+        )
+
+    with st.expander("4. Exacte FFT-gebaseerde methode (in ontwikkeling)"):
+        st.markdown(
+            "Een derde methode — zonder de Beta/Gamma-benadering van "
+            "momentmatching als tussenstap — bouwt de voorspellende "
+            "verdeling van de klant-foutfractie direct op via FFT-"
+            "convolutie van de twee-traps posterior uit punt 1. Dit maakt "
+            "een exacte (in plaats van benaderde) berekening van de "
+            "kanskromme en de maximale fout per klant mogelijk, maar "
+            "vereist een andere manier van samenvoegen van de strata dan "
+            "de huidige implementatie. Deze methode is nog niet "
+            "beschikbaar in de app; de statistische en technische "
+            "uitwerking is een apart vervolgtraject."
+        )
