@@ -1640,8 +1640,8 @@ with tab_sso:
                 "\u2018Theorie\u2019, sectie 1 voor de achtergrond."
             )
         st.caption(
-            "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf of "
-            "verwijder deze."
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "overschrijf of verwijder deze."
         )
         c_n, c_k, c_N, c_massa = st.columns(4)
         sso_totaal_n_text = c_n.text_input(
@@ -1691,8 +1691,8 @@ with tab_sso:
 
         st.subheader("2. Klanten")
         st.caption(
-            "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf of "
-            "verwijder de rijen."
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "overschrijf of verwijder de rijen."
         )
         sso_klanten_totaal_tabel = st.data_editor(
             st.session_state.sso_klanten_totaal_tabel,
@@ -1735,10 +1735,10 @@ with tab_sso:
         if sso_onderscheid == "ja":
             st.subheader("typen posten bij de SSO")
             st.caption(
-                "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf "
-                "of verwijder de rijen. De som van n en k over de typen "
-                "posten moet overeenkomen met de SSO-brede totalen "
-                "hierboven."
+                "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+                "overschrijf of verwijder de rijen. De som van n en k over "
+                "de typen posten moet overeenkomen met de SSO-brede "
+                "totalen hierboven."
             )
             sso_typen_posten_tabel = st.data_editor(
                 st.session_state.sso_typen_posten_tabel,
@@ -1783,10 +1783,10 @@ with tab_sso:
 
             st.subheader("klanten \u00d7 typen posten")
             st.caption(
-                "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf "
-                "of verwijder de rijen. Voor elke klant moet de som van "
-                "N_klant en waarde_laag over de typen posten overeenkomen "
-                "met de klanttotalen hierboven."
+                "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+                "overschrijf of verwijder de rijen. Voor elke klant moet de "
+                "som van N_klant en waarde_laag over de typen posten "
+                "overeenkomen met de klanttotalen hierboven."
             )
             sso_typen_posten_namen = [
                 str(n).strip()
