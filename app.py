@@ -202,22 +202,22 @@ def _sso_ongeveer_gelijk(
 def _teken_sso_steekproefschema():
     """Schematische weergave van de essentiële aanname achter de SSO-methode.
 
-    Binnen de grote cirkel (de totale massa posten van de SSO) staat één
-    pool van posten, standaard grijs. Alleen de posten die daadwerkelijk
-    via een pijl "ontsloten" worden \u2014 vanuit een klant-ovaal of vanuit
-    de SSO-steekproef-ovaal, beide *buiten* de cirkel getekend \u2014
-    krijgen een kleur; de rest blijft grijs, ook al "hoort" elke grijze
-    post in werkelijkheid óók al bij een klant. Dat beeldt de random
-    injectie uit: welke posten precies bij een klant horen, of in de
-    steekproef zitten, ligt niet vast in een patroon. Eén steekproefpijl
-    landt bewust op een post die al door een klantpijl is ontsloten (zwart
-    omcirkeld) \u2014 om te laten zien dat een steekproefpost heel goed kan
-    samenvallen met een post die ook al aantoonbaar bij een specifieke
-    klant hoort.
+    Binnen de grote cirkel (de totale massa posten van de SSO, in het
+    midden) staat één pool van posten, standaard grijs. Alleen de posten
+    die daadwerkelijk via een pijl "ontsloten" worden \u2014 vanuit een
+    klant-ovaal (rechts van de cirkel) of vanuit de SSO-steekproef-ovaal
+    (links van de cirkel, verticaal gecentreerd) \u2014 krijgen een kleur;
+    de rest blijft grijs, ook al "hoort" elke grijze post in werkelijkheid
+    óók al bij een klant. Dat beeldt de random injectie uit: welke posten
+    precies bij een klant horen, of in de steekproef zitten, ligt niet vast
+    in een patroon. Eén steekproefpijl landt bewust op een post die al door
+    een klantpijl is ontsloten (zwart omcirkeld) \u2014 om te laten zien
+    dat een steekproefpost heel goed kan samenvallen met een post die ook
+    al aantoonbaar bij een specifieke klant hoort.
     """
     rng = np.random.default_rng(4821)
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
-    cx, cy, straal = 5.2, 0.0, 3.6
+    cx, cy, straal = 0.0, 0.0, 3.6
 
     def _punten_in_cirkel(n, rng, r_max_frac=0.92):
         punten = []
@@ -232,15 +232,7 @@ def _teken_sso_steekproefschema():
     alle_posten = _punten_in_cirkel(150, rng)
     for x, y in alle_posten:
         ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=0.11,
-                height=0.08,
-                facecolor="#b0b0b0",
-                alpha=0.55,
-                edgecolor="none",
-                zorder=2,
-            )
+            Ellipse((x, y), width=0.11, height=0.08, facecolor="#b0b0b0", alpha=0.55, edgecolor="none", zorder=2)
         )
 
     klant_kleuren = {"Klant A": "#e8a33d", "Klant B": "#4caf7d", "Klant C": "#c768a8"}
@@ -258,21 +250,10 @@ def _teken_sso_steekproefschema():
         kleur = klant_kleuren[naam]
         for i in idxs:
             x, y = alle_posten[i]
-            ax.add_patch(
-                Ellipse(
-                    (x, y),
-                    width=0.15,
-                    height=0.11,
-                    facecolor=kleur,
-                    edgecolor="none",
-                    zorder=4,
-                )
-            )
+            ax.add_patch(Ellipse((x, y), width=0.15, height=0.11, facecolor=kleur, edgecolor="none", zorder=4))
 
     ax.add_patch(
-        Circle(
-            (cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=5
-        )
+        Circle((cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=5)
     )
     ax.text(
         cx,
@@ -292,20 +273,11 @@ def _teken_sso_steekproefschema():
                 punten.append((x, y))
         return punten
 
-    def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, doel_punten):
-        bronpunten = _punten_in_ellips(
-            bron_cx, bron_cy, w * 0.7, h * 0.7, len(doel_punten), rng
-        )
+    def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, doel_punten, rad=0.1):
+        bronpunten = _punten_in_ellips(bron_cx, bron_cy, w * 0.7, h * 0.7, len(doel_punten), rng)
         for (bx, by), (tx, ty) in zip(bronpunten, doel_punten, strict=True):
             ax.add_patch(
-                Ellipse(
-                    (bx, by),
-                    width=0.14,
-                    height=0.1,
-                    facecolor=kleur,
-                    edgecolor="none",
-                    zorder=6,
-                )
+                Ellipse((bx, by), width=0.14, height=0.1, facecolor=kleur, edgecolor="none", zorder=6)
             )
             ax.add_patch(
                 FancyArrowPatch(
@@ -317,16 +289,17 @@ def _teken_sso_steekproefschema():
                     linewidth=0.9,
                     alpha=0.7,
                     zorder=5.5,
-                    connectionstyle="arc3,rad=0.1",
+                    connectionstyle=f"arc3,rad={rad}",
                 )
             )
 
-    # Klant-ovalen (middelgroot), buiten de grote cirkel: hun posten komen
-    # via een random injectie terecht op specifieke, nu gekleurde posten.
+    # Klant-ovalen (middelgroot), rechts van de grote cirkel: hun posten
+    # komen via een random injectie terecht op specifieke, nu gekleurde
+    # posten.
     klant_bronnen = [
-        ("Klant A", -6.0, 2.6, 2.3, 1.9),
-        ("Klant B", -6.0, -0.2, 2.3, 1.9),
-        ("Klant C", -6.0, -2.9, 2.1, 1.7),
+        ("Klant A", 6.0, 2.6, 2.3, 1.9),
+        ("Klant B", 6.0, -0.2, 2.3, 1.9),
+        ("Klant C", 6.0, -2.9, 2.1, 1.7),
     ]
     for naam, bx_c, by_c, w, h in klant_bronnen:
         kleur = klant_kleuren[naam]
@@ -352,13 +325,14 @@ def _teken_sso_steekproefschema():
             fontweight="bold",
         )
         doelpunten = [alle_posten[i] for i in klant_doel_idx[naam]]
-        _teken_pijlen(bx_c, by_c, w, h, kleur, doelpunten)
+        _teken_pijlen(bx_c, by_c, w, h, kleur, doelpunten, rad=-0.1)
 
-    # SSO-steekproef (heel klein), buiten de grote cirkel: vier pijlen naar
-    # nieuwe, nog ongekleurde posten, en \u00e9\u00e9n pijl (als voorbeeld)
-    # naar een al door een klant ontsloten post \u2014 om te laten zien dat
-    # een steekproefpost heel goed kan samenvallen met een post die ook al
-    # aantoonbaar bij een specifieke klant hoort.
+    # SSO-steekproef (heel klein), links van de grote cirkel en verticaal
+    # gecentreerd: vier pijlen naar nieuwe, nog ongekleurde posten, en
+    # \u00e9\u00e9n pijl (als voorbeeld) naar een al door een klant
+    # ontsloten post \u2014 om te laten zien dat een steekproefpost heel
+    # goed kan samenvallen met een post die ook al aantoonbaar bij een
+    # specifieke klant hoort.
     alle_klant_idx = [i for idxs in klant_doel_idx.values() for i in idxs]
     gedeeld_idx = int(rng.choice(alle_klant_idx))
     overige_idx = [i for i in beschikbare_idx[idx_cursor:] if i != gedeeld_idx]
@@ -368,42 +342,26 @@ def _teken_sso_steekproefschema():
     kleur_s = "#c0392b"
     for i in nieuwe_idx:
         x, y = alle_posten[i]
-        ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=0.15,
-                height=0.11,
-                facecolor=kleur_s,
-                edgecolor="none",
-                zorder=4,
-            )
-        )
+        ax.add_patch(Ellipse((x, y), width=0.15, height=0.11, facecolor=kleur_s, edgecolor="none", zorder=4))
 
     # Markeer de gedeelde post duidelijk: een dunne zwarte rand eromheen,
     # plus een kort label.
     gx, gy = alle_posten[gedeeld_idx]
     ax.add_patch(
-        Ellipse(
-            (gx, gy),
-            width=0.3,
-            height=0.22,
-            facecolor="none",
-            edgecolor="black",
-            linewidth=1.3,
-            zorder=7,
-        )
+        Ellipse((gx, gy), width=0.3, height=0.22, facecolor="none", edgecolor="black", linewidth=1.3, zorder=7)
     )
     ax.annotate(
         "steekproefpost die toevallig\nbij deze klant blijkt te horen",
         xy=(gx, gy),
-        xytext=(gx + 0.9, gy + 1.0),
+        xytext=(gx - 2.6, gy + 1.3),
         fontsize=7.5,
         color="#333333",
+        ha="center",
         arrowprops={"arrowstyle": "-", "color": "#333333", "linewidth": 0.7},
         zorder=7,
     )
 
-    sx_c, sy_c, sw, sh = -1.0, -4.9, 1.5, 0.9
+    sx_c, sy_c, sw, sh = -6.0, 0.0, 2.0, 2.0
     ax.add_patch(
         Ellipse(
             (sx_c, sy_c),
@@ -426,10 +384,10 @@ def _teken_sso_steekproefschema():
         fontweight="bold",
     )
     steekproef_doelpunten = [alle_posten[i] for i in steekproef_doel_idx]
-    _teken_pijlen(sx_c, sy_c, sw, sh, kleur_s, steekproef_doelpunten)
+    _teken_pijlen(sx_c, sy_c, sw, sh, kleur_s, steekproef_doelpunten, rad=0.1)
 
-    ax.set_xlim(-8, 10)
-    ax.set_ylim(-6.6, 5.4)
+    ax.set_xlim(-8.8, 8.8)
+    ax.set_ylim(-5.5, 5.7)
     ax.set_aspect("equal")
     ax.axis("off")
     fig.tight_layout()
