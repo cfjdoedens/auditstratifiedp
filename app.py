@@ -1639,6 +1639,10 @@ with tab_sso:
                 "massa` de bijbehorende geldwaarde. Zie tabblad "
                 "\u2018Theorie\u2019, sectie 1 voor de achtergrond."
             )
+        st.caption(
+            "Onderstaande cijfers zijn een voorbeeld \u2014 overschrijf of "
+            "verwijder deze."
+        )
         c_n, c_k, c_N, c_massa = st.columns(4)
         sso_totaal_n_text = c_n.text_input(
             "n (steekproefomvang)",
