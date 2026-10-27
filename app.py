@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
-from matplotlib.patches import Circle, Ellipse, FancyArrowPatch, Wedge
+from matplotlib.patches import Circle, Ellipse, FancyArrowPatch
 
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
     evalueer_SSO_klant_gestratificeerd,
@@ -202,58 +202,72 @@ def _sso_ongeveer_gelijk(
 def _teken_sso_steekproefschema():
     """Schematische weergave van de essentiële aanname achter de SSO-methode.
 
-    De posten van elke klant, en de posten in de SSO-brede steekproef,
-    worden getekend als aparte ovalen *buiten* de grote cirkel van de totale
-    SSO-massa — met pijlen ("random injecties", in wiskundige zin: elke
-    bronpost komt terecht op een eigen, niet-gedeeld punt binnen de totale
-    massa). Omdat elke post bij precies één klant hoort, vormen de klanten
-    (plus "overige klanten") samen een **verdeling in taartpunten** die de
-    hele cirkel vullen — geen losse, willekeurig verspreide gebiedjes. De
-    klant-pijlen landen daarom steeds in hún eigen taartpunt, terwijl de
-    steekproef-pijlen in willekeurig wélk taartpunt mogen landen (nooit
-    "ertussenin" of "erbuiten"): een steekproefpost moet altijd bij één van
-    de klanten horen.
+    Binnen de grote cirkel (de totale massa posten van de SSO) liggen de
+    posten van elke klant (en van "overige klanten") door elkaar heen
+    willekeurig verspreid \u2014 geen aparte gebieden of taartpunten. Dat
+    beeldt de kern van de aanname uit: de posten van elke afzonderlijke
+    klant vormen zelf een *random injectie* (in wiskundige zin: ze liggen
+    verspreid, zonder herkenbaar patroon) op de totale SSO-massa, precies
+    zoals de SSO-brede steekproef dat ook is. Omdat elke post bij precies
+    één klant hoort, landt de steekproef (van buiten de cirkel aangevoerd,
+    met pijlen) bovendien altijd op een reeds bestaande, aan een klant
+    toebehorende stip \u2014 nooit op een "lege" plek.
     """
     rng = np.random.default_rng(4821)
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
 
     # Eén grote cirkel (ook een ovaal, in de brede zin): de totale massa
-    # posten van de SSO, verdeeld in taartpunten die samen de hele cirkel
-    # vullen (de klanten plus "overige klanten" delen de volledige massa).
+    # posten van de SSO.
     cx, cy, straal = 5.2, 0.0, 3.6
-    groepen = [
-        ("Klant A", 0.25, "#e8a33d"),
-        ("Klant B", 0.20, "#4caf7d"),
-        ("Klant C", 0.15, "#c768a8"),
-        ("Overige klanten", 0.40, "#b0b0b0"),
-    ]
-    start = 90.0
-    taartpunten = {}
-    for naam, fractie, kleur in groepen:
-        eind = start - fractie * 360.0
+
+    def _punten_in_cirkel(n, rng, r_max_frac=0.92):
+        punten = []
+        while len(punten) < n:
+            hoek = rng.uniform(0, 2 * math.pi)
+            r = straal * r_max_frac * math.sqrt(rng.uniform(0, 1))
+            punten.append((cx + r * math.cos(hoek), cy + r * math.sin(hoek)))
+        return punten
+
+    # Achtergrond: "overige klanten" \u2014 posten verspreid over de hele
+    # massa (grijs, licht), zodat duidelijk is dat de getoonde klanten niet
+    # per se de hele SSO vormen.
+    overige_posten = _punten_in_cirkel(90, rng)
+    for x, y in overige_posten:
         ax.add_patch(
-            Wedge(
-                (cx, cy),
-                straal,
-                eind,
-                start,
-                facecolor=kleur,
-                alpha=0.35,
-                edgecolor="white",
-                linewidth=1.5,
+            Ellipse(
+                (x, y),
+                width=0.11,
+                height=0.08,
+                facecolor="#b0b0b0",
+                alpha=0.55,
+                edgecolor="none",
                 zorder=2,
             )
         )
-        midden_hoek = math.radians((start + eind) / 2)
-        lx = cx + straal * 0.62 * math.cos(midden_hoek)
-        ly = cy + straal * 0.62 * math.sin(midden_hoek)
-        ax.text(lx, ly, naam, ha="center", va="center", fontsize=8.5)
-        taartpunten[naam] = (start, eind)
-        start = eind
+
+    # Klanten: ieders posten zélf ook willekeurig verspreid over de HELE
+    # massa (geen apart gebied) \u2014 dat is de random injectie.
+    klant_kleuren = {"Klant A": "#e8a33d", "Klant B": "#4caf7d", "Klant C": "#c768a8"}
+    klant_aantallen = {"Klant A": 22, "Klant B": 18, "Klant C": 14}
+    klant_posten = {}
+    for naam, kleur in klant_kleuren.items():
+        posten = _punten_in_cirkel(klant_aantallen[naam], rng)
+        klant_posten[naam] = posten
+        for x, y in posten:
+            ax.add_patch(
+                Ellipse(
+                    (x, y),
+                    width=0.13,
+                    height=0.095,
+                    facecolor=kleur,
+                    edgecolor="none",
+                    zorder=3,
+                )
+            )
 
     ax.add_patch(
         Circle(
-            (cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=3
+            (cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=4
         )
     )
     ax.text(
@@ -274,18 +288,11 @@ def _teken_sso_steekproefschema():
                 punten.append((x, y))
         return punten
 
-    def _punt_in_taartpunt(theta1, theta2, rng, r_max_frac=0.85):
-        hoek = math.radians(rng.uniform(theta2, theta1))
-        r = straal * r_max_frac * math.sqrt(rng.uniform(0.15, 1.0))
-        return cx + r * math.cos(hoek), cy + r * math.sin(hoek)
-
-    def _punt_overal(rng, r_max_frac=0.85):
-        hoek = math.radians(rng.uniform(0, 360))
-        r = straal * r_max_frac * math.sqrt(rng.uniform(0.0, 1.0))
-        return cx + r * math.cos(hoek), cy + r * math.sin(hoek)
-
-    def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, n, doelfunctie):
-        for bx, by in _punten_in_ellips(bron_cx, bron_cy, w * 0.7, h * 0.7, n, rng):
+    def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, n, doelen):
+        bronpunten = _punten_in_ellips(bron_cx, bron_cy, w * 0.7, h * 0.7, n, rng)
+        indices = rng.choice(len(doelen), size=n, replace=False)
+        gekozen_doelen = [doelen[i] for i in indices]
+        for (bx, by), (tx, ty) in zip(bronpunten, gekozen_doelen, strict=True):
             ax.add_patch(
                 Ellipse(
                     (bx, by),
@@ -293,18 +300,7 @@ def _teken_sso_steekproefschema():
                     height=0.1,
                     facecolor=kleur,
                     edgecolor="none",
-                    zorder=4,
-                )
-            )
-            tx, ty = doelfunctie()
-            ax.add_patch(
-                Ellipse(
-                    (tx, ty),
-                    width=0.14,
-                    height=0.1,
-                    facecolor=kleur,
-                    edgecolor="none",
-                    zorder=4,
+                    zorder=5,
                 )
             )
             ax.add_patch(
@@ -315,14 +311,15 @@ def _teken_sso_steekproefschema():
                     mutation_scale=8,
                     color=kleur,
                     linewidth=0.9,
-                    alpha=0.75,
-                    zorder=3.5,
-                    connectionstyle="arc3,rad=0.08",
+                    alpha=0.7,
+                    zorder=4.5,
+                    connectionstyle="arc3,rad=0.1",
                 )
             )
 
     # Klant-ovalen (middelgroot), buiten de grote cirkel: hun posten komen
-    # via een random injectie terecht in HÚN EIGEN taartpunt.
+    # via een random injectie terecht op al bestaande, eigen-kleurige
+    # stippen \u2014 verspreid over de hele massa, niet in een apart gebied.
     klant_bronnen = [
         ("Klant A", -6.0, 2.6, 2.3, 1.9, "#e8a33d", 4),
         ("Klant B", -6.0, -0.2, 2.3, 1.9, "#4caf7d", 4),
@@ -350,20 +347,18 @@ def _teken_sso_steekproefschema():
             color=kleur,
             fontweight="bold",
         )
-        t1, t2 = taartpunten[naam]
-        _teken_pijlen(
-            bx_c,
-            by_c,
-            w,
-            h,
-            kleur,
-            n,
-            lambda t1=t1, t2=t2: _punt_in_taartpunt(t1, t2, rng),
-        )
+        _teken_pijlen(bx_c, by_c, w, h, kleur, n, klant_posten[naam])
 
     # SSO-steekproef (heel klein), buiten de grote cirkel: elke steekproef-
-    # post landt via random injectie ÉRGENS in de totale massa — dus altijd
-    # in één van de taartpunten, nooit erbuiten.
+    # post landt willekeurig op één van de BESTAANDE posten (ongeacht welke
+    # klant) \u2014 dus altijd op een al aan een klant toebehorend punt,
+    # nooit op een lege plek.
+    alle_posten = (
+        overige_posten
+        + klant_posten["Klant A"]
+        + klant_posten["Klant B"]
+        + klant_posten["Klant C"]
+    )
     sx_c, sy_c, sw, sh = -1.0, -4.9, 1.5, 0.9
     kleur_s = "#c0392b"
     ax.add_patch(
@@ -387,7 +382,7 @@ def _teken_sso_steekproefschema():
         color=kleur_s,
         fontweight="bold",
     )
-    _teken_pijlen(sx_c, sy_c, sw, sh, kleur_s, 5, lambda: _punt_overal(rng))
+    _teken_pijlen(sx_c, sy_c, sw, sh, kleur_s, 5, alle_posten)
 
     ax.set_xlim(-8, 10)
     ax.set_ylim(-6.6, 5.4)
@@ -2441,32 +2436,32 @@ with tab_theorie:
         )
         st.markdown(
             "**Essentiële aanname.** De hele methode steunt op één "
-            "aanname: zowel de posten van **elke afzonderlijke klant** als "
-            "de posten in de **SSO-brede steekproef** vormen elk een "
-            "*random injectie* (in wiskundige zin: elke post komt op een "
-            "eigen, niet-gedeeld punt terecht) op de totale massa posten "
-            "van de SSO. Omdat elke post bij precies één klant hoort, "
-            "vormen de klanten samen een **verdeling in taartpunten** die "
-            "de hele SSO-massa vullen: een post uit de SSO-brede "
-            'steekproef kán niet "tussen" of "buiten" de klanten in '
-            "vallen — hij moet altijd bij één van hen horen. Die "
-            "willekeurige, maar onvermijdelijke toewijzing aan een klant "
-            "is precies wat de uit $(n,k)$ geschatte foutkans $p$ ook "
-            "geldig maakt als uitgangspunt voor wat er binnen de posten "
-            "van één klant aan fouten te verwachten is."
+            "aanname: de posten van **elke afzonderlijke klant** liggen "
+            "zelf willekeurig verspreid tussen de posten van de totale "
+            "SSO-massa \u2014 ze vormen een *random injectie* (in "
+            "wiskundige zin: elke post komt op een eigen, niet-gedeeld "
+            "punt terecht, zonder herkenbaar patroon) op die totale massa, "
+            "precies zoals de SSO-brede steekproef dat ook is. Omdat elke "
+            "post bovendien bij precies één klant hoort, landt een post "
+            "uit de SSO-brede steekproef altijd op een al bestaande, aan "
+            "een klant toebehorende plek \u2014 nooit op een \u201cvrije\u201d "
+            "plek die bij niemand hoort. Die combinatie \u2014 willekeurig "
+            "verspreid, én altijd bij een klant horend \u2014 is precies "
+            "wat de uit $(n,k)$ geschatte foutkans $p$ ook geldig maakt "
+            "als uitgangspunt voor wat er binnen de posten van één klant "
+            "aan fouten te verwachten is."
         )
         st.pyplot(_teken_sso_steekproefschema())
         st.caption(
             "Schematische weergave (niet op schaal): de grote cirkel is de "
-            "totale massa posten van de SSO, verdeeld in taartpunten die "
-            "samen de hele cirkel vullen (de klanten plus \u2018overige "
-            "klanten\u2019). De klant-ovalen (middelgroot) en de "
-            "SSO-steekproef-ovaal (heel klein) staan bewust *buiten* die "
-            "massa getekend \u2014 de pijlen stellen de random injectie "
-            "voor. Klant-pijlen landen steeds in hún eigen taartpunt; "
-            "steekproef-pijlen mogen in willekeurig wélk taartpunt landen, "
-            "maar altijd in precies één \u2014 nooit ertussenin of "
-            "erbuiten."
+            "totale massa posten van de SSO. Binnenin liggen de posten van "
+            "elke klant (gekleurde stippen) en van \u2018overige "
+            "klanten\u2019 (grijze stippen) door elkaar heen willekeurig "
+            "verspreid \u2014 geen aparte gebieden. De klant-ovalen "
+            "(middelgroot) en de SSO-steekproef-ovaal (heel klein) staan "
+            "bewust *buiten* die massa getekend; de pijlen stellen de "
+            "random injectie voor en landen altijd op een reeds bestaande, "
+            "gekleurde stip \u2014 nooit op een lege plek."
         )
         st.markdown(
             "- **Laag 1 — de ware SSO-brede foutkans** $p$: gegeven $(n,k)$ "
