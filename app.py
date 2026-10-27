@@ -1641,7 +1641,7 @@ with tab_sso:
             )
         st.caption(
             "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
-            "overschrijf of verwijder deze."
+            "pas deze (indien nodig) aan."
         )
         c_n, c_k, c_N, c_massa = st.columns(4)
         sso_totaal_n_text = c_n.text_input(
