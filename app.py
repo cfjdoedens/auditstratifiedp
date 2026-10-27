@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
-from matplotlib.patches import Ellipse
+from matplotlib.patches import Ellipse, FancyArrowPatch
 
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
     evalueer_SSO_klant_gestratificeerd,
@@ -202,94 +202,138 @@ def _sso_ongeveer_gelijk(
 def _teken_sso_steekproefschema():
     """Schematische weergave van de essentiële aanname achter de SSO-methode.
 
-    Eén grote ovaal stelt de totale massa posten van de SSO voor. Een paar
-    middelgrote ovalen daarbinnen stellen de posten per klant voor —
-    deelverzamelingen van die totale massa. De rode stipjes (zelf heel
-    kleine ovaaltjes) stellen de posten in de ene, SSO-brede steekproef
-    voor: ze zijn verspreid over de hele populatie, dus ook door elke
-    klant-ovaal heen. Dat visualiseert precies de aanname waar de methode
-    op steunt: de SSO-brede steekproef is tegelijk ook een (aselecte)
-    steekproef over de posten van elke afzonderlijke klant.
+    De posten van elke klant, en de posten in de SSO-brede steekproef,
+    worden getekend als aparte ovalen *buiten* de grote ovaal van de totale
+    SSO-massa — met pijlen ("random injecties", in wiskundige zin: elke
+    bronpost komt terecht op een eigen, niet-gedeeld punt binnen de totale
+    massa) die vanuit elke bron-ovaal naar een eigen punt binnen de totale
+    massa wijzen. Dat beeldt uit dat zowel de posten van elke klant als de
+    posten in de steekproef een random injectie zijn op de totale massa
+    posten van de SSO — niet dat ze er letterlijk "in" liggen getekend.
     """
     rng = np.random.default_rng(4821)
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
 
-    # 1. Eén heel grote ovaal: de totale massa posten van de SSO.
-    totaal = Ellipse(
-        (0, 0),
-        width=10,
-        height=6,
-        facecolor="#dbe9f6",
-        edgecolor="#3b6ea5",
-        linewidth=1.5,
-        zorder=1,
+    # Eén heel grote ovaal: de totale massa posten van de SSO.
+    cx_groot, cy_groot = 5.2, 0.0
+    w_groot, h_groot = 7.0, 7.5
+    ax.add_patch(
+        Ellipse(
+            (cx_groot, cy_groot),
+            width=w_groot,
+            height=h_groot,
+            facecolor="#dbe9f6",
+            edgecolor="#3b6ea5",
+            linewidth=1.5,
+            zorder=1,
+        )
     )
-    ax.add_patch(totaal)
-
-    # 2. Een paar middelgrote ovalen: de posten per klant (deelverzamelingen
-    # van de totale massa).
-    klanten = [
-        (-3.0, 0.3, 2.6, 2.2, "#f7d7a8", "Klant A"),
-        (0.3, -1.0, 2.2, 1.8, "#c9e4c5", "Klant B"),
-        (3.0, 0.8, 2.0, 1.6, "#e8c3d9", "Klant C"),
-    ]
-    for x, y, w, h, kleur, naam in klanten:
-        ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=w,
-                height=h,
-                facecolor=kleur,
-                edgecolor="#555555",
-                linewidth=1.0,
-                alpha=0.9,
-                zorder=2,
-            )
-        )
-        ax.text(x, y, naam, ha="center", va="center", fontsize=9)
-
-    # 3. Eén heel klein "ovaaltje" per steekproefpost: de SSO-brede
-    # steekproef, verspreid over de hele populatie (dus niet beperkt tot
-    # één klant-ovaal).
-    n_punten = 35
-    punten = []
-    while len(punten) < n_punten:
-        x = rng.uniform(-5, 5)
-        y = rng.uniform(-3, 3)
-        if (x / 5) ** 2 + (y / 3) ** 2 <= 1:
-            punten.append((x, y))
-    for x, y in punten:
-        ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=0.18,
-                height=0.13,
-                facecolor="#c0392b",
-                edgecolor="none",
-                zorder=3,
-            )
-        )
-
     ax.text(
-        0,
-        3.3,
+        cx_groot,
+        h_groot / 2 + 0.5,
         "Totale massa posten SSO ($N$ totaal)",
         ha="center",
         fontsize=10,
         color="#3b6ea5",
     )
-    ax.text(
-        0,
-        -3.3,
-        "Rode stipjes: posten in de SSO-brede steekproef ($n$) \u2014 "
-        "verspreid over alle klanten",
-        ha="center",
-        fontsize=8.5,
-        color="#c0392b",
-    )
 
-    ax.set_xlim(-5.5, 5.5)
-    ax.set_ylim(-4, 4)
+    def _punten_in_ellips(cx, cy, w, h, n, rng):
+        punten = []
+        while len(punten) < n:
+            x = rng.uniform(cx - w / 2, cx + w / 2)
+            y = rng.uniform(cy - h / 2, cy + h / 2)
+            if ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2 <= 0.85:
+                punten.append((x, y))
+        return punten
+
+    bezette_doelen = []
+
+    def _kies_doelpunt(rng, min_afstand=0.55, pogingen=200):
+        x = y = None
+        for _ in range(pogingen):
+            x = rng.uniform(cx_groot - w_groot / 2 + 0.6, cx_groot + w_groot / 2 - 0.6)
+            y = rng.uniform(cy_groot - h_groot / 2 + 0.6, cy_groot + h_groot / 2 - 0.6)
+            binnen = ((x - cx_groot) / (w_groot / 2 - 0.3)) ** 2 + (
+                (y - cy_groot) / (h_groot / 2 - 0.3)
+            ) ** 2 <= 0.85
+            if binnen and all(
+                (x - bx) ** 2 + (y - by) ** 2 >= min_afstand**2
+                for bx, by in bezette_doelen
+            ):
+                bezette_doelen.append((x, y))
+                return x, y
+        bezette_doelen.append((x, y))
+        return x, y
+
+    # Klant-ovalen (middelgroot) en de SSO-brede steekproef (heel klein),
+    # allemaal *buiten* de grote ovaal, elk met pijlen ("random injecties")
+    # naar eigen, niet-gedeelde punten binnen de grote ovaal.
+    bronnen = [
+        ("Klant A", -6.0, 2.6, 2.3, 1.9, "#e8a33d", 4),
+        ("Klant B", -6.0, -0.2, 2.3, 1.9, "#4caf7d", 4),
+        ("Klant C", -6.0, -2.9, 2.1, 1.7, "#c768a8", 3),
+        ("SSO-steekproef ($n$)", -1.0, -4.9, 1.5, 0.9, "#c0392b", 5),
+    ]
+    for naam, cx, cy, w, h, kleur, n in bronnen:
+        ax.add_patch(
+            Ellipse(
+                (cx, cy),
+                width=w,
+                height=h,
+                facecolor=kleur,
+                alpha=0.25,
+                edgecolor=kleur,
+                linewidth=1.5,
+                zorder=2,
+            )
+        )
+        ax.text(
+            cx,
+            cy + h / 2 + 0.25,
+            naam,
+            ha="center",
+            fontsize=8.5,
+            color=kleur,
+            fontweight="bold",
+        )
+        for bx, by in _punten_in_ellips(cx, cy, w * 0.7, h * 0.7, n, rng):
+            ax.add_patch(
+                Ellipse(
+                    (bx, by),
+                    width=0.14,
+                    height=0.1,
+                    facecolor=kleur,
+                    edgecolor="none",
+                    zorder=3,
+                )
+            )
+            tx, ty = _kies_doelpunt(rng)
+            ax.add_patch(
+                Ellipse(
+                    (tx, ty),
+                    width=0.14,
+                    height=0.1,
+                    facecolor=kleur,
+                    edgecolor="none",
+                    zorder=3,
+                )
+            )
+            ax.add_patch(
+                FancyArrowPatch(
+                    (bx, by),
+                    (tx, ty),
+                    arrowstyle="-|>",
+                    mutation_scale=8,
+                    color=kleur,
+                    linewidth=0.9,
+                    alpha=0.75,
+                    zorder=2.5,
+                    connectionstyle="arc3,rad=0.08",
+                )
+            )
+
+    ax.set_xlim(-8, 10)
+    ax.set_ylim(-6.6, 5)
     ax.set_aspect("equal")
     ax.axis("off")
     fig.tight_layout()
@@ -2340,24 +2384,27 @@ with tab_theorie:
         )
         st.markdown(
             "**Essentiële aanname.** De hele methode steunt op één "
-            "aanname: de steekproef die over de **totale massa van de "
-            "SSO** wordt getrokken, is tegelijk ook een (aselecte) "
-            "steekproef over de massa posten van **elke afzonderlijke "
-            "klant**. De klanten zijn dus geen apart bemonsterde "
-            "deelpopulaties, maar deelverzamelingen van de ene SSO-brede "
-            "populatie waaruit toevallig wordt getrokken. Alleen daardoor "
-            "mag de uit $(n,k)$ geschatte foutkans $p$ ook worden gebruikt "
-            "als uitgangspunt voor wat er binnen de posten van één klant "
-            "aan fouten te verwachten is."
+            "aanname: zowel de posten van **elke afzonderlijke klant** als "
+            "de posten in de **SSO-brede steekproef** vormen elk een "
+            "*random injectie* (in wiskundige zin: elke post komt op een "
+            "eigen, niet-gedeeld punt terecht) op de totale massa posten "
+            "van de SSO. Met andere woorden: welke posten bij een klant "
+            "horen, en welke posten in de steekproef zijn getrokken, zegt "
+            "op zichzelf niets over wáár in de totale populatie ze liggen "
+            "— ze zijn aselect daarbinnen verspreid. Alleen daardoor mag "
+            "de uit $(n,k)$ geschatte foutkans $p$ ook worden gebruikt als "
+            "uitgangspunt voor wat er binnen de posten van één klant aan "
+            "fouten te verwachten is."
         )
         st.pyplot(_teken_sso_steekproefschema())
         st.caption(
             "Schematische weergave (niet op schaal): de grote ovaal is de "
-            "totale massa posten van de SSO, de middelgrote ovalen zijn de "
-            "posten per klant (deelverzamelingen daarvan), en de rode "
-            "stipjes zijn de posten in de ene SSO-brede steekproef \u2014 "
-            "verspreid over de hele populatie en dus ook door elke "
-            "klant-ovaal heen."
+            "totale massa posten van de SSO. De klant-ovalen (middelgroot) "
+            "en de SSO-steekproef-ovaal (heel klein) staan bewust "
+            "*buiten* die massa getekend \u2014 de pijlen stellen de "
+            "random injectie voor: elke post uit een klant of uit de "
+            "steekproef hoort bij een eigen, niet-gedeeld punt binnen de "
+            "totale massa, zonder vast patroon in waar dat punt ligt."
         )
         st.markdown(
             "- **Laag 1 — de ware SSO-brede foutkans** $p$: gegeven $(n,k)$ "
