@@ -2835,9 +2835,7 @@ with tab_sso:
                 "Dit resultaat is niet de optelling van de resultaten van de "
                 "afzonderlijke klanten, maar een eigenstandige berekening die "
                 "alleen uitgaat van de gegevens van de hele SSO: n, k, de "
-                "totale massa, IHR, IBR, CAR en de materialiteit (bij "
-                "onderscheid naar typen posten: per type post). Er is geen "
-                "klantkalibratie."
+                "totale massa, IHR, IBR, CAR en de materialiteit."
             )
             sso_totaal_col1, sso_totaal_col2 = st.columns(2)
             sso_totaal_col1.metric(
