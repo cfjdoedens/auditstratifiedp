@@ -33,6 +33,7 @@ auditstat/
     evalueer_SSO_klant_gestratificeerd.py  # Roept bouw_strata_SSO_klant + eval_stratified aan
     script_SSO.py                     # Demonstratiescript
     invoer_csv.py                     # CSV-uitwisseling van de SSO-invoer: maak_sso_invoer_csv / lees_sso_invoer_csv
+    rapport_pdf.py                    # PDF-rapport van een SSO-evaluatie (reportlab): maak_sso_rapport_pdf
 tests/
   __init__.py
   stratified/              # Spiegelt auditstat/stratified/
@@ -50,6 +51,7 @@ tests/
     test_strata_SSO_klant.py
     test_evalueer_SSO_klant_gestratificeerd.py
     test_invoer_csv.py
+    test_rapport_pdf.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
 pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
@@ -254,7 +256,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-249 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+256 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -380,6 +382,14 @@ De SSO-tab kan de volledige invoer uit één CSV inlezen en weer wegschrijven (u
 **Callback-patroon (`on_sso_csv_upload`):** draait als `on_change`, dus vóór de rerun, waardoor widget-sleutels (`sso_model`, `sso_totaal_*`, ...) en tabel-state veilig gezet kunnen worden; de tabel-key-tellers worden opgehoogd zodat de data_editors verversen, oude resultaten worden gewist. De uploader krijgt na elke verwerking een nieuwe key (`sso_csv_upload_key`), zodat hetzelfde bestand na een wijziging opnieuw kan worden geüpload. De melding gaat via `st.session_state.sso_csv_melding` en wordt eenmalig getoond. De downloadknop wordt pas ná alle invoerwidgets opgebouwd (kolom `col_sso_inst` wordt opnieuw betreden) zodat hij de actuele waarden kent.
 
 **Voorbeeldbestand en formatuitleg (2026-10-29):** onder de downloadknop in `col_sso_inst` staat een tweede downloadknop "Voorbeeldbestand downloaden (CSV)" (`sso_invoer_voorbeeld.csv`, `onderscheid = ja`), gebouwd met `maak_sso_invoer_csv` uit de voorbeeldconstanten `SSO_TOTAAL_VOORBEELD`, `LEGE_SSO_TYPEN_POSTEN_DF`, `LEGE_SSO_KLANTEN_DF` en `LEGE_SSO_KLANTEN_TOTAAL_DF` -- het voorbeeld blijft dus automatisch gelijk aan de voorbeeldinvoer van de app (geverifieerd: wordt door `lees_sso_invoer_csv` geaccepteerd). Daaronder een `st.expander("Uitleg van het CSV-formaat")` met de onderdelen-tabel en de leesregels. Bij wijziging van het formaat in `invoer_csv.py` moet deze uitlegtekst in `app.py` handmatig mee.
+
+## SSO-PDF-rapport (2026-10-29)
+
+`auditstat/sso/rapport_pdf.py` bevat `maak_sso_rapport_pdf(invoer, resultaten, waarschuwingen=None, datum=None) -> bytes` (A4, NL-notatie, DejaVu Sans uit matplotlib's meegeleverde fonts zodat Unicode werkt). `invoer` heeft dezelfde vorm als de uitvoer van `lees_sso_invoer_csv` (`instellingen`, `totaal`, DataFrames `klanten`/`typen_posten`/`klanten_typen`); bij `onderscheid = ja` worden de typen-posten-tabellen getoond, anders de klantentabel. Inhoud: instellingen, SSO-totalen, invoertabellen, samenvattingstabel per klant, waarschuwingen en per klant metrics, steekproeventabel (effectieve n/k) en kanskromme.
+
+**Keuzes (na overleg):** reportlab (niet matplotlib-PdfPages of fpdf2), invoer + resultaten + kanskrommen (geen methodebeschrijving), logica los testbaar in het pakket en niet in `app.py`. `reportlab` is een **optionele** dependency: extra `pdf` in `[project.optional-dependencies]`, plus in beide dev-secties (met `pypdf` voor de tests, die tekst uit de PDF halen) en in `requirements.txt` (Streamlit Cloud). `app.py` importeert de module in `try/except ImportError` en toont zonder reportlab een hint in plaats van de knop.
+
+**App-koppeling:** bij een geslaagde berekening bewaart `app.py` een **momentopname** van de invoer (`st.session_state.sso_rapport_invoer`, kopieën van de tabellen) zodat het rapport bij de resultaten blijft passen als de invoer daarna wordt aangepast. De PDF wordt op verzoek gebouwd (knop "PDF-rapport maken" -> `sso_rapport_pdf` in session state -> `st.download_button`), niet bij elke rerun, omdat het tekenen van de kanskrommen enkele seconden kost. De opgeslagen PDF wordt gewist bij elke nieuwe berekening.
 
 **Valkuil:** de tekstvelden van de SSO-totalen en `sso_zekerheid_text` hebben **geen `value=`** meer; hun standaardwaarden staan in de `session_state`-initialisatie bovenaan `app.py`. Combineren van `value=` met een via de Session State API gezette waarde geeft een Streamlit-logwaarschuwing.
 

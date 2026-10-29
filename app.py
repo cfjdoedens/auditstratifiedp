@@ -15,6 +15,13 @@ from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
     lees_sso_invoer_csv,
     maak_sso_invoer_csv,
 )
+
+try:
+    from auditstat.sso.rapport_pdf import (  # pyrefly: ignore[missing-import]
+        maak_sso_rapport_pdf,
+    )
+except ImportError:  # reportlab is optioneel: pip install auditstat[pdf]
+    maak_sso_rapport_pdf = None
 from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
@@ -141,6 +148,8 @@ for key, standaard in {
     "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
     "sso_klanten_totaal_tabel_key": 0,
     "sso_csv_upload_key": 0,
+    "sso_rapport_invoer": None,
+    "sso_rapport_pdf": None,
     "sso_zekerheid_text": "0,95",
     "sso_totaal_n_text": SSO_TOTAAL_VOORBEELD["n"],
     "sso_totaal_k_text": SSO_TOTAAL_VOORBEELD["k"],
@@ -2402,6 +2411,7 @@ with tab_sso:
         st.error(st.session_state.sso_error)
 
     if sso_bereken:
+        st.session_state.sso_rapport_pdf = None
         sso_zekerheid = _parse_nl(sso_zekerheid_text)
         klanten_fouten = []
         klanten_rijen_per_klant = {}
@@ -2626,6 +2636,30 @@ with tab_sso:
             st.session_state.sso_error = (
                 "\n".join(berekenings_fouten) if berekenings_fouten else None
             )
+            # Momentopname van de invoer waarmee is gerekend, zodat het
+            # PDF-rapport bij de resultaten blijft passen ook als de invoer
+            # daarna nog wordt aangepast.
+            st.session_state.sso_rapport_invoer = {
+                "instellingen": {
+                    "model": sso_model,
+                    "zekerheid": sso_zekerheid_text,
+                    "berekeningsmethode": sso_kalibratiemethode,
+                    "onderscheid": sso_onderscheid,
+                },
+                "totaal": {
+                    "n": sso_totaal_n_text,
+                    "k": sso_totaal_k_text,
+                    "N_totaal": sso_totaal_N_text,
+                    "massa": sso_totaal_massa_text,
+                    "ihr": sso_totaal_ihr,
+                    "ibr": sso_totaal_ibr,
+                    "car": sso_totaal_car,
+                    "materialiteit": sso_totaal_materialiteit_text,
+                },
+                "klanten": st.session_state.sso_klanten_totaal_tabel.copy(),
+                "typen_posten": st.session_state.sso_typen_posten_tabel.copy(),
+                "klanten_typen": st.session_state.sso_klanten_tabel.copy(),
+            }
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
@@ -2639,6 +2673,36 @@ with tab_sso:
             for klant, res in sso_klanten_res.items()
         ])
         st.table(sso_samenvatting)
+
+        if maak_sso_rapport_pdf is None:
+            st.caption(
+                "Voor een PDF-rapport is het pakket \u2018reportlab\u2019 "
+                "nodig (`pip install auditstat[pdf]`)."
+            )
+        elif st.session_state.sso_rapport_invoer is not None:
+            if st.button("PDF-rapport maken", key="sso_rapport_maken"):
+                with st.spinner("Rapport wordt opgebouwd\u2026"):
+                    try:
+                        st.session_state.sso_rapport_pdf = maak_sso_rapport_pdf(
+                            st.session_state.sso_rapport_invoer,
+                            sso_klanten_res,
+                            st.session_state.sso_klanten_waarschuwingen,
+                        )
+                    except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
+                        st.session_state.sso_rapport_pdf = None
+                        st.error(f"Het rapport kon niet worden gemaakt: {e}")
+            if st.session_state.sso_rapport_pdf is not None:
+                st.download_button(
+                    "PDF-rapport downloaden",
+                    data=st.session_state.sso_rapport_pdf,
+                    file_name="sso_rapport.pdf",
+                    mime="application/pdf",
+                    key="sso_rapport_download",
+                    help=(
+                        "Bevat de invoer waarmee is gerekend, de resultaten "
+                        "per klant en de kanskrommen."
+                    ),
+                )
 
         if st.session_state.sso_klanten_waarschuwingen:
             alle_waarschuwingen = [

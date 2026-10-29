@@ -1,0 +1,445 @@
+"""PDF-rapport van een SSO-evaluatie (invoer, resultaten en kanskrommen).
+
+De functie :func:`maak_sso_rapport_pdf` zet de invoer van de SSO-tab en de
+bijbehorende rekenresultaten om in een PDF (A4, Nederlandse getalnotatie)
+en geeft de bytes terug. Er wordt niets naar schijf geschreven.
+
+Dit onderdeel vereist het optionele pakket ``reportlab``
+(``pip install auditstat[pdf]``).
+"""
+
+from __future__ import annotations
+
+import datetime
+import io
+import os
+from xml.sax.saxutils import escape
+
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import (
+        Image,
+        KeepTogether,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+except ImportError as exc:  # pragma: no cover - afhankelijk van de omgeving
+    raise ImportError(
+        "Voor het PDF-rapport is 'reportlab' nodig: pip install auditstat[pdf]"
+    ) from exc
+
+from auditstat._formatting import nl_getal
+from auditstat.sso.invoer_csv import _tekst
+from auditstat.stratified.plot_kanskromme import plot_kanskromme
+
+_LETTER = "DejaVuSans"
+_LETTER_VET = "DejaVuSans-Bold"
+
+_KALIBRATIE_LABELS = {
+    "momentmatching": "Momentmatching",
+    "naief": "Na\u00efef (benadering)",
+}
+
+_INSTELLING_LABELS = [
+    ("model", "Model"),
+    ("zekerheid", "Zekerheid"),
+    ("berekeningsmethode", "Berekeningsmethode"),
+    ("onderscheid", "Onderscheid naar typen posten"),
+]
+_TOTAAL_LABELS = [
+    ("n", "n (steekproefomvang)"),
+    ("k", "k (fouten)"),
+    ("N_totaal", "N totaal (aantal posten)"),
+    ("massa", "Totale massa (euro\u2019s)"),
+    ("ihr", "ihr"),
+    ("ibr", "ibr"),
+    ("car", "car"),
+    ("materialiteit", "Materialiteit"),
+]
+
+
+def _registreer_lettertypen() -> None:
+    """Registreer de met matplotlib meegeleverde DejaVu Sans (Unicode)."""
+    if _LETTER in pdfmetrics.getRegisteredFontNames():
+        return
+    map_ = os.path.join(matplotlib.get_data_path(), "fonts", "ttf")
+    pdfmetrics.registerFont(TTFont(_LETTER, os.path.join(map_, "DejaVuSans.ttf")))
+    pdfmetrics.registerFont(
+        TTFont(_LETTER_VET, os.path.join(map_, "DejaVuSans-Bold.ttf"))
+    )
+    pdfmetrics.registerFontFamily(_LETTER, normal=_LETTER, bold=_LETTER_VET)
+
+
+def _stijlen() -> dict[str, ParagraphStyle]:
+    return {
+        "titel": ParagraphStyle(
+            "titel", fontName=_LETTER_VET, fontSize=18, leading=22, spaceAfter=4
+        ),
+        "kop1": ParagraphStyle(
+            "kop1",
+            fontName=_LETTER_VET,
+            fontSize=13,
+            leading=16,
+            spaceBefore=14,
+            spaceAfter=6,
+        ),
+        "kop2": ParagraphStyle(
+            "kop2",
+            fontName=_LETTER_VET,
+            fontSize=11,
+            leading=14,
+            spaceBefore=12,
+            spaceAfter=4,
+        ),
+        "tekst": ParagraphStyle("tekst", fontName=_LETTER, fontSize=9, leading=12),
+        "klein": ParagraphStyle(
+            "klein",
+            fontName=_LETTER,
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#555555"),
+        ),
+        "cel": ParagraphStyle("cel", fontName=_LETTER, fontSize=8.5, leading=11),
+        "cel_rechts": ParagraphStyle(
+            "cel_rechts", fontName=_LETTER, fontSize=8.5, leading=11, alignment=2
+        ),
+        "kop_cel": ParagraphStyle(
+            "kop_cel", fontName=_LETTER_VET, fontSize=8.5, leading=11
+        ),
+        "kop_cel_rechts": ParagraphStyle(
+            "kop_cel_rechts",
+            fontName=_LETTER_VET,
+            fontSize=8.5,
+            leading=11,
+            alignment=2,
+        ),
+        "waarschuwing": ParagraphStyle(
+            "waarschuwing",
+            fontName=_LETTER,
+            fontSize=8.5,
+            leading=11,
+            backColor=colors.HexColor("#FFF4D6"),
+            borderPadding=4,
+            spaceAfter=6,
+        ),
+    }
+
+
+def _tabel(
+    kop: list[str],
+    rijen: list[list[str]],
+    breedtes: list[float],
+    stijlen: dict[str, ParagraphStyle],
+    rechts: set[int] | None = None,
+) -> Table:
+    """Eenvoudige opgemaakte tabel; kolommen in `rechts` rechts uitgelijnd."""
+    rechts = rechts or set()
+
+    def cel(tekst: str, i: int, is_kop: bool) -> Paragraph:
+        naam = ("kop_cel" if is_kop else "cel") + ("_rechts" if i in rechts else "")
+        return Paragraph(escape(tekst), stijlen[naam])
+
+    data = [[cel(t, i, True) for i, t in enumerate(kop)]]
+    data += [[cel(t, i, False) for i, t in enumerate(rij)] for rij in rijen]
+    tabel = Table(data, colWidths=breedtes, repeatRows=1, hAlign="LEFT")
+    tabel.setStyle(
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#7A8794")),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.25, colors.HexColor("#D0D5DA")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ])
+    )
+    return tabel
+
+
+def _df_tabel(
+    df: pd.DataFrame,
+    kolommen: dict[str, str],
+    rechts: set[str],
+    breedte: float,
+    stijlen: dict[str, ParagraphStyle],
+    fracties: list[float] | None = None,
+) -> Table | None:
+    """Tabel uit een DataFrame (lege tabelrijen overgeslagen), of None."""
+    rijen = []
+    for _, rij in df.iterrows():
+        waarden = [_tekst(rij.get(k)) for k in kolommen]
+        if not any(waarden):
+            continue
+        rijen.append(waarden)
+    if not rijen:
+        return None
+    n = len(kolommen)
+    fracties = fracties or [1 / n] * n
+    breedtes = [breedte * f for f in fracties]
+    return _tabel(
+        list(kolommen.values()),
+        rijen,
+        breedtes,
+        stijlen,
+        rechts={i for i, k in enumerate(kolommen) if k in rechts},
+    )
+
+
+def _figuur_als_afbeelding(res: dict, breedte: float) -> Image:
+    """Teken de kanskromme en geef 'm terug als reportlab-afbeelding."""
+    fig = plot_kanskromme(res)
+    try:
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    finally:
+        plt.close(fig)
+    buf.seek(0)
+    from PIL import Image as PilImage  # matplotlib-afhankelijkheid
+
+    with PilImage.open(buf) as im:
+        px_b, px_h = im.size
+    buf.seek(0)
+    hoogte = breedte * px_h / px_b
+    return Image(buf, width=breedte, height=hoogte)
+
+
+def _paginanummer(canvas, doc) -> None:
+    canvas.saveState()
+    canvas.setFont(_LETTER, 8)
+    canvas.setFillColor(colors.HexColor("#555555"))
+    canvas.drawRightString(A4[0] - 2 * cm, 1.2 * cm, f"Pagina {doc.page}")
+    canvas.drawString(2 * cm, 1.2 * cm, "auditstat \u2014 SSO-evaluatierapport")
+    canvas.restoreState()
+
+
+def maak_sso_rapport_pdf(
+    invoer: dict,
+    resultaten: dict,
+    waarschuwingen: dict[str, list[str]] | None = None,
+    datum: datetime.date | None = None,
+) -> bytes:
+    """Maak een PDF-rapport van een SSO-evaluatie.
+
+    Parameters
+    ----------
+    invoer : dict
+        De invoer waarmee is gerekend, in dezelfde vorm als de uitvoer van
+        :func:`auditstat.sso.invoer_csv.lees_sso_invoer_csv`: sleutels
+        ``instellingen`` en ``totaal`` (dicts met tekstwaarden in NL-notatie)
+        en ``klanten``, ``typen_posten``, ``klanten_typen`` (DataFrames of
+        None). Bij ``onderscheid == "ja"`` worden de typen-posten-tabellen
+        getoond, anders de klantentabel.
+    resultaten : dict
+        Per klantnaam het resultaat van
+        :func:`auditstat.sso.evalueer_SSO_klant_gestratificeerd.evalueer_SSO_klant_gestratificeerd`.
+    waarschuwingen : dict, optional
+        Per klantnaam een lijst met waarschuwingsteksten.
+    datum : datetime.date, optional
+        Datum op het rapport (standaard vandaag).
+
+    Returns
+    -------
+    bytes
+        De inhoud van het PDF-bestand.
+
+    Raises
+    ------
+    ValueError
+        Als `resultaten` leeg is.
+    """
+    if not resultaten:
+        raise ValueError("Er zijn geen resultaten om in een rapport op te nemen.")
+
+    _registreer_lettertypen()
+    stijlen = _stijlen()
+    waarschuwingen = waarschuwingen or {}
+    datum = datum or datetime.date.today()
+    instellingen = dict(invoer.get("instellingen") or {})
+    totaal = invoer.get("totaal") or {}
+    breedte = A4[0] - 4 * cm
+
+    onderdelen: list = [
+        Paragraph("SSO-evaluatierapport", stijlen["titel"]),
+        Paragraph(
+            f"Gemaakt op {datum.day}-{datum.month}-{datum.year} met auditstat.",
+            stijlen["klein"],
+        ),
+        Paragraph("Instellingen", stijlen["kop1"]),
+    ]
+
+    onderscheid = instellingen.get("onderscheid", "nee")
+    weergave = dict(instellingen)
+    weergave["berekeningsmethode"] = _KALIBRATIE_LABELS.get(
+        instellingen.get("berekeningsmethode", ""),
+        instellingen.get("berekeningsmethode", ""),
+    )
+    weergave["onderscheid"] = "ja" if onderscheid == "ja" else "nee"
+    onderdelen.append(
+        _tabel(
+            ["Instelling", "Waarde"],
+            [[lbl, _tekst(weergave.get(sl))] for sl, lbl in _INSTELLING_LABELS],
+            [breedte * 0.5, breedte * 0.5],
+            stijlen,
+            rechts={1},
+        )
+    )
+
+    onderdelen.append(Paragraph("SSO-totalen", stijlen["kop1"]))
+    onderdelen.append(
+        _tabel(
+            ["Veld", "Waarde"],
+            [[lbl, _tekst(totaal.get(sl))] for sl, lbl in _TOTAAL_LABELS],
+            [breedte * 0.5, breedte * 0.5],
+            stijlen,
+            rechts={1},
+        )
+    )
+
+    onderdelen.append(Paragraph("Klanten", stijlen["kop1"]))
+    if onderscheid == "ja":
+        tabellen = [
+            (
+                "Typen posten (SSO-breed)",
+                invoer.get("typen_posten"),
+                {
+                    "naam": "Type post",
+                    "n": "n",
+                    "k": "k",
+                    "ihr": "ihr",
+                    "ibr": "ibr",
+                    "car": "car",
+                    "materialiteit": "Materialiteit",
+                },
+                {"n", "k", "materialiteit"},
+                [0.26, 0.12, 0.08, 0.1, 0.1, 0.1, 0.24],
+            ),
+            (
+                "Klanten per type post",
+                invoer.get("klanten_typen"),
+                {
+                    "klant": "Klant",
+                    "type_post": "Type post",
+                    "N_klant": "N klant",
+                    "waarde_laag": "Waarde (euro\u2019s)",
+                },
+                {"N_klant", "waarde_laag"},
+                None,
+            ),
+        ]
+    else:
+        tabellen = [
+            (
+                None,
+                invoer.get("klanten"),
+                {
+                    "klant": "Klant",
+                    "N_klant": "N klant",
+                    "waarde_laag": "Waarde (euro\u2019s)",
+                },
+                {"N_klant", "waarde_laag"},
+                None,
+            )
+        ]
+    for titel, df, kolommen, rechts, fracties in tabellen:
+        if titel:
+            onderdelen.append(Paragraph(titel, stijlen["kop2"]))
+        tabel = (
+            _df_tabel(df, kolommen, rechts, breedte, stijlen, fracties)
+            if df is not None
+            else None
+        )
+        onderdelen.append(
+            tabel
+            if tabel is not None
+            else Paragraph("(geen gegevens)", stijlen["klein"])
+        )
+
+    onderdelen.append(Paragraph("Resultaat per klant", stijlen["kop1"]))
+    onderdelen.append(
+        _tabel(
+            ["Klant", "Maximale fout (fractie)", "Maximale fout (euro\u2019s)"],
+            [
+                [
+                    klant,
+                    nl_getal(res["max_fout_convolutie"], 4),
+                    nl_getal(res["max_fout_convolutie_geld"], 2),
+                ]
+                for klant, res in resultaten.items()
+            ],
+            [breedte * 0.4, breedte * 0.3, breedte * 0.3],
+            stijlen,
+            rechts={1, 2},
+        )
+    )
+
+    alle_waarschuwingen = [
+        f"Klant \u2019{klant}\u2019: {w}"
+        for klant, ws in waarschuwingen.items()
+        for w in ws
+    ]
+    if alle_waarschuwingen:
+        onderdelen.append(Paragraph("Waarschuwingen", stijlen["kop2"]))
+        for w in alle_waarschuwingen:
+            onderdelen.append(Paragraph(escape(w), stijlen["waarschuwing"]))
+
+    for klant, res in resultaten.items():
+        steekproeven = res["steekproeven"]
+        rijen = [
+            [
+                _tekst(r["naam"]),
+                nl_getal(r["waarde_laag"], 2),
+                nl_getal(r["n_laag"], 2),
+                nl_getal(r["k_laag"], 2),
+            ]
+            for _, r in steekproeven.iterrows()
+        ]
+        blok = [
+            Paragraph(escape(klant), stijlen["kop1"]),
+            Paragraph(
+                "Maximale fout: "
+                f"<b>{nl_getal(res['max_fout_convolutie'], 4)}</b> (fractie), "
+                f"<b>{nl_getal(res['max_fout_convolutie_geld'], 2)}</b> euro\u2019s.",
+                stijlen["tekst"],
+            ),
+            Spacer(1, 6),
+            _tabel(
+                ["Type post", "Waarde (euro\u2019s)", "n (effectief)", "k (effectief)"],
+                rijen,
+                [breedte * 0.34, breedte * 0.26, breedte * 0.2, breedte * 0.2],
+                stijlen,
+                rechts={1, 2, 3},
+            ),
+            Paragraph(
+                "n en k zijn de gekalibreerde, effectieve waarden voor deze "
+                "klant (geen gehele tellingen).",
+                stijlen["klein"],
+            ),
+            Spacer(1, 8),
+        ]
+        onderdelen.append(KeepTogether(blok))
+        onderdelen.append(_figuur_als_afbeelding(res, breedte))
+
+    uit = io.BytesIO()
+    doc = SimpleDocTemplate(
+        uit,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+        title="SSO-evaluatierapport",
+        author="auditstat",
+    )
+    doc.build(onderdelen, onFirstPage=_paginanummer, onLaterPages=_paginanummer)
+    return uit.getvalue()

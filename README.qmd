@@ -574,6 +574,16 @@ invoer = lees_sso_invoer_csv(open("sso_invoer.csv", "rb").read())
 # invoer["typen_posten"] en invoer["klanten_typen"] zijn DataFrames (of None).
 ```
 
+# PDF-rapport van een SSO-evaluatie
+
+Na een berekening in het SSO-tabblad verschijnt onder de samenvattingstabel de knop *PDF-rapport maken*, gevolgd door *PDF-rapport downloaden*. Het rapport bevat de invoer waarmee is gerekend, de resultaten per klant en de kanskrommen. Hiervoor is het optionele pakket `reportlab` nodig:
+
+```bash
+pip install "auditstat[pdf]"
+```
+
+Buiten de app kan hetzelfde met `auditstat.sso.rapport_pdf.maak_sso_rapport_pdf(invoer, resultaten)`, waarbij `invoer` dezelfde vorm heeft als de uitvoer van `lees_sso_invoer_csv`.
+
 # Referenties
 
 * Wikipedia — Convolution
