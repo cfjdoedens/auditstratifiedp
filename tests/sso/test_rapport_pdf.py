@@ -199,3 +199,13 @@ def test_sectie_hele_sso_alleen_met_resultaat_totaal(invoer, resultaten):
     met = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten, resultaat_totaal=totaal))
     assert "Hele SSO" not in zonder
     assert "Hele SSO" in met
+
+
+def test_hele_sso_is_eerste_regel_van_resultaattabel(invoer, resultaten):
+    totaal = evalueer_SSO_totaal(
+        [dict(naam="totaal", n=200, k=4, waarde_laag=2_500_000.0)]
+    )
+    tekst = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten, resultaat_totaal=totaal))
+    na_kop = tekst.split("Resultaat", 1)[1]
+    eerste_klant = next(iter(resultaten))
+    assert na_kop.index("Hele SSO") < na_kop.index(eerste_klant)

@@ -416,3 +416,5 @@ Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op
 **PDF-rapport:** `maak_sso_rapport_pdf(..., resultaat_totaal=None)` voegt een sectie "Hele SSO" toe (tabel + kanskromme) direct na de klantensamenvatting. De stale-modulecontrole in `app.py` controleert nu ook op de parameter `resultaat_totaal`.
 
 Getest in `tests/sso/test_evalueer_SSO_totaal.py` en `tests/sso/test_rapport_pdf.py`; app-flow (ja/nee, incl. PDF) met `AppTest` gecontroleerd.
+
+**Hele SSO als eerste regel van de resultaatsamenvatting (2026-10-29):** onder het kopje "Resultaat" (app) staat "Hele SSO" als eerste regel van de samenvattingstabel, gevolgd door de klanten; in het PDF-rapport geldt hetzelfde voor de tabel onder het kopje "Resultaat" (voorheen "Resultaat per klant"). De regel verschijnt alleen als `sso_totaal_res`/`resultaat_totaal` beschikbaar is. Een klant die zelf "Hele SSO" heet zou in de tabel niet te onderscheiden zijn.

@@ -2730,13 +2730,18 @@ with tab_sso:
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
         st.subheader("Resultaat")
+        sso_samenvatting_bronnen = list(sso_klanten_res.items())
+        if st.session_state.sso_totaal_res is not None:
+            sso_samenvatting_bronnen.insert(
+                0, ("Hele SSO", st.session_state.sso_totaal_res)
+            )
         sso_samenvatting = pd.DataFrame([
             {
                 "klant": klant,
                 "max_fout_fractie": _nl(res["max_fout_convolutie"], 4),
                 "max_fout_euro": _nl(res["max_fout_convolutie_geld"], 2),
             }
-            for klant, res in sso_klanten_res.items()
+            for klant, res in sso_samenvatting_bronnen
         ])
         st.table(sso_samenvatting)
 

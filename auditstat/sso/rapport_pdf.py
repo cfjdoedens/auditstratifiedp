@@ -537,7 +537,7 @@ def maak_sso_rapport_pdf(
             else Paragraph("(geen gegevens)", stijlen["klein"])
         )
 
-    onderdelen.append(Paragraph("Resultaat per klant", stijlen["kop1"]))
+    onderdelen.append(Paragraph("Resultaat", stijlen["kop1"]))
     onderdelen.append(
         _tabel(
             ["Klant", "Maximale fout (fractie)", "Maximale fout (euro\u2019s)"],
@@ -547,7 +547,10 @@ def maak_sso_rapport_pdf(
                     nl_getal(res["max_fout_convolutie"], 4),
                     nl_getal(res["max_fout_convolutie_geld"], 2),
                 ]
-                for klant, res in resultaten.items()
+                for klant, res in (
+                    ([("Hele SSO", resultaat_totaal)] if resultaat_totaal else [])
+                    + list(resultaten.items())
+                )
             ],
             [breedte * 0.4, breedte * 0.3, breedte * 0.3],
             stijlen,
