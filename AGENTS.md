@@ -258,7 +258,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-276 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+277 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -422,3 +422,5 @@ Getest in `tests/sso/test_evalueer_SSO_totaal.py` en `tests/sso/test_rapport_pdf
 **`sso_error` wordt na de berekening getoond (2026-10-29):** het `st.error(sso_error)`-blok staat direct vóór de resultaatsectie, ná het `if sso_bereken:`-blok. Daarvoor stond het erboven, waardoor fouten van de berekeningsknop pas bij de volgende interactie zichtbaar werden (met AppTest aangetoond).
 
 **Imports in `app.py` zijn robuust tegen verouderde modules (2026-10-29):** alle `auditstat`-imports staan in een `for _poging in (1, 2)`-lus. Bij een `ImportError` (typisch: een langlopend proces, bijv. Streamlit Cloud na een push, houdt een oudere `auditstat`-module in het geheugen) worden alle `auditstat*`-modules uit `sys.modules` gehaald en opnieuw geladen (zelfherstel). Lukt het dan nog niet, dan toont de app een duidelijke `st.error` met herstartinstructie plus de technische melding, en `st.stop()`. De optionele `rapport_pdf`-import vangt alleen een ontbrekende `reportlab` af (`e.name`); een andere `ImportError` gaat naar de herstartlogica. Met `AppTest` geverifieerd (zelfherstel en harde melding), niet in de pytest-suite. Nieuwe `auditstat`-imports in `app.py` horen in deze lus.
+
+**Prestaties PDF-rapport (2026-10-29):** de bouwtijd wordt gedomineerd door het tekenen van de kanskrommen (~0,3 s per figuur op Linux, op een trage Windows-omgeving merkbaar langer; bij veel klanten loopt het op). Maatregelen: (1) `_gekleurde_subtitel` in `plot_kanskromme.py` deed twee overbodige `fig.canvas.draw()`-aanroepen (tekstbreedtes meten kan met `get_window_extent(renderer=...)` zonder tekenen); verwijderd, afbeelding pixel-identiek (md5 vergeleken), ~35% sneller, ook voor de plots in de app. (2) `maak_sso_rapport_pdf(..., voortgang=None)` roept `voortgang(fractie, tekst)` aan voor/na elke kanskromme; de app toont daarmee een `st.progress`-balk (houdt ook de verbinding actief, relevant achter proxies). De stale-modulecontrole in `app.py` controleert nu ook op de parameter `voortgang`. Dpi verlagen of `bbox_inches="tight"` weglaten bleek nauwelijks te schelen (~10%).

@@ -210,3 +210,22 @@ def test_hele_sso_is_eerste_regel_van_resultaattabel(invoer, resultaten):
     na_kop = tekst.split("Resultaat", 1)[1]
     eerste_klant = next(iter(resultaten))
     assert na_kop.index("Hele SSO") < na_kop.index(eerste_klant)
+
+
+def test_voortgang_wordt_gemeld_per_kanskromme(invoer, resultaten):
+    totaal = evalueer_SSO_totaal(
+        [dict(naam="totaal", n=200, k=4, waarde_laag=2_500_000.0)]
+    )
+    meldingen = []
+    maak_sso_rapport_pdf(
+        invoer,
+        resultaten,
+        resultaat_totaal=totaal,
+        voortgang=lambda fractie, tekst: meldingen.append((fractie, tekst)),
+    )
+    stappen = len(resultaten) + 1
+    assert len(meldingen) == 2 * stappen
+    assert meldingen[0][0] == 0.0
+    assert meldingen[-1][0] == 1.0
+    fracties = [f for f, _ in meldingen]
+    assert fracties == sorted(fracties)

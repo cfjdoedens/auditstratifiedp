@@ -15,6 +15,7 @@ import importlib.metadata
 import io
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -392,6 +393,7 @@ def maak_sso_rapport_pdf(
     tijdstip: datetime.datetime | None = None,
     methodebeschrijving: bool = False,
     resultaat_totaal: dict | None = None,
+    voortgang: Callable[[float, str], None] | None = None,
 ) -> bytes:
     """Maak een PDF-rapport van een SSO-evaluatie.
 
@@ -419,6 +421,11 @@ def maak_sso_rapport_pdf(
         Resultaat van
         :func:`auditstat.sso.evalueer_SSO_totaal.evalueer_SSO_totaal`; als
         opgegeven komt er een sectie "Hele SSO" met resultaat en kanskromme.
+    voortgang : callable, optional
+        Wordt na elke getekende kanskromme aangeroepen als
+        ``voortgang(fractie, tekst)`` met ``fractie`` tussen 0 en 1, zodat
+        een aanroeper (bijv. een voortgangsbalk) kan tonen dat het werk
+        vordert. Het tekenen van de kanskrommen is het trage deel.
 
     Returns
     -------
@@ -440,6 +447,19 @@ def maak_sso_rapport_pdf(
     instellingen = dict(invoer.get("instellingen") or {})
     totaal = invoer.get("totaal") or {}
     breedte = A4[0] - 4 * cm
+
+    totaal_stappen = len(resultaten) + (1 if resultaat_totaal is not None else 0)
+    gedaan = 0
+
+    def _figuur(res: dict, naam: str) -> Image:
+        nonlocal gedaan
+        if voortgang is not None:
+            voortgang(gedaan / totaal_stappen, f"Kanskromme tekenen: {naam}")
+        afbeelding = _figuur_als_afbeelding(res, breedte)
+        gedaan += 1
+        if voortgang is not None:
+            voortgang(gedaan / totaal_stappen, f"Kanskromme getekend: {naam}")
+        return afbeelding
 
     onderdelen: list = [
         Paragraph("SSO-evaluatierapport", stijlen["titel"]),
@@ -592,7 +612,7 @@ def maak_sso_rapport_pdf(
                 ),
             ])
         )
-        onderdelen.append(_figuur_als_afbeelding(resultaat_totaal, breedte))
+        onderdelen.append(_figuur(resultaat_totaal, "Hele SSO"))
 
     alle_waarschuwingen = [
         f"Klant \u2019{klant}\u2019: {w}"
@@ -639,7 +659,7 @@ def maak_sso_rapport_pdf(
             Spacer(1, 8),
         ]
         onderdelen.append(KeepTogether(blok))
-        onderdelen.append(_figuur_als_afbeelding(res, breedte))
+        onderdelen.append(_figuur(res, klant))
 
     if methodebeschrijving:
         onderdelen += _methode_onderdelen(instellingen, stijlen)

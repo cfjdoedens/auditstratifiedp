@@ -17,7 +17,6 @@ def _gekleurde_subtitel(
     gecentreerd boven de as.
     """
     fig = ax.figure
-    fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
 
     teksten = [
@@ -34,7 +33,6 @@ def _gekleurde_subtitel(
         for tekst, kleur in segmenten
     ]
 
-    fig.canvas.draw()
     breedtes = [t.get_window_extent(renderer=renderer).width for t in teksten]
     totale_breedte = sum(breedtes)
 

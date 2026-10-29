@@ -2820,7 +2820,7 @@ with tab_sso:
                 ),
             )
             if st.button("PDF-rapport maken", key="sso_rapport_maken"):
-                if not {"methodebeschrijving", "resultaat_totaal"} <= set(
+                if not {"methodebeschrijving", "resultaat_totaal", "voortgang"} <= set(
                     inspect.signature(maak_sso_rapport_pdf).parameters
                 ):
                     # Een draaiend proces kan een oudere versie van de
@@ -2833,18 +2833,23 @@ with tab_sso:
                         "\u2192 Reboot app) en probeer het opnieuw."
                     )
                     st.stop()
-                with st.spinner("Rapport wordt opgebouwd\u2026"):
-                    try:
-                        st.session_state.sso_rapport_pdf = maak_sso_rapport_pdf(
-                            st.session_state.sso_rapport_invoer,
-                            sso_klanten_res,
-                            st.session_state.sso_klanten_waarschuwingen,
-                            methodebeschrijving=st.session_state.sso_rapport_methode,
-                            resultaat_totaal=st.session_state.sso_totaal_res,
-                        )
-                    except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
-                        st.session_state.sso_rapport_pdf = None
-                        st.error(f"Het rapport kon niet worden gemaakt: {e}")
+                sso_rapport_balk = st.progress(0.0, text="Rapport wordt opgebouwd\u2026")
+                try:
+                    st.session_state.sso_rapport_pdf = maak_sso_rapport_pdf(
+                        st.session_state.sso_rapport_invoer,
+                        sso_klanten_res,
+                        st.session_state.sso_klanten_waarschuwingen,
+                        methodebeschrijving=st.session_state.sso_rapport_methode,
+                        resultaat_totaal=st.session_state.sso_totaal_res,
+                        voortgang=lambda fractie, tekst: sso_rapport_balk.progress(
+                            fractie, text=tekst
+                        ),
+                    )
+                except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
+                    st.session_state.sso_rapport_pdf = None
+                    st.error(f"Het rapport kon niet worden gemaakt: {e}")
+                finally:
+                    sso_rapport_balk.empty()
             if st.session_state.sso_rapport_pdf is not None:
                 st.download_button(
                     "PDF-rapport downloaden",
