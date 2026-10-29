@@ -11,8 +11,11 @@ Dit onderdeel vereist het optionele pakket ``reportlab``
 from __future__ import annotations
 
 import datetime
+import importlib.metadata
 import io
 import os
+import re
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 import matplotlib
@@ -69,6 +72,29 @@ _TOTAAL_LABELS = [
     ("car", "car"),
     ("materialiteit", "Materialiteit"),
 ]
+
+
+def _auditstat_versie() -> str:
+    """Versie van auditstat waarmee het rapport wordt gemaakt.
+
+    Bij een broncode-checkout (``pyproject.toml`` naast het pakket) is dat de
+    versie uit dat bestand: de metadata van een editable installatie loopt
+    na een versieverhoging achter. Anders de metadata van het geïnstalleerde
+    pakket, en bij gebrek daaraan "onbekend".
+    """
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    try:
+        tekst = pyproject.read_text(encoding="utf-8")
+        if re.search(r'^name\s*=\s*"auditstat"', tekst, re.MULTILINE):
+            m = re.search(r'^version\s*=\s*"([^"]+)"', tekst, re.MULTILINE)
+            if m:
+                return m.group(1)
+    except OSError:
+        pass
+    try:
+        return importlib.metadata.version("auditstat")
+    except importlib.metadata.PackageNotFoundError:
+        return "onbekend"
 
 
 def _registreer_lettertypen() -> None:
@@ -363,7 +389,7 @@ def maak_sso_rapport_pdf(
     invoer: dict,
     resultaten: dict,
     waarschuwingen: dict[str, list[str]] | None = None,
-    datum: datetime.date | None = None,
+    tijdstip: datetime.datetime | None = None,
     methodebeschrijving: bool = False,
 ) -> bytes:
     """Maak een PDF-rapport van een SSO-evaluatie.
@@ -382,8 +408,9 @@ def maak_sso_rapport_pdf(
         :func:`auditstat.sso.evalueer_SSO_klant_gestratificeerd.evalueer_SSO_klant_gestratificeerd`.
     waarschuwingen : dict, optional
         Per klantnaam een lijst met waarschuwingsteksten.
-    datum : datetime.date, optional
-        Datum op het rapport (standaard vandaag).
+    tijdstip : datetime.datetime, optional
+        Datum en tijd van maken, zoals vermeld in het rapport (standaard
+        nu).
     methodebeschrijving : bool, standaard False
         Voeg aan het eind een pagina toe met de gekozen kalibratiemethode
         en de aannames van het model.
@@ -404,7 +431,7 @@ def maak_sso_rapport_pdf(
     _registreer_lettertypen()
     stijlen = _stijlen()
     waarschuwingen = waarschuwingen or {}
-    datum = datum or datetime.date.today()
+    tijdstip = tijdstip or datetime.datetime.now()
     instellingen = dict(invoer.get("instellingen") or {})
     totaal = invoer.get("totaal") or {}
     breedte = A4[0] - 4 * cm
@@ -412,7 +439,7 @@ def maak_sso_rapport_pdf(
     onderdelen: list = [
         Paragraph("SSO-evaluatierapport", stijlen["titel"]),
         Paragraph(
-            f"Gemaakt op {datum.day}-{datum.month}-{datum.year} met auditstat.",
+            f"Gemaakt op {tijdstip.day}-{tijdstip.month}-{tijdstip.year}.",
             stijlen["klein"],
         ),
         Paragraph("Instellingen", stijlen["kop1"]),
@@ -572,6 +599,16 @@ def maak_sso_rapport_pdf(
 
     if methodebeschrijving:
         onderdelen += _methode_onderdelen(instellingen, stijlen)
+
+    onderdelen.append(Spacer(1, 18))
+    onderdelen.append(
+        Paragraph(
+            f"Dit rapport is gemaakt met auditstat versie {escape(_auditstat_versie())} "
+            f"op {tijdstip.day}-{tijdstip.month}-{tijdstip.year} "
+            f"om {tijdstip:%H:%M:%S}.",
+            stijlen["klein"],
+        )
+    )
 
     uit = io.BytesIO()
     doc = SimpleDocTemplate(

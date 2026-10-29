@@ -92,7 +92,7 @@ def invoer():
 
 
 def test_geeft_geldige_pdf_terug(invoer, resultaten):
-    pdf = maak_sso_rapport_pdf(invoer, resultaten, datum=datetime.date(2026, 10, 29))
+    pdf = maak_sso_rapport_pdf(invoer, resultaten, tijdstip=datetime.datetime(2026, 10, 29, 14, 5, 9))
     assert pdf.startswith(b"%PDF-")
     assert pdf.rstrip().endswith(b"%%EOF")
 
@@ -164,3 +164,27 @@ def test_methodebeschrijving_naief_en_poisson(invoer, resultaten):
     assert "poolingformule" in tekst
     assert "negatief-binomiale" in tekst
     assert "momentmatching" not in tekst.split("Methodebeschrijving", 1)[1]
+
+
+def test_colofon_met_versie_en_tijdstip(invoer, resultaten):
+    from auditstat.sso.rapport_pdf import _auditstat_versie
+
+    tekst = _pdf_tekst(
+        maak_sso_rapport_pdf(
+            invoer, resultaten, tijdstip=datetime.datetime(2026, 10, 29, 14, 5, 9)
+        )
+    )
+    tekst = " ".join(tekst.split())
+    assert f"auditstat versie {_auditstat_versie()}" in tekst
+    assert "29-10-2026 om 14:05:09" in tekst
+
+
+def test_versie_komt_uit_pyproject_bij_broncode_checkout():
+    import re
+    from pathlib import Path
+
+    from auditstat.sso.rapport_pdf import _auditstat_versie
+
+    tekst = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text()
+    verwacht = re.search(r'^version\s*=\s*"([^"]+)"', tekst, re.MULTILINE).group(1)
+    assert _auditstat_versie() == verwacht
