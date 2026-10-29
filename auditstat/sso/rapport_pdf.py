@@ -391,6 +391,7 @@ def maak_sso_rapport_pdf(
     waarschuwingen: dict[str, list[str]] | None = None,
     tijdstip: datetime.datetime | None = None,
     methodebeschrijving: bool = False,
+    resultaat_totaal: dict | None = None,
 ) -> bytes:
     """Maak een PDF-rapport van een SSO-evaluatie.
 
@@ -414,6 +415,10 @@ def maak_sso_rapport_pdf(
     methodebeschrijving : bool, standaard False
         Voeg aan het eind een pagina toe met de gekozen kalibratiemethode
         en de aannames van het model.
+    resultaat_totaal : dict, optional
+        Resultaat van
+        :func:`auditstat.sso.evalueer_SSO_totaal.evalueer_SSO_totaal`; als
+        opgegeven komt er een sectie "Hele SSO" met resultaat en kanskromme.
 
     Returns
     -------
@@ -549,6 +554,39 @@ def maak_sso_rapport_pdf(
             rechts={1, 2},
         )
     )
+
+    if resultaat_totaal is not None:
+        onderdelen.append(
+            KeepTogether([
+                Paragraph("Hele SSO", stijlen["kop1"]),
+                Paragraph(
+                    "Evaluatie van de SSO-brede steekproef direct op de "
+                    "totale massa, zonder klantkalibratie. Maximale fout: "
+                    f"<b>{nl_getal(resultaat_totaal['max_fout_convolutie'], 4)}"
+                    "</b> (fractie), "
+                    f"<b>{nl_getal(resultaat_totaal['max_fout_convolutie_geld'], 2)}"
+                    "</b> euro\u2019s.",
+                    stijlen["tekst"],
+                ),
+                Spacer(1, 6),
+                _tabel(
+                    ["Type post", "Waarde (euro\u2019s)", "n", "k"],
+                    [
+                        [
+                            _tekst(r["naam"]),
+                            nl_getal(r["waarde_laag"], 2),
+                            nl_getal(r["n_laag"], 0),
+                            nl_getal(r["k_laag"], 0),
+                        ]
+                        for _, r in resultaat_totaal["steekproeven"].iterrows()
+                    ],
+                    [breedte * 0.34, breedte * 0.26, breedte * 0.2, breedte * 0.2],
+                    stijlen,
+                    rechts={1, 2, 3},
+                ),
+            ])
+        )
+        onderdelen.append(_figuur_als_afbeelding(resultaat_totaal, breedte))
 
     alle_waarschuwingen = [
         f"Klant \u2019{klant}\u2019: {w}"

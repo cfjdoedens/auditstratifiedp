@@ -33,6 +33,7 @@ auditstat/
     evalueer_SSO_klant_gestratificeerd.py  # Roept bouw_strata_SSO_klant + eval_stratified aan
     script_SSO.py                     # Demonstratiescript
     invoer_csv.py                     # CSV-uitwisseling van de SSO-invoer: maak_sso_invoer_csv / lees_sso_invoer_csv
+    evalueer_SSO_totaal.py            # Evaluatie van de hele SSO (geen klantkalibratie): evalueer_SSO_totaal
     rapport_pdf.py                    # PDF-rapport van een SSO-evaluatie (reportlab): maak_sso_rapport_pdf
 tests/
   __init__.py
@@ -51,6 +52,7 @@ tests/
     test_strata_SSO_klant.py
     test_evalueer_SSO_klant_gestratificeerd.py
     test_invoer_csv.py
+    test_evalueer_SSO_totaal.py
     test_rapport_pdf.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
@@ -256,7 +258,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-261 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+270 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -404,3 +406,13 @@ De SSO-tab kan de volledige invoer uit één CSV inlezen en weer wegschrijven (u
 ## Beveiligingsonderhoud
 
 Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op MITM voor tools met eigen CA-store zoals `pip`/`uv`/`certifi`) zijn volgende acties ondernomen: `uv self update` (0.11.28 → 0.13.5, bevat afwijzing van de gecompromitteerde keten), en `uv lock --upgrade-package certifi` + `uv sync` om `certifi` in `uv.lock` bij te werken naar 2026.10.19 (was transitief gepind via streamlit/requests op een kwetsbare versie). GitHub Actions-runners zijn niet getroffen (altijd verse images met actuele `pip`/`certifi`). Check bij toekomstige soortgelijke incidenten `uv.lock` op verouderde `certifi`-pins.
+
+## Evaluatie over de hele SSO (2026-10-29)
+
+`auditstat/sso/evalueer_SSO_totaal.py` bevat `evalueer_SSO_totaal(post_typen, model, zekerheid, methode, granulariteit)`: evalueert de **hele SSO** (niet één klant). Er is geen tweede trap en dus geen kalibratie: de SSO-steekproef `(n, k)` is direct een steekproef uit de populatie waarover geoordeeld wordt. Elk type post wordt één stratum met `n_laag = n`, `k_laag = k` en `waarde_laag` = totale massa van dat type post bij de hele SSO; daarna `eval_stratified`. `n` en `k` moeten geheel zijn (anders `ValueError` met naam type post).
+
+**App:** bij "evalueer alle klanten" wordt dit ook berekend (`st.session_state.sso_totaal_res`, sectie "Hele SSO" onder de klantensamenvatting, met metrics, tabel en kanskromme). Bij onderscheid = nee: één stratum `"totaal"` met de SSO-totalen en `totale massa`; bij ja: één stratum per type post, massa = som van `waarde_laag` over alle klanten. Een fout hierbij komt in `sso_error` als `"SSO totaal: ..."` zonder de klantresultaten te blokkeren.
+
+**PDF-rapport:** `maak_sso_rapport_pdf(..., resultaat_totaal=None)` voegt een sectie "Hele SSO" toe (tabel + kanskromme) direct na de klantensamenvatting. De stale-modulecontrole in `app.py` controleert nu ook op de parameter `resultaat_totaal`.
+
+Getest in `tests/sso/test_evalueer_SSO_totaal.py` en `tests/sso/test_rapport_pdf.py`; app-flow (ja/nee, incl. PDF) met `AppTest` gecontroleerd.

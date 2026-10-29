@@ -13,6 +13,7 @@ matplotlib.use("Agg")
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # noqa: E402
     evalueer_SSO_klant_gestratificeerd,
 )
+from auditstat.sso.evalueer_SSO_totaal import evalueer_SSO_totaal  # noqa: E402
 from auditstat.sso.rapport_pdf import maak_sso_rapport_pdf  # noqa: E402
 
 
@@ -188,3 +189,13 @@ def test_versie_komt_uit_pyproject_bij_broncode_checkout():
     tekst = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text()
     verwacht = re.search(r'^version\s*=\s*"([^"]+)"', tekst, re.MULTILINE).group(1)
     assert _auditstat_versie() == verwacht
+
+
+def test_sectie_hele_sso_alleen_met_resultaat_totaal(invoer, resultaten):
+    totaal = evalueer_SSO_totaal(
+        [dict(naam="totaal", n=200, k=4, waarde_laag=2_500_000.0)]
+    )
+    zonder = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten))
+    met = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten, resultaat_totaal=totaal))
+    assert "Hele SSO" not in zonder
+    assert "Hele SSO" in met

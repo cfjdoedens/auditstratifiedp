@@ -12,6 +12,9 @@ from matplotlib.patches import Circle, Ellipse, FancyArrowPatch
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
     evalueer_SSO_klant_gestratificeerd,
 )
+from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
+    evalueer_SSO_totaal,
+)
 from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
     lees_sso_invoer_csv,
     maak_sso_invoer_csv,
@@ -160,6 +163,7 @@ for key, standaard in {
     "sso_totaal_materialiteit_text": SSO_TOTAAL_VOORBEELD["materialiteit"],
     "sso_klanten_res": {},
     "sso_klanten_waarschuwingen": {},
+    "sso_totaal_res": None,
     "sso_error": None,
 }.items():
     if key not in st.session_state:
@@ -1090,6 +1094,7 @@ def on_sso_csv_upload():
     # Oude resultaten horen niet meer bij de nieuwe invoer.
     st.session_state.sso_klanten_res = {}
     st.session_state.sso_klanten_waarschuwingen = {}
+    st.session_state.sso_totaal_res = None
     st.session_state.sso_error = None
     st.session_state.sso_csv_melding = (
         "success",
@@ -2603,10 +2608,12 @@ with tab_sso:
             )
             st.session_state.sso_klanten_res = {}
             st.session_state.sso_klanten_waarschuwingen = {}
+            st.session_state.sso_totaal_res = None
         elif klanten_fouten:
             st.session_state.sso_error = "\n".join(klanten_fouten)
             st.session_state.sso_klanten_res = {}
             st.session_state.sso_klanten_waarschuwingen = {}
+            st.session_state.sso_totaal_res = None
         else:
             sso_klanten_res = {}
             sso_klanten_waarschuwingen = {}
@@ -2633,8 +2640,65 @@ with tab_sso:
                 except ValueError as e:
                     berekenings_fouten.append(f"Klant '{klant}': {e}")
 
+            # Evaluatie van de hele SSO: de SSO-brede steekproef direct op
+            # de totale massa, zonder klantkalibratie.
+            if sso_onderscheid == "nee":
+                sso_totaal_massa_val = _parse_nl(sso_totaal_massa_text)
+                if sso_totaal_massa_val is None:
+                    sso_totaal_posten = []
+                    berekenings_fouten.append(
+                        "SSO totaal: veld 'totale massa' "
+                        f'("{sso_totaal_massa_text}") is geen geldig getal.'
+                    )
+                else:
+                    sso_totaal_posten = [
+                        dict(
+                            naam="totaal",
+                            n=_parse_nl(sso_totaal_n_text),
+                            k=_parse_nl(sso_totaal_k_text),
+                            ihr=sso_totaal_ihr,
+                            ibr=sso_totaal_ibr,
+                            car=sso_totaal_car,
+                            materialiteit=(
+                                _parse_nl(sso_totaal_materialiteit_text)
+                                if _parse_nl(sso_totaal_materialiteit_text)
+                                is not None
+                                else 0.01
+                            ),
+                            waarde_laag=sso_totaal_massa_val,
+                        )
+                    ]
+            else:
+                # Massa per type post = som over alle klanten.
+                sso_massa_per_type = {}
+                for type_post_dict in klanten_rijen_per_klant.values():
+                    for type_post, post in type_post_dict.items():
+                        sso_massa_per_type[type_post] = (
+                            sso_massa_per_type.get(type_post, 0.0)
+                            + post["waarde_laag"]
+                        )
+                sso_totaal_posten = [
+                    {
+                        key: waarde
+                        for key, waarde in sso_typen_posten_per_naam[naam].items()
+                    }
+                    | {"waarde_laag": massa}
+                    for naam, massa in sso_massa_per_type.items()
+                ]
+            sso_totaal_res = None
+            if sso_totaal_posten:
+                try:
+                    sso_totaal_res = evalueer_SSO_totaal(
+                        sso_totaal_posten,
+                        model=sso_model,
+                        zekerheid=sso_zekerheid,
+                    )
+                except ValueError as e:
+                    berekenings_fouten.append(f"SSO totaal: {e}")
+
             st.session_state.sso_klanten_res = sso_klanten_res
             st.session_state.sso_klanten_waarschuwingen = sso_klanten_waarschuwingen
+            st.session_state.sso_totaal_res = sso_totaal_res
             st.session_state.sso_error = (
                 "\n".join(berekenings_fouten) if berekenings_fouten else None
             )
@@ -2676,6 +2740,32 @@ with tab_sso:
         ])
         st.table(sso_samenvatting)
 
+        sso_totaal_res = st.session_state.sso_totaal_res
+        if sso_totaal_res is not None:
+            st.markdown("#### Hele SSO")
+            st.caption(
+                "Evaluatie van de SSO-brede steekproef direct op de totale "
+                "massa, zonder klantkalibratie."
+            )
+            sso_totaal_col1, sso_totaal_col2 = st.columns(2)
+            sso_totaal_col1.metric(
+                "Maximale fout (fractie)", _nl(sso_totaal_res["max_fout_convolutie"], 4)
+            )
+            sso_totaal_col2.metric(
+                "Maximale fout (euro\u2019s)",
+                _nl(sso_totaal_res["max_fout_convolutie_geld"], 2),
+            )
+            st.table(
+                sso_totaal_res["steekproeven"][
+                    ["naam", "waarde_laag", "n_laag", "k_laag"]
+                ].assign(
+                    waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
+                    n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 0)),
+                    k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 0)),
+                )
+            )
+            st.pyplot(plot_kanskromme(sso_totaal_res))
+
         if maak_sso_rapport_pdf is None:
             st.caption(
                 "Voor een PDF-rapport is het pakket \u2018reportlab\u2019 "
@@ -2692,9 +2782,9 @@ with tab_sso:
                 ),
             )
             if st.button("PDF-rapport maken", key="sso_rapport_maken"):
-                if "methodebeschrijving" not in inspect.signature(
-                    maak_sso_rapport_pdf
-                ).parameters:
+                if not {"methodebeschrijving", "resultaat_totaal"} <= set(
+                    inspect.signature(maak_sso_rapport_pdf).parameters
+                ):
                     # Een draaiend proces kan een oudere versie van de
                     # module in het geheugen houden dan de app verwacht.
                     st.session_state.sso_rapport_pdf = None
@@ -2712,6 +2802,7 @@ with tab_sso:
                             sso_klanten_res,
                             st.session_state.sso_klanten_waarschuwingen,
                             methodebeschrijving=st.session_state.sso_rapport_methode,
+                            resultaat_totaal=st.session_state.sso_totaal_res,
                         )
                     except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
                         st.session_state.sso_rapport_pdf = None
