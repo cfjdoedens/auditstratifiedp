@@ -2740,32 +2740,6 @@ with tab_sso:
         ])
         st.table(sso_samenvatting)
 
-        sso_totaal_res = st.session_state.sso_totaal_res
-        if sso_totaal_res is not None:
-            st.markdown("#### Hele SSO")
-            st.caption(
-                "Evaluatie van de SSO-brede steekproef direct op de totale "
-                "massa, zonder klantkalibratie."
-            )
-            sso_totaal_col1, sso_totaal_col2 = st.columns(2)
-            sso_totaal_col1.metric(
-                "Maximale fout (fractie)", _nl(sso_totaal_res["max_fout_convolutie"], 4)
-            )
-            sso_totaal_col2.metric(
-                "Maximale fout (euro\u2019s)",
-                _nl(sso_totaal_res["max_fout_convolutie_geld"], 2),
-            )
-            st.table(
-                sso_totaal_res["steekproeven"][
-                    ["naam", "waarde_laag", "n_laag", "k_laag"]
-                ].assign(
-                    waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
-                    n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 0)),
-                    k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 0)),
-                )
-            )
-            st.pyplot(plot_kanskromme(sso_totaal_res))
-
         if maak_sso_rapport_pdf is None:
             st.caption(
                 "Voor een PDF-rapport is het pakket \u2018reportlab\u2019 "
@@ -2819,6 +2793,32 @@ with tab_sso:
                         "per klant en de kanskrommen."
                     ),
                 )
+
+        sso_totaal_res = st.session_state.sso_totaal_res
+        if sso_totaal_res is not None:
+            st.markdown("#### Hele SSO")
+            st.caption(
+                "Evaluatie van de SSO-brede steekproef direct op de totale "
+                "massa, zonder klantkalibratie."
+            )
+            sso_totaal_col1, sso_totaal_col2 = st.columns(2)
+            sso_totaal_col1.metric(
+                "Maximale fout (fractie)", _nl(sso_totaal_res["max_fout_convolutie"], 4)
+            )
+            sso_totaal_col2.metric(
+                "Maximale fout (euro\u2019s)",
+                _nl(sso_totaal_res["max_fout_convolutie_geld"], 2),
+            )
+            st.table(
+                sso_totaal_res["steekproeven"][
+                    ["naam", "waarde_laag", "n_laag", "k_laag"]
+                ].assign(
+                    waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2)),
+                    n_laag=lambda d: d["n_laag"].apply(lambda x: _nl(x, 0)),
+                    k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 0)),
+                )
+            )
+            st.pyplot(plot_kanskromme(sso_totaal_res))
 
         if st.session_state.sso_klanten_waarschuwingen:
             alle_waarschuwingen = [
