@@ -243,7 +243,15 @@ def _teken_sso_steekproefschema():
     alle_posten = _punten_in_cirkel(150, rng)
     for x, y in alle_posten:
         ax.add_patch(
-            Ellipse((x, y), width=0.11, height=0.08, facecolor="#b0b0b0", alpha=0.55, edgecolor="none", zorder=2)
+            Ellipse(
+                (x, y),
+                width=0.11,
+                height=0.08,
+                facecolor="#b0b0b0",
+                alpha=0.55,
+                edgecolor="none",
+                zorder=2,
+            )
         )
 
     klant_kleuren = {"Klant A": "#e8a33d", "Klant B": "#4caf7d", "Klant C": "#c768a8"}
@@ -261,10 +269,21 @@ def _teken_sso_steekproefschema():
         kleur = klant_kleuren[naam]
         for i in idxs:
             x, y = alle_posten[i]
-            ax.add_patch(Ellipse((x, y), width=0.15, height=0.11, facecolor=kleur, edgecolor="none", zorder=4))
+            ax.add_patch(
+                Ellipse(
+                    (x, y),
+                    width=0.15,
+                    height=0.11,
+                    facecolor=kleur,
+                    edgecolor="none",
+                    zorder=4,
+                )
+            )
 
     ax.add_patch(
-        Circle((cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=5)
+        Circle(
+            (cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=5
+        )
     )
     ax.text(
         cx,
@@ -285,10 +304,19 @@ def _teken_sso_steekproefschema():
         return punten
 
     def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, doel_punten, rad=0.1):
-        bronpunten = _punten_in_ellips(bron_cx, bron_cy, w * 0.7, h * 0.7, len(doel_punten), rng)
+        bronpunten = _punten_in_ellips(
+            bron_cx, bron_cy, w * 0.7, h * 0.7, len(doel_punten), rng
+        )
         for (bx, by), (tx, ty) in zip(bronpunten, doel_punten, strict=True):
             ax.add_patch(
-                Ellipse((bx, by), width=0.14, height=0.1, facecolor=kleur, edgecolor="none", zorder=6)
+                Ellipse(
+                    (bx, by),
+                    width=0.14,
+                    height=0.1,
+                    facecolor=kleur,
+                    edgecolor="none",
+                    zorder=6,
+                )
             )
             ax.add_patch(
                 FancyArrowPatch(
@@ -353,13 +381,30 @@ def _teken_sso_steekproefschema():
     kleur_s = "#c0392b"
     for i in nieuwe_idx:
         x, y = alle_posten[i]
-        ax.add_patch(Ellipse((x, y), width=0.15, height=0.11, facecolor=kleur_s, edgecolor="none", zorder=4))
+        ax.add_patch(
+            Ellipse(
+                (x, y),
+                width=0.15,
+                height=0.11,
+                facecolor=kleur_s,
+                edgecolor="none",
+                zorder=4,
+            )
+        )
 
     # Markeer de gedeelde post duidelijk: een dunne zwarte rand eromheen,
     # plus een kort label.
     gx, gy = alle_posten[gedeeld_idx]
     ax.add_patch(
-        Ellipse((gx, gy), width=0.3, height=0.22, facecolor="none", edgecolor="black", linewidth=1.3, zorder=7)
+        Ellipse(
+            (gx, gy),
+            width=0.3,
+            height=0.22,
+            facecolor="none",
+            edgecolor="black",
+            linewidth=1.3,
+            zorder=7,
+        )
     )
     ax.annotate(
         "steekproefpost die toevallig\nbij deze klant blijkt te horen",
@@ -994,8 +1039,7 @@ def on_sso_csv_upload():
     except ValueError as fout:
         st.session_state.sso_csv_melding = (
             "error",
-            "CSV niet ingelezen; de huidige invoer is ongewijzigd.\n\n"
-            f"{fout}",
+            f"CSV niet ingelezen; de huidige invoer is ongewijzigd.\n\n{fout}",
         )
         return
 
@@ -2294,6 +2338,65 @@ with tab_sso:
                 "ook als onderscheid op \u2018nee\u2019 staat."
             ),
         )
+        st.download_button(
+            "Voorbeeldbestand downloaden (CSV)",
+            data=maak_sso_invoer_csv(
+                instellingen={
+                    "model": "binomiaal",
+                    "zekerheid": "0,95",
+                    "berekeningsmethode": "momentmatching",
+                    "onderscheid": "ja",
+                },
+                totaal={
+                    **SSO_TOTAAL_VOORBEELD,
+                    "ihr": "H",
+                    "ibr": "H",
+                    "car": "H",
+                },
+                klanten=LEGE_SSO_KLANTEN_TOTAAL_DF,
+                typen_posten=LEGE_SSO_TYPEN_POSTEN_DF,
+                klanten_typen=LEGE_SSO_KLANTEN_DF,
+            ).encode("utf-8-sig"),
+            file_name="sso_invoer_voorbeeld.csv",
+            mime="text/csv",
+            help=(
+                "Een ingevuld voorbeeld in het juiste formaat, om te openen "
+                "in Excel en als uitgangspunt voor een eigen bestand."
+            ),
+        )
+        with st.expander("Uitleg van het CSV-formaat"):
+            st.markdown(
+                "Eén bestand, lang formaat: elke regel is één waarde, in de "
+                "kolommen `onderdeel;klant;type_post;veld;waarde` "
+                "(scheidingsteken `;`, UTF-8).\n\n"
+                "| onderdeel | klant | type_post | velden |\n"
+                "|---|---|---|---|\n"
+                "| `instelling` | leeg | leeg | `model` (binomiaal/poisson), "
+                "`zekerheid`, `berekeningsmethode` (momentmatching/naief), "
+                "`onderscheid` (nee/ja) |\n"
+                "| `totaal` | leeg | leeg | `n`, `k`, `N_totaal`, `massa`, "
+                "`ihr`, `ibr`, `car`, `materialiteit` |\n"
+                "| `klant` | naam | leeg | `N_klant`, `waarde_laag` |\n"
+                "| `type_post` | leeg | naam | `n`, `k`, `ihr`, `ibr`, `car`, "
+                "`materialiteit` |\n"
+                "| `klant_type_post` | naam | naam | `N_klant`, "
+                "`waarde_laag` |\n\n"
+                "Regels voor het inlezen:\n"
+                "- Getallen in Nederlandse notatie: punt als "
+                "duizendtalscheiding, komma als decimaalteken "
+                "(`1.500.000,00`). `1234.56` wordt geweigerd, omdat het "
+                "dubbelzinnig is.\n"
+                "- `ihr`, `ibr`, `car` zijn `H`, `M` of `L`; `materialiteit` "
+                "mag leeg zijn (standaard 0,01).\n"
+                "- Alle velden van een klant, type post of het totaal zijn "
+                "verplicht; dubbele regels worden geweigerd.\n"
+                "- Bij `onderscheid = ja` zijn zowel `type_post`- als "
+                "`klant_type_post`-regels nodig.\n"
+                "- Onderdelen die ontbreken laten de huidige invoer "
+                "ongemoeid.\n"
+                "- Alles-of-niets: bij een fout wordt niets overgenomen en "
+                "toont de app alle gevonden fouten met regelnummer."
+            )
 
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
