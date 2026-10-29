@@ -1,3 +1,4 @@
+import inspect
 import math
 import time
 import warnings
@@ -2691,6 +2692,19 @@ with tab_sso:
                 ),
             )
             if st.button("PDF-rapport maken", key="sso_rapport_maken"):
+                if "methodebeschrijving" not in inspect.signature(
+                    maak_sso_rapport_pdf
+                ).parameters:
+                    # Een draaiend proces kan een oudere versie van de
+                    # module in het geheugen houden dan de app verwacht.
+                    st.session_state.sso_rapport_pdf = None
+                    st.error(
+                        "De geladen rapportmodule is verouderd ten opzichte "
+                        "van de app. Herstart de app (lokaal: stop en start "
+                        "Streamlit opnieuw; op Streamlit Cloud: Manage app "
+                        "\u2192 Reboot app) en probeer het opnieuw."
+                    )
+                    st.stop()
                 with st.spinner("Rapport wordt opgebouwd\u2026"):
                     try:
                         st.session_state.sso_rapport_pdf = maak_sso_rapport_pdf(
