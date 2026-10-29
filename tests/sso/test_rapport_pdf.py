@@ -199,6 +199,7 @@ def test_sectie_hele_sso_alleen_met_resultaat_totaal(invoer, resultaten):
     met = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten, resultaat_totaal=totaal))
     assert "Hele SSO" not in zonder
     assert "Hele SSO" in met
+    assert "eigenstandige" in " ".join(met.split())
 
 
 def test_hele_sso_is_eerste_regel_van_resultaattabel(invoer, resultaten):

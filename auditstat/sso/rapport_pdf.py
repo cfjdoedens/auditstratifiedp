@@ -563,8 +563,12 @@ def maak_sso_rapport_pdf(
             KeepTogether([
                 Paragraph("Hele SSO", stijlen["kop1"]),
                 Paragraph(
-                    "Evaluatie van de SSO-brede steekproef direct op de "
-                    "totale massa, zonder klantkalibratie. Maximale fout: "
+                    "Dit resultaat is niet de optelling van de resultaten "
+                    "van de afzonderlijke klanten, maar een eigenstandige "
+                    "berekening die alleen uitgaat van de gegevens van de "
+                    "hele SSO: n, k, de totale massa, IHR, IBR, CAR en de "
+                    "materialiteit (bij onderscheid naar typen posten: per "
+                    "type post). Er is geen klantkalibratie. Maximale fout: "
                     f"<b>{nl_getal(resultaat_totaal['max_fout_convolutie'], 4)}"
                     "</b> (fractie), "
                     f"<b>{nl_getal(resultaat_totaal['max_fout_convolutie_geld'], 2)}"

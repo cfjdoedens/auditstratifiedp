@@ -2832,8 +2832,12 @@ with tab_sso:
         if sso_totaal_res is not None:
             st.markdown("#### Hele SSO")
             st.caption(
-                "Evaluatie van de SSO-brede steekproef direct op de totale "
-                "massa, zonder klantkalibratie."
+                "Dit resultaat is niet de optelling van de resultaten van de "
+                "afzonderlijke klanten, maar een eigenstandige berekening die "
+                "alleen uitgaat van de gegevens van de hele SSO: n, k, de "
+                "totale massa, IHR, IBR, CAR en de materialiteit (bij "
+                "onderscheid naar typen posten: per type post). Er is geen "
+                "klantkalibratie."
             )
             sso_totaal_col1, sso_totaal_col2 = st.columns(2)
             sso_totaal_col1.metric(
