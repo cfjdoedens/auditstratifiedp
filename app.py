@@ -150,6 +150,7 @@ for key, standaard in {
     "sso_csv_upload_key": 0,
     "sso_rapport_invoer": None,
     "sso_rapport_pdf": None,
+    "sso_rapport_methode": False,
     "sso_zekerheid_text": "0,95",
     "sso_totaal_n_text": SSO_TOTAAL_VOORBEELD["n"],
     "sso_totaal_k_text": SSO_TOTAAL_VOORBEELD["k"],
@@ -2680,6 +2681,15 @@ with tab_sso:
                 "nodig (`pip install auditstat[pdf]`)."
             )
         elif st.session_state.sso_rapport_invoer is not None:
+            st.checkbox(
+                "Methodebeschrijving opnemen in het rapport",
+                key="sso_rapport_methode",
+                on_change=lambda: st.session_state.update(sso_rapport_pdf=None),
+                help=(
+                    "Voegt een pagina toe met de gekozen kalibratiemethode "
+                    "en de aannames van het model."
+                ),
+            )
             if st.button("PDF-rapport maken", key="sso_rapport_maken"):
                 with st.spinner("Rapport wordt opgebouwd\u2026"):
                     try:
@@ -2687,6 +2697,7 @@ with tab_sso:
                             st.session_state.sso_rapport_invoer,
                             sso_klanten_res,
                             st.session_state.sso_klanten_waarschuwingen,
+                            methodebeschrijving=st.session_state.sso_rapport_methode,
                         )
                     except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
                         st.session_state.sso_rapport_pdf = None

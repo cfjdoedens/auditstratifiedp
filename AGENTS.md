@@ -256,7 +256,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-256 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+259 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -388,6 +388,8 @@ De SSO-tab kan de volledige invoer uit één CSV inlezen en weer wegschrijven (u
 `auditstat/sso/rapport_pdf.py` bevat `maak_sso_rapport_pdf(invoer, resultaten, waarschuwingen=None, datum=None) -> bytes` (A4, NL-notatie, DejaVu Sans uit matplotlib's meegeleverde fonts zodat Unicode werkt). `invoer` heeft dezelfde vorm als de uitvoer van `lees_sso_invoer_csv` (`instellingen`, `totaal`, DataFrames `klanten`/`typen_posten`/`klanten_typen`); bij `onderscheid = ja` worden de typen-posten-tabellen getoond, anders de klantentabel. Inhoud: instellingen, SSO-totalen, invoertabellen, samenvattingstabel per klant, waarschuwingen en per klant metrics, steekproeventabel (effectieve n/k) en kanskromme.
 
 **Keuzes (na overleg):** reportlab (niet matplotlib-PdfPages of fpdf2), invoer + resultaten + kanskrommen (geen methodebeschrijving), logica los testbaar in het pakket en niet in `app.py`. `reportlab` is een **optionele** dependency: extra `pdf` in `[project.optional-dependencies]`, plus in beide dev-secties (met `pypdf` voor de tests, die tekst uit de PDF halen) en in `requirements.txt` (Streamlit Cloud). `app.py` importeert de module in `try/except ImportError` en toont zonder reportlab een hint in plaats van de knop.
+
+**Methodebeschrijving (optioneel, 2026-10-29):** `maak_sso_rapport_pdf(..., methodebeschrijving=False)` voegt bij `True` een laatste pagina toe (`_methode_onderdelen`), afgestemd op de instellingen: model (binomiaal/Poisson), kalibratiemethode (momentmatching: samengestelde verdeling, Beta/Gamma-moment-matching, klem- en blinde-vlek-afhandeling bij vaste 95%; naïef: poolingformule, geen klem-afhandeling, alleen ter vergelijking) en de drie aannames (willekeurige verspreiding/random injectie, vlakke prior, elke post volledig goed of fout met Var(X) ≤ p(1-p)). De tekst staat hard in `rapport_pdf.py`; bij inhoudelijke wijzigingen aan `moment_match_SSO`/`naief_SSO` moet die handmatig mee. In de app: checkbox `sso_rapport_methode` (wist de opgeslagen PDF bij wijziging) boven de knop "PDF-rapport maken".
 
 **App-koppeling:** bij een geslaagde berekening bewaart `app.py` een **momentopname** van de invoer (`st.session_state.sso_rapport_invoer`, kopieën van de tabellen) zodat het rapport bij de resultaten blijft passen als de invoer daarna wordt aangepast. De PDF wordt op verzoek gebouwd (knop "PDF-rapport maken" -> `sso_rapport_pdf` in session state -> `st.download_button`), niet bij elke rerun, omdat het tekenen van de kanskrommen enkele seconden kost. De opgeslagen PDF wordt gewist bij elke nieuwe berekening.
 

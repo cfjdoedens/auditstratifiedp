@@ -29,6 +29,7 @@ try:
     from reportlab.platypus import (
         Image,
         KeepTogether,
+        PageBreak,
         Paragraph,
         SimpleDocTemplate,
         Spacer,
@@ -214,6 +215,141 @@ def _figuur_als_afbeelding(res: dict, breedte: float) -> Image:
     return Image(buf, width=breedte, height=hoogte)
 
 
+def _methode_onderdelen(
+    instellingen: dict[str, str], stijlen: dict[str, ParagraphStyle]
+) -> list:
+    """Flowables voor de methodebeschrijving, afgestemd op de instellingen."""
+    model = instellingen.get("model", "binomiaal")
+    kalibratie = instellingen.get("berekeningsmethode", "momentmatching")
+    zekerheid = _tekst(instellingen.get("zekerheid")) or "0,95"
+
+    def alinea(tekst: str) -> Paragraph:
+        return Paragraph(
+            tekst,
+            ParagraphStyle("methode", parent=stijlen["tekst"], spaceAfter=5),
+        )
+
+    if model == "poisson":
+        model_tekst = (
+            "Gekozen model: <b>Poisson</b>. De foutkans heeft een "
+            "gammaverdeling en het aantal fouten bij de klant een "
+            "negatief-binomiale verdeling."
+        )
+    else:
+        model_tekst = (
+            "Gekozen model: <b>binomiaal</b>. De foutkans heeft een "
+            "betaverdeling en het aantal fouten bij de klant een "
+            "beta-binomiale verdeling."
+        )
+
+    onderdelen: list = [
+        PageBreak(),
+        Paragraph("Methodebeschrijving", stijlen["kop1"]),
+        Paragraph("Uitgangspunt", stijlen["kop2"]),
+        alinea(
+            "De SSO trekt \u00e9\u00e9n gezamenlijke steekproef uit alle posten "
+            "van de SSO: n posten met daarin k fouten. Uit die steekproef "
+            "wordt per klant een bovengrens voor de fout afgeleid. Dat "
+            "gebeurt per type post, of voor alle posten samen als er geen "
+            "onderscheid naar typen posten is gemaakt."
+        ),
+        alinea(model_tekst),
+        Paragraph("Aannames", stijlen["kop2"]),
+        alinea(
+            "<b>1. Willekeurige verspreiding.</b> De posten van elke klant "
+            "liggen willekeurig verspreid tussen alle posten van de SSO, "
+            "zonder herkenbaar patroon, en elke post hoort bij precies "
+            "\u00e9\u00e9n klant. Alleen dan is de uit (n, k) geschatte foutkans "
+            "een geldig uitgangspunt voor wat er bij \u00e9\u00e9n klant aan "
+            "fouten te verwachten is."
+        ),
+        alinea(
+            "<b>2. Vlakke prior.</b> Vooraf is elke foutkans even aannemelijk; "
+            "de verdeling van de foutkans volgt dan alleen uit n en k."
+        ),
+        alinea(
+            "<b>3. Elke post volledig goed of volledig fout.</b> Voor de "
+            "spreiding bij de klant wordt elke post behandeld als "
+            "\u00f3f volledig goed, \u00f3f volledig fout. Dat is de "
+            "maximaal conservatieve keuze: voor elke grootheid X tussen 0 "
+            "en 1 met gemiddelde p geldt Var(X) \u2264 p(1\u2212p), met "
+            "gelijkheid alleen in dit binaire geval. Posten die in de "
+            "praktijk gedeeltelijk fout zijn (tainting), hebben minder "
+            "spreiding, dus de berekende grens is eerder te ruim dan te "
+            "krap. Een op echte tainting-data gekalibreerd model is niet "
+            "toegepast."
+        ),
+        Paragraph("Kalibratie per klant", stijlen["kop2"]),
+    ]
+
+    if kalibratie == "naief":
+        onderdelen += [
+            alinea(
+                "Gekozen methode: <b>na\u00efef (benadering)</b>. Per type post "
+                "wordt een effectieve steekproef bepaald met een "
+                "poolingformule, naar analogie van weerstanden in parallel: "
+                "n_eff = n\u00b7N_klant / (n + N_klant) en "
+                "k_eff = k\u00b7n_eff / n, waarbij N_klant het aantal posten "
+                "van de klant is."
+            ),
+            alinea(
+                "De formule is gemotiveerd door twee grensgevallen "
+                "(N_klant veel groter dan n: n_eff nadert n; N_klant veel "
+                "kleiner dan n: n_eff nadert N_klant) en is geen afleiding "
+                "uit een kansmodel. Ze kent geen afhandeling van extreem "
+                "kleine klanten en geeft daarom ook geen waarschuwing of "
+                "weigering in die gevallen. Gebruik de uitkomst als "
+                "vergelijking, niet als statistisch onderbouwde grens."
+            ),
+        ]
+    else:
+        onderdelen += [
+            alinea(
+                "Gekozen methode: <b>momentmatching</b>. Het aantal fouten "
+                "bij de klant volgt een samengestelde verdeling: de "
+                "onzekerheid over de SSO-brede foutkans, gecombineerd met de "
+                "steekproefvariatie binnen de N_klant posten van de klant. "
+                "Om die verdeling in de gestratificeerde berekening te "
+                "kunnen gebruiken, wordt per type post een effectieve "
+                "steekproef (n_eff, k_eff) gekozen waarvan de beta- "
+                "(binomiaal) of gammaverdeling (Poisson) hetzelfde "
+                "gemiddelde en dezelfde variantie heeft."
+            ),
+            alinea(
+                "Is N_klant zo klein dat dit niet meer binnen de beta- of "
+                "gammafamilie kan (k_eff zou negatief worden, of n_eff "
+                "kleiner dan k_eff), dan wordt een (n_eff, k_eff) gekozen "
+                "waarvan de 95%-grens gelijk is aan de grens van de "
+                "samengestelde verdeling onder aanname 3. Dit gebeurt "
+                f"altijd bij 95%, ook als de gekozen zekerheid {zekerheid} is, "
+                "en het rapport toont dan een waarschuwing. Kan zelfs dat "
+                "niet (de grens is vrijwel zeker 0 of 1), dan wordt de "
+                "berekening geweigerd: controleer de posten van dat type bij "
+                "die klant dan rechtstreeks."
+            ),
+        ]
+
+    onderdelen += [
+        Paragraph("Combineren en uitkomst", stijlen["kop2"]),
+        alinea(
+            "Elk type post vormt een stratum in euro\u2019s met zijn "
+            "(n_eff, k_eff). De verdelingen van de foutfractie per stratum "
+            "worden door convolutie (FFT) samengevoegd tot \u00e9\u00e9n verdeling "
+            "van de totale fout van de klant. De risico-inschatting "
+            "(ihr, ibr, car) en de materialiteit worden verwerkt als extra "
+            "foutloze posten (HARo)."
+        ),
+        alinea(
+            "De <b>maximale fout</b> in het rapport is de bovengrens van "
+            f"die verdeling bij de gekozen zekerheid ({zekerheid}): met die "
+            "zekerheid is de werkelijke fout bij de klant niet groter, "
+            "onder bovenstaande aannames. De uitkomst is daarmee zo goed "
+            "als deze aannames, in het bijzonder aanname 1."
+        ),
+    ]
+    return onderdelen
+
+
 def _paginanummer(canvas, doc) -> None:
     canvas.saveState()
     canvas.setFont(_LETTER, 8)
@@ -228,6 +364,7 @@ def maak_sso_rapport_pdf(
     resultaten: dict,
     waarschuwingen: dict[str, list[str]] | None = None,
     datum: datetime.date | None = None,
+    methodebeschrijving: bool = False,
 ) -> bytes:
     """Maak een PDF-rapport van een SSO-evaluatie.
 
@@ -247,6 +384,9 @@ def maak_sso_rapport_pdf(
         Per klantnaam een lijst met waarschuwingsteksten.
     datum : datetime.date, optional
         Datum op het rapport (standaard vandaag).
+    methodebeschrijving : bool, standaard False
+        Voeg aan het eind een pagina toe met de gekozen kalibratiemethode
+        en de aannames van het model.
 
     Returns
     -------
@@ -429,6 +569,9 @@ def maak_sso_rapport_pdf(
         ]
         onderdelen.append(KeepTogether(blok))
         onderdelen.append(_figuur_als_afbeelding(res, breedte))
+
+    if methodebeschrijving:
+        onderdelen += _methode_onderdelen(instellingen, stijlen)
 
     uit = io.BytesIO()
     doc = SimpleDocTemplate(

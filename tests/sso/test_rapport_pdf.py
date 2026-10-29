@@ -138,3 +138,29 @@ def test_lege_resultaten_geven_value_error(invoer):
 def test_speciale_tekens_in_namen_breken_niet(invoer, resultaten):
     resultaten = {"A&B <café>": resultaten["Klant A"]}
     assert maak_sso_rapport_pdf(invoer, resultaten).startswith(b"%PDF-")
+
+
+def test_methodebeschrijving_standaard_uit(invoer, resultaten):
+    tekst = _pdf_tekst(maak_sso_rapport_pdf(invoer, resultaten))
+    assert "Methodebeschrijving" not in tekst
+
+
+def test_methodebeschrijving_momentmatching(invoer, resultaten):
+    tekst = _pdf_tekst(
+        maak_sso_rapport_pdf(invoer, resultaten, methodebeschrijving=True)
+    )
+    assert "Methodebeschrijving" in tekst
+    assert "momentmatching" in tekst
+    assert "Aannames" in tekst
+    assert "beta-binomiale" in tekst
+
+
+def test_methodebeschrijving_naief_en_poisson(invoer, resultaten):
+    invoer["instellingen"]["berekeningsmethode"] = "naief"
+    invoer["instellingen"]["model"] = "poisson"
+    tekst = _pdf_tekst(
+        maak_sso_rapport_pdf(invoer, resultaten, methodebeschrijving=True)
+    )
+    assert "poolingformule" in tekst
+    assert "negatief-binomiale" in tekst
+    assert "momentmatching" not in tekst.split("Methodebeschrijving", 1)[1]

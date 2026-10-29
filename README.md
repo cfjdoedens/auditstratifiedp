@@ -645,6 +645,10 @@ optionele pakket `reportlab` nodig:
 pip install "auditstat[pdf]"
 ```
 
+Met het vinkje *Methodebeschrijving opnemen in het rapport* komt er een
+laatste pagina bij met de gekozen kalibratiemethode (momentmatching of
+naïef) en de aannames van het model.
+
 Buiten de app kan hetzelfde met
 `auditstat.sso.rapport_pdf.maak_sso_rapport_pdf(invoer, resultaten)`,
 waarbij `invoer` dezelfde vorm heeft als de uitvoer van
