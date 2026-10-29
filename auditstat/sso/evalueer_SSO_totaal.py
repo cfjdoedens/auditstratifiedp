@@ -2,6 +2,16 @@ import pandas as pd
 
 from auditstat.stratified.eval_stratified import eval_stratified
 
+# Naam waaronder de evaluatie van de hele SSO in samenvattingen en rapporten
+# verschijnt; daarom niet toegestaan als naam van een klant.
+HELE_SSO_NAAM = "Hele SSO"
+
+
+def is_gereserveerde_klantnaam(naam) -> bool:
+    """True als ``naam`` (hoofdletterongevoelig, zonder omringende spaties) ``HELE_SSO_NAAM`` is."""
+    return str(naam).strip().casefold() == HELE_SSO_NAAM.casefold()
+
+
 _OPTIONELE_KOLOMMEN = (
     "ihr",
     "ibr",

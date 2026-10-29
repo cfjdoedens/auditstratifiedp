@@ -13,7 +13,9 @@ from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignor
     evalueer_SSO_klant_gestratificeerd,
 )
 from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
+    HELE_SSO_NAAM,
     evalueer_SSO_totaal,
+    is_gereserveerde_klantnaam,
 )
 from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
     lees_sso_invoer_csv,
@@ -168,6 +170,12 @@ for key, standaard in {
 }.items():
     if key not in st.session_state:
         st.session_state[key] = standaard
+
+
+_GERESERVEERDE_KLANTNAAM_FOUT = (
+    f'De naam "{HELE_SSO_NAAM}" is gereserveerd voor de evaluatie van de hele '
+    "SSO en mag niet als naam van een klant worden gebruikt."
+)
 
 
 def _nl(getal: float, decimalen: int = 4) -> str:
@@ -903,6 +911,13 @@ def on_sso_klanten_tabel_change():
             weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
             df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
 
+        if klant_cel and is_gereserveerde_klantnaam(klant_cel):
+            revert_cel(
+                "klant",
+                f'De naam "{HELE_SSO_NAAM}" is gereserveerd voor de hele SSO '
+                "en mag niet als klantnaam worden gebruikt",
+            )
+
         for col in ("N_klant", "waarde_laag"):
             val_str = str(df.at[idx, col]).strip()
             if val_str == "":
@@ -975,6 +990,13 @@ def on_sso_klanten_totaal_tabel_change():
         def revert_cel(kolom, foutmelding, current_idx=idx, current_rij_naam=rij_naam):
             weggepoetste_fouten.append(f"{foutmelding} bij {current_rij_naam}.")
             df.at[current_idx, kolom] = oude_df.at[current_idx, kolom]
+
+        if klant_cel and is_gereserveerde_klantnaam(klant_cel):
+            revert_cel(
+                "klant",
+                f'De naam "{HELE_SSO_NAAM}" is gereserveerd voor de hele SSO '
+                "en mag niet als klantnaam worden gebruikt",
+            )
 
         for col in ("N_klant", "waarde_laag"):
             val_str = str(df.at[idx, col]).strip()
@@ -2414,9 +2436,6 @@ with tab_sso:
                 "toont de app alle gevonden fouten met regelnummer."
             )
 
-    if st.session_state.sso_error:
-        st.error(st.session_state.sso_error)
-
     if sso_bereken:
         st.session_state.sso_rapport_pdf = None
         sso_zekerheid = _parse_nl(sso_zekerheid_text)
@@ -2456,6 +2475,9 @@ with tab_sso:
             ]
             for rij in sso_klanten_totaal_rijen:
                 klant = str(rij.get("klant", "")).strip()
+                if is_gereserveerde_klantnaam(klant):
+                    klanten_fouten.append(_GERESERVEERDE_KLANTNAAM_FOUT)
+                    continue
                 N_klant_val = _parse_nl(rij.get("N_klant"))
                 waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
                 for veld_naam, veld_waarde in (
@@ -2563,6 +2585,10 @@ with tab_sso:
 
             for rij in sso_klanten_rijen:
                 klant = str(rij.get("klant", "")).strip()
+                if is_gereserveerde_klantnaam(klant):
+                    if _GERESERVEERDE_KLANTNAAM_FOUT not in klanten_fouten:
+                        klanten_fouten.append(_GERESERVEERDE_KLANTNAAM_FOUT)
+                    continue
                 type_post = str(rij.get("type_post", "")).strip()
                 N_klant_val = _parse_nl(rij.get("N_klant"))
                 waarde_laag_val = _parse_nl(rij.get("waarde_laag"))
@@ -2726,6 +2752,9 @@ with tab_sso:
                 "typen_posten": st.session_state.sso_typen_posten_tabel.copy(),
                 "klanten_typen": st.session_state.sso_klanten_tabel.copy(),
             }
+
+    if st.session_state.sso_error:
+        st.error(st.session_state.sso_error)
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:

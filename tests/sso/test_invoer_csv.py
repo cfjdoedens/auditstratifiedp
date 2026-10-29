@@ -214,3 +214,10 @@ def test_onderscheid_nee_zonder_detailtabellen_is_toegestaan(klanten):
     res = lees_sso_invoer_csv(tekst)
     assert res["typen_posten"] is None and res["klanten_typen"] is None
     assert len(res["klanten"]) == 2
+
+
+@pytest.mark.parametrize("naam", ["Hele SSO", "hele sso", " HELE SSO "])
+def test_klantnaam_hele_sso_is_gereserveerd(csv_tekst, naam):
+    tekst = csv_tekst.replace("Klant A", naam)
+    with pytest.raises(ValueError, match="gereserveerd"):
+        lees_sso_invoer_csv(tekst)

@@ -31,6 +31,11 @@ import re
 
 import pandas as pd
 
+from auditstat.sso.evalueer_SSO_totaal import (
+    HELE_SSO_NAAM,
+    is_gereserveerde_klantnaam,
+)
+
 KOLOMMEN = ("onderdeel", "klant", "type_post", "veld", "waarde")
 
 _RISICO = ("H", "M", "L")
@@ -256,6 +261,13 @@ def lees_sso_invoer_csv(inhoud: str | bytes) -> dict:
             fouten.append(
                 f'Regel {regel}: kolom "klant" moet bij onderdeel '
                 f'"{onderdeel}" {"ingevuld" if klant_nodig else "leeg"} zijn.'
+            )
+            continue
+        if klant and is_gereserveerde_klantnaam(klant):
+            fouten.append(
+                f'Regel {regel}: de klantnaam "{HELE_SSO_NAAM}" is gereserveerd '
+                "voor de evaluatie van de hele SSO en mag niet als naam van "
+                "een klant worden gebruikt."
             )
             continue
         if bool(type_post) != type_nodig:
