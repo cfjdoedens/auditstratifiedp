@@ -32,6 +32,7 @@ auditstat/
     strata_SSO_klant.py              # bouw_strata_SSO_klant: zet post_typen (per type post: n, k, N_klant, waarde_laag) om in een stratatabel
     evalueer_SSO_klant_gestratificeerd.py  # Roept bouw_strata_SSO_klant + eval_stratified aan
     script_SSO.py                     # Demonstratiescript
+    invoer_csv.py                     # CSV-uitwisseling van de SSO-invoer: maak_sso_invoer_csv / lees_sso_invoer_csv
 tests/
   __init__.py
   stratified/              # Spiegelt auditstat/stratified/
@@ -48,6 +49,7 @@ tests/
     test_moment_match_SSO.py
     test_strata_SSO_klant.py
     test_evalueer_SSO_klant_gestratificeerd.py
+    test_invoer_csv.py
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
 pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
@@ -252,7 +254,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-205 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+249 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -366,6 +368,20 @@ vervolgtraject/apart ontwerpgesprek afgebakend (zie ook het Theorie-tabblad, dat
 aankondigt).
 
 Plan vastgelegd in `.posit/assistant/plans/2026-10-27-sso-tab-herontwerp-geleide-flow-theorie-methodekeuze.md`.
+
+## SSO-invoer als CSV (2026-10-29)
+
+De SSO-tab kan de volledige invoer uit één CSV inlezen en weer wegschrijven (uploader + downloadknop onder "invoer als CSV" in de linkerkolom). Logica staat in `auditstat/sso/invoer_csv.py` (puur, getest in `tests/sso/test_invoer_csv.py`); `app.py` bevat alleen de koppeling.
+
+**Formaat (bewuste keuzes na overleg):** één bestand, lang formaat, kolommen `onderdeel;klant;type_post;veld;waarde`, scheidingsteken `;`, getallen in **NL-notatie** zoals de invoervelden ze tonen (opent direct goed in Nederlandse Excel; export is `utf-8-sig`). Onderdelen: `instelling` (model, zekerheid, berekeningsmethode, onderscheid), `totaal` (n, k, N_totaal, massa, ihr, ibr, car, materialiteit), `klant` (N_klant, waarde_laag), `type_post` (n, k, ihr, ibr, car, materialiteit), `klant_type_post` (N_klant, waarde_laag). Alleen invoer wordt geëxporteerd, geen resultaten. De typen-posten-tabellen worden ook geëxporteerd als `onderscheid = nee`.
+
+**Inlezen is strikt en alles-of-niets:** `lees_sso_invoer_csv` verzamelt alle fouten (met regelnummer) en gooit één `ValueError`; de app past dan niets toe en toont de meldingen. Getallen moeten strikte NL-notatie hebben (`_NL_GETAL`): `1234.56` wordt **bewust geweigerd**, omdat `_parse_nl` in de app dat stilzwijgend als 123456 zou lezen (punt = duizendtalscheiding). Verder gecontroleerd: kop, onbekend onderdeel/veld, `klant`/`type_post` verkeerd (niet) ingevuld, dubbele regels, ontbrekende verplichte velden (`materialiteit` mag leeg), H/M/L, model/methode/onderscheid, verwijzing van `klant_type_post` naar een onbekend type post, en `onderscheid = ja` zonder detailtabellen. Ook `,` als scheidingsteken en BOM/Windows-regeleinden worden geaccepteerd. Onderdelen die ontbreken laten de bestaande invoer ongemoeid.
+
+**Callback-patroon (`on_sso_csv_upload`):** draait als `on_change`, dus vóór de rerun, waardoor widget-sleutels (`sso_model`, `sso_totaal_*`, ...) en tabel-state veilig gezet kunnen worden; de tabel-key-tellers worden opgehoogd zodat de data_editors verversen, oude resultaten worden gewist. De uploader krijgt na elke verwerking een nieuwe key (`sso_csv_upload_key`), zodat hetzelfde bestand na een wijziging opnieuw kan worden geüpload. De melding gaat via `st.session_state.sso_csv_melding` en wordt eenmalig getoond. De downloadknop wordt pas ná alle invoerwidgets opgebouwd (kolom `col_sso_inst` wordt opnieuw betreden) zodat hij de actuele waarden kent.
+
+**Valkuil:** de tekstvelden van de SSO-totalen en `sso_zekerheid_text` hebben **geen `value=`** meer; hun standaardwaarden staan in de `session_state`-initialisatie bovenaan `app.py`. Combineren van `value=` met een via de Session State API gezette waarde geeft een Streamlit-logwaarschuwing.
+
+**Getest met `streamlit.testing.v1.AppTest`** (niet in de pytest-suite opgenomen): upload via `at.file_uploader[0].set_value((naam, bytes, mime))` (niet `.upload`), ongeldig bestand laat invoer ongewijzigd, export→import geeft identieke tabellen, en berekening na import slaagt.
 
 ## Beveiligingsonderhoud
 

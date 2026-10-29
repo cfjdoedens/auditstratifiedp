@@ -11,6 +11,10 @@ from matplotlib.patches import Circle, Ellipse, FancyArrowPatch
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
     evalueer_SSO_klant_gestratificeerd,
 )
+from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
+    lees_sso_invoer_csv,
+    maak_sso_invoer_csv,
+)
 from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
@@ -136,6 +140,13 @@ for key, standaard in {
     "sso_klanten_tabel_key": 0,
     "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
     "sso_klanten_totaal_tabel_key": 0,
+    "sso_csv_upload_key": 0,
+    "sso_zekerheid_text": "0,95",
+    "sso_totaal_n_text": SSO_TOTAAL_VOORBEELD["n"],
+    "sso_totaal_k_text": SSO_TOTAAL_VOORBEELD["k"],
+    "sso_totaal_N_text": SSO_TOTAAL_VOORBEELD["N_totaal"],
+    "sso_totaal_massa_text": SSO_TOTAAL_VOORBEELD["massa"],
+    "sso_totaal_materialiteit_text": SSO_TOTAAL_VOORBEELD["materialiteit"],
     "sso_klanten_res": {},
     "sso_klanten_waarschuwingen": {},
     "sso_error": None,
@@ -933,6 +944,106 @@ def on_sso_klanten_totaal_tabel_change():
 
     st.session_state.sso_klanten_totaal_tabel = df
     st.session_state.sso_klanten_totaal_tabel_key += 1
+
+
+# Koppeling tussen de widget-sleutels van de SSO-tab en de sleutels in een
+# SSO-invoer-CSV (zie auditstat.sso.invoer_csv).
+SSO_CSV_INSTELLING_SLEUTELS = {
+    "model": "sso_model",
+    "zekerheid": "sso_zekerheid_text",
+    "berekeningsmethode": "sso_kalibratiemethode",
+    "onderscheid": "sso_onderscheid",
+}
+SSO_CSV_TOTAAL_SLEUTELS = {
+    "n": "sso_totaal_n_text",
+    "k": "sso_totaal_k_text",
+    "N_totaal": "sso_totaal_N_text",
+    "massa": "sso_totaal_massa_text",
+    "ihr": "sso_totaal_ihr",
+    "ibr": "sso_totaal_ibr",
+    "car": "sso_totaal_car",
+    "materialiteit": "sso_totaal_materialiteit_text",
+}
+
+
+def _formatteer_nl_kolommen(df: pd.DataFrame, min_decimalen: dict) -> pd.DataFrame:
+    """Herformatteer getalkolommen naar NL-notatie, zoals de tabelcallbacks."""
+    df = df.copy()
+    for kolom, minimaal in min_decimalen.items():
+        df[kolom] = df[kolom].apply(lambda w, m=minimaal: _format_nl_auto(w, m))
+    return df
+
+
+def on_sso_csv_upload():
+    """Lees een geüploade SSO-invoer-CSV in en zet de invoer van de SSO-tab.
+
+    Draait als `on_change`-callback, dus vóór de rerun: widget-sleutels
+    mogen hier nog worden gezet. Alles-of-niets: bij een ongeldig bestand
+    blijft de huidige invoer volledig ongewijzigd en krijgt de gebruiker de
+    foutmeldingen te zien. De uploader krijgt een nieuwe sleutel, zodat
+    hetzelfde bestand na een wijziging opnieuw kan worden geüpload.
+    """
+    sleutel = f"sso_csv_upload_{st.session_state.sso_csv_upload_key}"
+    bestand = st.session_state.get(sleutel)
+    st.session_state.sso_csv_upload_key += 1
+    if bestand is None:
+        return
+
+    try:
+        invoer = lees_sso_invoer_csv(bestand.getvalue())
+    except ValueError as fout:
+        st.session_state.sso_csv_melding = (
+            "error",
+            "CSV niet ingelezen; de huidige invoer is ongewijzigd.\n\n"
+            f"{fout}",
+        )
+        return
+
+    for csv_veld, widget_sleutel in SSO_CSV_INSTELLING_SLEUTELS.items():
+        if csv_veld in invoer["instellingen"]:
+            st.session_state[widget_sleutel] = invoer["instellingen"][csv_veld]
+    for csv_veld, widget_sleutel in SSO_CSV_TOTAAL_SLEUTELS.items():
+        if csv_veld in invoer["totaal"]:
+            st.session_state[widget_sleutel] = invoer["totaal"][csv_veld]
+
+    tabellen = [
+        (
+            "klanten",
+            "sso_klanten_totaal_tabel",
+            {"N_klant": 0, "waarde_laag": 2},
+        ),
+        (
+            "typen_posten",
+            "sso_typen_posten_tabel",
+            {"n": 0, "k": 0, "materialiteit": 2},
+        ),
+        (
+            "klanten_typen",
+            "sso_klanten_tabel",
+            {"N_klant": 0, "waarde_laag": 2},
+        ),
+    ]
+    ingelezen = []
+    for csv_naam, state_naam, decimalen in tabellen:
+        df = invoer[csv_naam]
+        if df is None:
+            continue
+        st.session_state[state_naam] = _formatteer_nl_kolommen(df, decimalen)
+        st.session_state[f"{state_naam}_key"] += 1
+        ingelezen.append(f"{len(df)} rijen {csv_naam.replace('_', ' ')}")
+
+    # Oude resultaten horen niet meer bij de nieuwe invoer.
+    st.session_state.sso_klanten_res = {}
+    st.session_state.sso_klanten_waarschuwingen = {}
+    st.session_state.sso_error = None
+    st.session_state.sso_csv_melding = (
+        "success",
+        "CSV ingelezen: "
+        f"{len(invoer['instellingen'])} instellingen, "
+        f"{len(invoer['totaal'])} totaalvelden"
+        + "".join(f", {tekst}" for tekst in ingelezen)
+        + ". Klik op \u2018evalueer alle klanten\u2019 om te rekenen.",
+    )
 
 
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
@@ -1807,9 +1918,7 @@ with tab_sso:
             horizontal=True,
             key="sso_model",
         )
-        sso_zekerheid_text = st.text_input(
-            "zekerheid", value="0,95", key="sso_zekerheid_text"
-        )
+        sso_zekerheid_text = st.text_input("zekerheid", key="sso_zekerheid_text")
         sso_kalibratiemethode = st.radio(
             "berekeningsmethode",
             ["momentmatching", "naief"],
@@ -1844,22 +1953,18 @@ with tab_sso:
         c_n, c_k, c_N, c_massa = st.columns(4)
         sso_totaal_n_text = c_n.text_input(
             "n (steekproefomvang)",
-            value=SSO_TOTAAL_VOORBEELD["n"],
             key="sso_totaal_n_text",
         )
         sso_totaal_k_text = c_k.text_input(
             "k (fouten in steekproef)",
-            value=SSO_TOTAAL_VOORBEELD["k"],
             key="sso_totaal_k_text",
         )
         sso_totaal_N_text = c_N.text_input(
             "N totaal (aantal posten)",
-            value=SSO_TOTAAL_VOORBEELD["N_totaal"],
             key="sso_totaal_N_text",
         )
         sso_totaal_massa_text = c_massa.text_input(
             "totale massa (euro\u2019s)",
-            value=SSO_TOTAAL_VOORBEELD["massa"],
             key="sso_totaal_massa_text",
         )
         c_ihr, c_ibr, c_car, c_mat = st.columns(4)
@@ -1883,7 +1988,6 @@ with tab_sso:
         )
         sso_totaal_materialiteit_text = c_mat.text_input(
             "materialiteit",
-            value=SSO_TOTAAL_VOORBEELD["materialiteit"],
             key="sso_totaal_materialiteit_text",
         )
 
@@ -2137,6 +2241,59 @@ with tab_sso:
                 "maar controleer of dit klopt:\n\n"
                 + "\n\n".join(sso_consistentie_meldingen)
             )
+
+    # Invoer als CSV: pas hier (na alle invoerwidgets) opgebouwd, zodat de
+    # downloadknop de actuele waarden kent; de kolom wordt opnieuw
+    # betreden, waardoor deze blokken onder de berekenknop terechtkomen.
+    with col_sso_inst:
+        st.divider()
+        st.subheader("invoer als CSV")
+        sso_csv_melding = st.session_state.pop("sso_csv_melding", None)
+        if sso_csv_melding is not None:
+            soort, tekst = sso_csv_melding
+            (st.success if soort == "success" else st.error)(tekst)
+        st.file_uploader(
+            "CSV met SSO-invoer inlezen",
+            type=["csv"],
+            key=f"sso_csv_upload_{st.session_state.sso_csv_upload_key}",
+            on_change=on_sso_csv_upload,
+            help=(
+                "Een eerder gedownload bestand (kolommen onderdeel;klant;"
+                "type_post;veld;waarde, scheidingsteken ';', getallen in "
+                "Nederlandse notatie). Overschrijft de huidige invoer; bij "
+                "een fout blijft de invoer ongewijzigd."
+            ),
+        )
+        st.download_button(
+            "SSO-invoer downloaden (CSV)",
+            data=maak_sso_invoer_csv(
+                instellingen={
+                    "model": sso_model,
+                    "zekerheid": sso_zekerheid_text,
+                    "berekeningsmethode": sso_kalibratiemethode,
+                    "onderscheid": sso_onderscheid,
+                },
+                totaal={
+                    "n": sso_totaal_n_text,
+                    "k": sso_totaal_k_text,
+                    "N_totaal": sso_totaal_N_text,
+                    "massa": sso_totaal_massa_text,
+                    "ihr": sso_totaal_ihr,
+                    "ibr": sso_totaal_ibr,
+                    "car": sso_totaal_car,
+                    "materialiteit": sso_totaal_materialiteit_text,
+                },
+                klanten=st.session_state.sso_klanten_totaal_tabel,
+                typen_posten=st.session_state.sso_typen_posten_tabel,
+                klanten_typen=st.session_state.sso_klanten_tabel,
+            ).encode("utf-8-sig"),
+            file_name="sso_invoer.csv",
+            mime="text/csv",
+            help=(
+                "Bevat de huidige invoer, inclusief de typen-posten-tabellen "
+                "ook als onderscheid op \u2018nee\u2019 staat."
+            ),
+        )
 
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
