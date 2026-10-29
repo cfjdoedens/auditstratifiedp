@@ -574,9 +574,28 @@ invoer = lees_sso_invoer_csv(open("sso_invoer.csv", "rb").read())
 # invoer["typen_posten"] en invoer["klanten_typen"] zijn DataFrames (of None).
 ```
 
+# Evaluatie over de hele SSO
+
+Naast de evaluatie per klant berekent de SSO-tab bij *evalueer alle klanten* ook een resultaat voor de **hele SSO**, onder het kopje *Hele SSO*. Daar is geen klantkalibratie: de SSO-steekproef $(n, k)$ is direct een steekproef uit de populatie waarover geoordeeld wordt. Elk type post wordt één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post (de som over alle klanten); zonder onderscheid naar typen posten is het één stratum met de SSO-totalen. Daarna combineert `eval_stratified` de strata tot één kanskromme en maximale fout.
+
+De uitkomst is niet de optelsom van de klantuitkomsten, want die komen uit dezelfde steekproef en zijn niet onafhankelijk. `n` en `k` moeten gehele getallen zijn. Het resultaat staat ook in het PDF-rapport.
+
+Buiten de app:
+
+```python
+from auditstat.sso.evalueer_SSO_totaal import evalueer_SSO_totaal
+
+resultaat = evalueer_SSO_totaal(
+    [dict(naam="totaal", n=200, k=4, waarde_laag=2_500_000.0)],
+    model="binomiaal",
+    zekerheid=0.95,
+)
+resultaat["max_fout_convolutie"]
+```
+
 # PDF-rapport van een SSO-evaluatie
 
-Na een berekening in het SSO-tabblad verschijnt onder de samenvattingstabel de knop *PDF-rapport maken*, gevolgd door *PDF-rapport downloaden*. Het rapport bevat de invoer waarmee is gerekend, de resultaten per klant en de kanskrommen. Hiervoor is het optionele pakket `reportlab` nodig:
+Na een berekening in het SSO-tabblad verschijnt onder de samenvattingstabel de knop *PDF-rapport maken*, gevolgd door *PDF-rapport downloaden*. Het rapport bevat de invoer waarmee is gerekend, de resultaten per klant, de evaluatie van de hele SSO en de kanskrommen. Hiervoor is het optionele pakket `reportlab` nodig:
 
 ```bash
 pip install "auditstat[pdf]"

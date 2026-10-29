@@ -2996,7 +2996,29 @@ with tab_theorie:
             "de randgevallen."
         )
 
-    with st.expander("4. Exacte FFT-gebaseerde methode (in ontwikkeling)"):
+    with st.expander("4. Evaluatie over de hele SSO"):
+        st.markdown(
+            "Naast de evaluatie per klant rekent de app ook de **hele SSO** "
+            "door. Daar is geen tweede trap: de SSO-brede steekproef "
+            "$(n, k)$ is zelf een steekproef uit de populatie waarover "
+            "geoordeeld wordt, dus is er niets te kalibreren en geen "
+            "$N_\\text{klant}$ nodig. Elk type post wordt \u00e9\u00e9n "
+            "stratum met $n_\\text{laag} = n$, $k_\\text{laag} = k$ en als "
+            "waarde de totale massa van dat type post bij de hele SSO "
+            "(zonder onderscheid naar typen posten: \u00e9\u00e9n stratum "
+            "met de SSO-totalen). Daarna combineert dezelfde "
+            "gestratificeerde convolutie als bij de klanten de strata tot "
+            "\u00e9\u00e9n kanskromme en maximale fout."
+        )
+        st.markdown(
+            "Twee kanttekeningen. De uitkomst voor de hele SSO is *niet* "
+            "de optelsom van de klantuitkomsten: die komen uit dezelfde "
+            "steekproef en zijn dus niet onafhankelijk. En $n$ en $k$ "
+            "moeten hier gehele tellingen zijn, omdat ze direct als "
+            "steekproef worden gebruikt."
+        )
+
+    with st.expander("5. Exacte FFT-gebaseerde methode (in ontwikkeling)"):
         st.markdown(
             "Een derde methode — zonder de Beta/Gamma-benadering van "
             "momentmatching als tussenstap — bouwt de voorspellende "
