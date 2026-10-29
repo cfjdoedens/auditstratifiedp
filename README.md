@@ -574,6 +574,65 @@ print(virtuele_posten)
 
 Deze functies worden automatisch gebruikt binnen `eval_stratified()`.
 
+# SSO-invoer opslaan en hergebruiken via CSV
+
+In het SSO-tabblad van de app kun je de volledige invoer (instellingen,
+SSO-totalen, klanten en eventueel typen posten) in één CSV-bestand
+opslaan en later weer inlezen. Dat is handig om een berekening te
+herhalen, te delen of in Excel voor te bereiden.
+
+## Stap voor stap
+
+1.  **Begin met het voorbeeld.** Klik onder “invoer als CSV” op
+    *Voorbeeldbestand downloaden (CSV)*. Open het bestand in Excel
+    (Nederlandse instellingen) of een teksteditor.
+2.  **Pas het bestand aan** naar je eigen situatie. Elke regel is één
+    waarde in de kolommen `onderdeel;klant;type_post;veld;waarde`. Houd
+    je aan de volgende regels:
+    - getallen in Nederlandse notatie: punt als duizendtalscheiding en
+      komma als decimaalteken (`1.500.000,00`); `1234.56` wordt bewust
+      geweigerd;
+    - `ihr`, `ibr` en `car` zijn `H`, `M` of `L`; `materialiteit` mag
+      leeg zijn (standaard 0,01);
+    - bij `onderscheid = ja` zijn zowel `type_post`- als
+      `klant_type_post`-regels nodig.
+3.  **Sla op als “CSV UTF-8”** met `;` als scheidingsteken.
+4.  **Lees het bestand in** met *CSV met SSO-invoer inlezen*. De app
+    vult de instellingen en tabellen. Inlezen is alles-of-niets: bij een
+    fout blijft de bestaande invoer ongewijzigd en toont de app alle
+    gevonden fouten met regelnummer, zodat je ze in één keer kunt
+    herstellen.
+5.  **Controleer en bereken.** Kijk of de consistentiecontroles kloppen
+    en klik op de berekenknop.
+6.  **Bewaar je invoer** met *SSO-invoer downloaden (CSV)*. Dit bestand
+    bevat alleen invoer, geen resultaten, en kan later weer worden
+    ingelezen.
+
+## Onderdelen van het bestand
+
+| onderdeel | klant | type_post | velden |
+|----|----|----|----|
+| `instelling` | leeg | leeg | `model`, `zekerheid`, `berekeningsmethode`, `onderscheid` |
+| `totaal` | leeg | leeg | `n`, `k`, `N_totaal`, `massa`, `ihr`, `ibr`, `car`, `materialiteit` |
+| `klant` | naam | leeg | `N_klant`, `waarde_laag` |
+| `type_post` | leeg | naam | `n`, `k`, `ihr`, `ibr`, `car`, `materialiteit` |
+| `klant_type_post` | naam | naam | `N_klant`, `waarde_laag` |
+
+Onderdelen die in het bestand ontbreken, laten de huidige invoer in de
+app ongemoeid.
+
+## Programmatisch gebruik
+
+Dezelfde logica is ook als Python-functies beschikbaar:
+
+``` python
+from auditstat.sso.invoer_csv import lees_sso_invoer_csv, maak_sso_invoer_csv
+
+invoer = lees_sso_invoer_csv(open("sso_invoer.csv", "rb").read())
+# invoer["instellingen"], invoer["totaal"] zijn dicts; invoer["klanten"],
+# invoer["typen_posten"] en invoer["klanten_typen"] zijn DataFrames (of None).
+```
+
 # Referenties
 
 - Wikipedia — Convolution https://en.wikipedia.org/wiki/Convolution
