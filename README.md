@@ -646,8 +646,9 @@ SSO-totalen. Daarna combineert `eval_stratified` de strata tot één
 kanskromme en maximale fout.
 
 De uitkomst is niet de optelsom van de klantuitkomsten, want die komen
-uit dezelfde steekproef en zijn niet onafhankelijk. `n` en `k` moeten
-gehele getallen zijn. Het resultaat staat ook in het PDF-rapport.
+uit dezelfde steekproef en zijn niet onafhankelijk. `n` moet een geheel
+getal zijn; `k` mag niet-geheel zijn (bijvoorbeeld 1,5 bij gewogen
+fouten). Het resultaat staat ook in het PDF-rapport.
 
 Buiten de app:
 

@@ -409,7 +409,7 @@ Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op
 
 ## Evaluatie over de hele SSO (2026-10-29)
 
-`auditstat/sso/evalueer_SSO_totaal.py` bevat `evalueer_SSO_totaal(post_typen, model, zekerheid, methode, granulariteit)`: evalueert de **hele SSO** (niet één klant). Er is geen tweede trap en dus geen kalibratie: de SSO-steekproef `(n, k)` is direct een steekproef uit de populatie waarover geoordeeld wordt. Elk type post wordt één stratum met `n_laag = n`, `k_laag = k` en `waarde_laag` = totale massa van dat type post bij de hele SSO; daarna `eval_stratified`. `n` en `k` moeten geheel zijn (anders `ValueError` met naam type post).
+`auditstat/sso/evalueer_SSO_totaal.py` bevat `evalueer_SSO_totaal(post_typen, model, zekerheid, methode, granulariteit)`: evalueert de **hele SSO** (niet één klant). Er is geen tweede trap en dus geen kalibratie: de SSO-steekproef `(n, k)` is direct een steekproef uit de populatie waarover geoordeeld wordt. Elk type post wordt één stratum met `n_laag = n`, `k_laag = k` en `waarde_laag` = totale massa van dat type post bij de hele SSO; daarna `eval_stratified`. `n` moet geheel zijn (anders `ValueError` met naam type post); `k` mag niet-geheel zijn (gewogen foutaantal bij een geldsteekproef), mits 0 ≤ k ≤ n.
 
 **App:** bij "evalueer alle klanten" wordt dit ook berekend (`st.session_state.sso_totaal_res`, sectie "Hele SSO" onder de klantensamenvatting, met metrics, tabel en kanskromme). Bij onderscheid = nee: één stratum `"totaal"` met de SSO-totalen en `totale massa`; bij ja: één stratum per type post, massa = som van `waarde_laag` over alle klanten. Een fout hierbij komt in `sso_error` als `"SSO totaal: ..."` zonder de klantresultaten te blokkeren.
 

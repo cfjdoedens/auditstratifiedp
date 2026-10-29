@@ -578,7 +578,7 @@ invoer = lees_sso_invoer_csv(open("sso_invoer.csv", "rb").read())
 
 Naast de evaluatie per klant berekent de SSO-tab bij *evalueer alle klanten* ook een resultaat voor de **hele SSO**, onder het kopje *Hele SSO*. Daar is geen klantkalibratie: de SSO-steekproef $(n, k)$ is direct een steekproef uit de populatie waarover geoordeeld wordt. Elk type post wordt één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post (de som over alle klanten); zonder onderscheid naar typen posten is het één stratum met de SSO-totalen. Daarna combineert `eval_stratified` de strata tot één kanskromme en maximale fout.
 
-De uitkomst is niet de optelsom van de klantuitkomsten, want die komen uit dezelfde steekproef en zijn niet onafhankelijk. `n` en `k` moeten gehele getallen zijn. Het resultaat staat ook in het PDF-rapport.
+De uitkomst is niet de optelsom van de klantuitkomsten, want die komen uit dezelfde steekproef en zijn niet onafhankelijk. `n` moet een geheel getal zijn; `k` mag niet-geheel zijn (bijvoorbeeld 1,5 bij gewogen fouten). Het resultaat staat ook in het PDF-rapport.
 
 Buiten de app:
 

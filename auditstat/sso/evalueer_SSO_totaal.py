@@ -48,7 +48,7 @@ def evalueer_SSO_totaal(
     ----------
     post_typen : list[dict]
         Eén dict per type post (= stratum), met verplichte sleutels
-        ``naam``, ``n`` (geheel), ``k`` (geheel) en ``waarde_laag`` (totale
+        ``naam``, ``n`` (geheel), ``k`` (mag niet-geheel zijn, bijv. een gewogen foutaantal bij een geldsteekproef) en ``waarde_laag`` (totale
         geldwaarde van dit type post bij de hele SSO). Optioneel: ``ihr``,
         ``ibr``, ``car``, ``waarde_hoog``, ``fout_hoog``, ``materialiteit``.
         Zonder onderscheid naar typen posten is dit één dict met de
@@ -79,7 +79,7 @@ def evalueer_SSO_totaal(
             "naam": naam,
             "waarde_laag": post["waarde_laag"],
             "n_laag": _als_geheel(post["n"], naam, "n"),
-            "k_laag": _als_geheel(post["k"], naam, "k"),
+            "k_laag": post["k"],
         }
         for optioneel in _OPTIONELE_KOLOMMEN:
             if optioneel in post:

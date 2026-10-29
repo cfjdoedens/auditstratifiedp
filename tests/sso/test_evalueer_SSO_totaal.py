@@ -48,6 +48,16 @@ def test_niet_geheel_getal_wordt_geweigerd():
         evalueer_SSO_totaal([_post(n=200.5)])
 
 
+def test_k_mag_niet_geheel_zijn():
+    res = evalueer_SSO_totaal([_post(k=1.5)])
+    assert res["steekproeven"]["k_laag"].iloc[0] == 1.5
+
+
+def test_k_groter_dan_n_wordt_geweigerd():
+    with pytest.raises(ValueError, match="k_laag"):
+        evalueer_SSO_totaal([_post(n=10, k=11)])
+
+
 def test_ontbrekend_veld_wordt_geweigerd():
     with pytest.raises(ValueError, match="mist verplicht"):
         evalueer_SSO_totaal([dict(naam="x", n=10, k=0)])

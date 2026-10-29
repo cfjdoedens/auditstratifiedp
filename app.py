@@ -3013,9 +3013,9 @@ with tab_theorie:
         st.markdown(
             "Twee kanttekeningen. De uitkomst voor de hele SSO is *niet* "
             "de optelsom van de klantuitkomsten: die komen uit dezelfde "
-            "steekproef en zijn dus niet onafhankelijk. En $n$ en $k$ "
-            "moeten hier gehele tellingen zijn, omdat ze direct als "
-            "steekproef worden gebruikt."
+            "steekproef en zijn dus niet onafhankelijk. En $n$ "
+            "moet hier een geheel getal zijn; $k$ mag niet-geheel zijn "
+            "(bijv. een gewogen foutaantal)."
         )
 
     with st.expander("5. Exacte FFT-gebaseerde methode (in ontwikkeling)"):
