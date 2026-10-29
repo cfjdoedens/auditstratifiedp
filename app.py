@@ -1,5 +1,6 @@
 import inspect
 import math
+import sys
 import time
 import warnings
 
@@ -9,39 +10,68 @@ import pandas as pd
 import streamlit as st
 from matplotlib.patches import Circle, Ellipse, FancyArrowPatch
 
-from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
-    evalueer_SSO_klant_gestratificeerd,
-)
-from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
-    HELE_SSO_NAAM,
-    evalueer_SSO_totaal,
-    is_gereserveerde_klantnaam,
-)
-from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
-    lees_sso_invoer_csv,
-    maak_sso_invoer_csv,
-)
+# Een langlopend proces (bijv. Streamlit Cloud na een nieuwe push) kan oudere
+# versies van de auditstat-modules in het geheugen houden dan deze app
+# verwacht, wat een ImportError geeft. Bij een eerste mislukking worden de
+# auditstat-modules uit het geheugen gehaald en opnieuw geladen; lukt het dan
+# nog niet, dan volgt een duidelijke herstartmelding.
+for _poging in (1, 2):
+    try:
+        from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
+            evalueer_SSO_klant_gestratificeerd,
+        )
+        from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
+            HELE_SSO_NAAM,
+            evalueer_SSO_totaal,
+            is_gereserveerde_klantnaam,
+        )
+        from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
+            lees_sso_invoer_csv,
+            maak_sso_invoer_csv,
+        )
+        from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+            eval_stratified,
+        )
+        from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+            plan_stratified_basis,
+            vind_beste_strata_groep,
+        )
+        from auditstat.stratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+            plot_kanskromme,
+        )
+        from auditstat.stratified.utils import (  # pyrefly: ignore[missing-import]
+            foutloze_posten_equivalent,
+            haro_nog_nodige_zekerheid,
+        )
 
-try:
-    from auditstat.sso.rapport_pdf import (  # pyrefly: ignore[missing-import]
-        maak_sso_rapport_pdf,
-    )
-except ImportError:  # reportlab is optioneel: pip install auditstat[pdf]
-    maak_sso_rapport_pdf = None
-from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
-    eval_stratified,
-)
-from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
-    plan_stratified_basis,
-    vind_beste_strata_groep,
-)
-from auditstat.stratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
-    plot_kanskromme,
-)
-from auditstat.stratified.utils import (  # pyrefly: ignore[missing-import]
-    foutloze_posten_equivalent,
-    haro_nog_nodige_zekerheid,
-)
+        try:
+            from auditstat.sso.rapport_pdf import (  # pyrefly: ignore[missing-import]
+                maak_sso_rapport_pdf,
+            )
+        except ImportError as _fout:
+            # reportlab is optioneel: pip install auditstat[pdf]. Een andere
+            # ImportError (bijv. een verouderde module) mag niet worden
+            # verborgen en gaat naar de herstartlogica hieronder.
+            if (_fout.name or "").split(".")[0] != "reportlab":
+                raise
+            maak_sso_rapport_pdf = None
+        break
+    except ImportError as _fout:
+        if _poging == 2:
+            st.set_page_config(page_title="auditstat", layout="wide")
+            st.error(
+                "De app kan een deel van het auditstat-pakket niet laden, "
+                "waarschijnlijk omdat het draaiende proces nog een oudere "
+                "versie van het pakket in het geheugen heeft. Herstart de "
+                "app (lokaal: stop en start Streamlit opnieuw; op Streamlit "
+                "Cloud: Manage app \u2192 Reboot app) en probeer het opnieuw."
+            )
+            st.caption(f"Technische melding: {_fout}")
+            st.stop()
+        for _naam in [
+            m for m in sys.modules if m == "auditstat" or m.startswith("auditstat.")
+        ]:
+            del sys.modules[_naam]
 
 # Configureer de pagina lay-out en titel van de Streamlit webapplicatie.
 st.set_page_config(page_title="auditstat", layout="wide")
