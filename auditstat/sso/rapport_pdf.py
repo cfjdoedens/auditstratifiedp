@@ -53,8 +53,8 @@ _LETTER = "DejaVuSans"
 _LETTER_VET = "DejaVuSans-Bold"
 
 _KALIBRATIE_LABELS = {
-    "momentmatching": "Momentmatching",
-    "naief": "Na\u00efef (benadering)",
+    "momentmatching": "Momentmatching (scherper, complexer)",
+    "naief": "Eenvoudig (poolingformule, conservatief)",
 }
 
 _INSTELLING_LABELS = [
@@ -312,7 +312,7 @@ def _methode_onderdelen(
     if kalibratie == "naief":
         onderdelen += [
             alinea(
-                "Gekozen methode: <b>na\u00efef (benadering)</b>. Per type post "
+                "Gekozen methode: <b>eenvoudig (poolingformule)</b>. Per type post "
                 "wordt een effectieve steekproef bepaald met een "
                 "poolingformule, naar analogie van weerstanden in parallel: "
                 "n_eff = n\u00b7N_klant / (n + N_klant) en "
@@ -323,10 +323,13 @@ def _methode_onderdelen(
                 "De formule is gemotiveerd door twee grensgevallen "
                 "(N_klant veel groter dan n: n_eff nadert n; N_klant veel "
                 "kleiner dan n: n_eff nadert N_klant) en is geen afleiding "
-                "uit een kansmodel. Ze kent geen afhandeling van extreem "
-                "kleine klanten en geeft daarom ook geen waarschuwing of "
-                "weigering in die gevallen. Gebruik de uitkomst als "
-                "vergelijking, niet als statistisch onderbouwde grens."
+                "uit een kansmodel. In de praktijk geeft ze meestal een "
+                "conservatieve grens, ruimer dan die van de scherpere maar "
+                "complexere kalibratiemethode. Onder zeer extreme "
+                "omstandigheden, bij een zeer kleine N_klant (bijvoorbeeld 1 "
+                "of enkele posten), kan de grens te laag uitvallen. Ze kent "
+                "geen afhandeling van extreem kleine klanten en geeft "
+                "daarom ook geen waarschuwing of weigering in die gevallen."
             ),
         ]
     else:
@@ -340,7 +343,8 @@ def _methode_onderdelen(
                 "kunnen gebruiken, wordt per type post een effectieve "
                 "steekproef (n_eff, k_eff) gekozen waarvan de beta- "
                 "(binomiaal) of gammaverdeling (Poisson) hetzelfde "
-                "gemiddelde en dezelfde variantie heeft."
+                "gemiddelde en dezelfde variantie heeft. Dit is scherper "
+                "dan de eenvoudige poolingformule, maar ook complexer."
             ),
             alinea(
                 "Is N_klant zo klein dat dit niet meer binnen de beta- of "

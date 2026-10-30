@@ -67,11 +67,12 @@ def bouw_strata_SSO_klant(
     kalibratiemethode : {"momentmatching", "naief"}, standaard "momentmatching"
         Welke functie per type post (n_eff, k_eff) berekent:
 
-        - ``"momentmatching"``: ``moment_match_SSO`` (aanbevolen; matcht
-          gemiddelde én variantie van de werkelijke compound-verdeling).
+        - ``"momentmatching"``: ``moment_match_SSO`` (scherper maar
+          complexer; matcht gemiddelde én variantie van de werkelijke
+          compound-verdeling).
         - ``"naief"``: ``naief_match_SSO`` (eenvoudige poolingheuristiek,
-          ter vergelijking — zie die functie voor de onderbouwing en de
-          beperkingen ervan).
+          meestal conservatiever; zie die functie voor de onderbouwing en
+          de beperkingen ervan).
 
         De waarschuwings-/foutafhandeling bij klemming resp. een
         volledige blinde vlek (zie hieronder) is alleen van toepassing op

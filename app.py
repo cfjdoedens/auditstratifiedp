@@ -2033,10 +2033,10 @@ with tab_sso:
         sso_zekerheid_text = st.text_input("zekerheid", key="sso_zekerheid_text")
         sso_kalibratiemethode = st.radio(
             "berekeningsmethode",
-            ["momentmatching", "naief"],
+            ["naief", "momentmatching"],
             format_func=lambda m: {
-                "momentmatching": "Momentmatching (aanbevolen)",
-                "naief": "Naïef (benadering, ter vergelijking)",
+                "naief": "gebruik afgeleide n_klant en k_klant, conservatief",
+                "momentmatching": "idem, maar scherper en complexer",
             }[m],
             key="sso_kalibratiemethode",
         )
@@ -2717,8 +2717,7 @@ with tab_sso:
                             car=sso_totaal_car,
                             materialiteit=(
                                 _parse_nl(sso_totaal_materialiteit_text)
-                                if _parse_nl(sso_totaal_materialiteit_text)
-                                is not None
+                                if _parse_nl(sso_totaal_materialiteit_text) is not None
                                 else 0.01
                             ),
                             waarde_laag=sso_totaal_massa_val,
@@ -2730,8 +2729,7 @@ with tab_sso:
                 for type_post_dict in klanten_rijen_per_klant.values():
                     for type_post, post in type_post_dict.items():
                         sso_massa_per_type[type_post] = (
-                            sso_massa_per_type.get(type_post, 0.0)
-                            + post["waarde_laag"]
+                            sso_massa_per_type.get(type_post, 0.0) + post["waarde_laag"]
                         )
                 sso_totaal_posten = [
                     {
@@ -2833,7 +2831,9 @@ with tab_sso:
                         "\u2192 Reboot app) en probeer het opnieuw."
                     )
                     st.stop()
-                sso_rapport_balk = st.progress(0.0, text="Rapport wordt opgebouwd\u2026")
+                sso_rapport_balk = st.progress(
+                    0.0, text="Rapport wordt opgebouwd\u2026"
+                )
                 try:
                     st.session_state.sso_rapport_pdf = maak_sso_rapport_pdf(
                         st.session_state.sso_rapport_invoer,
@@ -2996,11 +2996,11 @@ with tab_theorie:
             "dus een **mengsel (compound distribution)** over beide lagen: "
             "eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij "
             "de klant op zijn beurt weer onzeker. Beide methoden hieronder "
-            "(momentmatching en de naïeve benadering) proberen deze "
+            "(de eenvoudige poolingformule en momentmatching) proberen deze "
             "samengestelde verdeling op een andere manier te benaderen."
         )
 
-    with st.expander("2. De naïeve n_klant-poolingformule"):
+    with st.expander("2. Eenvoudige methode: de n_klant-poolingformule"):
         st.markdown(
             "Een eenvoudige benadering kent de klant een **effectieve "
             "steekproefomvang** $n_\\text{eff}$ toe, gebaseerd op een "
@@ -3027,17 +3027,19 @@ with tab_theorie:
         )
         st.markdown(
             "$k_\\text{eff}$ wordt proportioneel meegeschaald, zodat de "
-            "geschatte foutfractie $k/n$ behouden blijft. Deze methode "
-            'heet in de app "naïef": ze is eenvoudig te doorzien, maar '
-            "— anders dan momentmatching hieronder — niet gekalibreerd op "
-            "de werkelijke variantie van de samengestelde verdeling. Ze "
-            "dient als vergelijkingsmethode, niet als aanbevolen "
-            "standaard. Een formeel bewijs (of weerlegging) van de "
-            "kwaliteit van deze benadering, bijvoorbeeld in Lean, is een "
-            "mogelijk vervolgtraject."
+            "geschatte foutfractie $k/n$ behouden blijft. Deze methode is "
+            "eenvoudig te doorzien en geeft in de praktijk meestal een "
+            "conservatieve grens, ruimer dan die van momentmatching "
+            "hieronder. Anders dan momentmatching is ze niet gekalibreerd "
+            "op de werkelijke variantie van de samengestelde verdeling; "
+            "onder zeer extreme omstandigheden, bij een zeer kleine "
+            "$N_\\text{klant}$ (bijvoorbeeld 1 of enkele posten), kan de "
+            "grens daardoor te laag uitvallen. Een formeel bewijs (of "
+            "weerlegging) van de kwaliteit van deze benadering, "
+            "bijvoorbeeld in Lean, is een mogelijk vervolgtraject."
         )
 
-    with st.expander("3. Momentmatching-kalibratie (de aanbevolen methode)"):
+    with st.expander("3. Momentmatching-kalibratie (scherper, maar complexer)"):
         st.markdown(
             "In plaats van de twee onzekerheidslagen uit punt 1 te "
             "benaderen met een vuistregel, kalibreert momentmatching een "
@@ -3053,7 +3055,9 @@ with tab_theorie:
             r" + \mathrm{Var}_p\!\left(\mathbb{E}[X \mid p]\right)"
         )
         st.markdown(
-            "Dit behoudt beide onzekerheidslagen voor zover dat binnen één "
+            "Het resultaat is scherper dan dat van de eenvoudige methode, "
+            "tegen de prijs van een ingewikkelder berekening. Dit behoudt "
+            "beide onzekerheidslagen voor zover dat binnen één "
             "Beta/Gamma-verdeling mogelijk is. Bij een absoluut te kleine "
             "$N_\\text{klant}$ kan het benodigde gemiddelde niet meer "
             "gecombineerd worden met de juiste variantie binnen die "

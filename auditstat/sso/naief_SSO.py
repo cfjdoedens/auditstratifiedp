@@ -1,10 +1,12 @@
 def naief_match_SSO(n, k, N_klant):
     """Naïeve pooling-benadering voor een effectieve (n_eff, k_eff) per klant.
 
-    Dit is een eenvoudige, niet-statistisch-onderbouwde heuristiek —
-    bedoeld als referentiepunt/vergelijkingsmethode naast de rigoureuzere
-    momentmatching-aanpak van ``moment_match_SSO``, niet als vervanging
-    ervan.
+    Dit is een eenvoudige, niet-statistisch-onderbouwde heuristiek, een
+    gelijkwaardig alternatief naast de scherpere maar complexere
+    momentmatching-aanpak van ``moment_match_SSO``. In de praktijk geeft ze
+    meestal een conservatievere (ruimere) grens; onder zeer extreme
+    omstandigheden (een zeer kleine ``N_klant``, bijv. 1) is dat niet
+    gegarandeerd.
 
     Achtergrond
     -----------

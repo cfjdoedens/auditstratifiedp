@@ -321,7 +321,7 @@ oorspronkelijke vraag, maar nodig om de consistentiecheck tussen de klantentotal
 SSO-brede populatieomvang mogelijk te maken).
 
 **Theoretische achtergrond.** Nieuw tabblad "Theorie" met vier `st.expander`-secties (two-stage
-sampling-idee, de naïeve n_klant-poolingformule met randgevallenargument, de
+sampling-idee, de eenvoudige (naïeve) n_klant-poolingformule met randgevallenargument, de
 momentmatching-kalibratie met de Var(X)≤p(1-p)-redenering, en een aankondiging van de nog niet
 geïmplementeerde FFT-exacte methode), plus korte contextuele `st.expander("Hoe werkt dit?")`-
 uitklappers bij de SSO-totalen-sectie in de werktab zelf, die naar het Theorie-tabblad
@@ -361,7 +361,7 @@ paarsgewijs", "direct", "Monte Carlo" — een andere as). Nieuw: `auditstat/sso/
 poolingheuristiek: `n_eff = n·N_klant/(n+N_klant)` (parallelformule, analoog aan weerstanden in
 parallel), `k_eff = k·n_eff/n` (foutfractie behouden). Gemotiveerd via twee grensgevallen
 (N_klant≫n → n_eff→n; N_klant≪n → n_eff→N_klant), niet via een afleiding uit een kansmodel —
-expliciet een vergelijkingsmethode naast `moment_match_SSO`, geen vervanging. Anders dan
+een gelijkwaardig alternatief naast `moment_match_SSO` (zie "Labels berekeningsmethode" hieronder). Anders dan
 `moment_match_SSO` kent `naief_match_SSO` geen klemming/blinde-vlek-afhandeling (geen
 `RuntimeWarning`/`ValueError` bij een extreem kleine `N_klant`) — simpelweg de formule, altijd.
 In de app is dit een radio "berekeningsmethode" naast model/zekerheid in het instellingenblok.
@@ -395,7 +395,7 @@ De SSO-tab kan de volledige invoer uit één CSV inlezen en weer wegschrijven (u
 
 **Colofon (2026-10-29):** onderaan de laatste pagina staat in klein lettertype "Dit rapport is gemaakt met auditstat versie X op d-m-jjjj om uu:mm:ss". De parameter `tijdstip: datetime.datetime | None` (was `datum`; standaard nu) levert datum en tijd. `_auditstat_versie()` leest bij een broncode-checkout (`pyproject.toml` met `name = "auditstat"` naast het pakket) de versie uit dat bestand, omdat de metadata van een editable installatie na een versieverhoging achterloopt (hier gaf `importlib.metadata` nog 0.1.9) en Streamlit Cloud het pakket niet installeert maar uit de repo draait; anders `importlib.metadata`, anders "onbekend".
 
-**Methodebeschrijving (optioneel, 2026-10-29):** `maak_sso_rapport_pdf(..., methodebeschrijving=False)` voegt bij `True` een laatste pagina toe (`_methode_onderdelen`), afgestemd op de instellingen: model (binomiaal/Poisson), kalibratiemethode (momentmatching: samengestelde verdeling, Beta/Gamma-moment-matching, klem- en blinde-vlek-afhandeling bij vaste 95%; naïef: poolingformule, geen klem-afhandeling, alleen ter vergelijking) en de drie aannames (willekeurige verspreiding/random injectie, vlakke prior, elke post volledig goed of fout met Var(X) ≤ p(1-p)). De tekst staat hard in `rapport_pdf.py`; bij inhoudelijke wijzigingen aan `moment_match_SSO`/`naief_SSO` moet die handmatig mee. In de app: checkbox `sso_rapport_methode` (wist de opgeslagen PDF bij wijziging) boven de knop "PDF-rapport maken".
+**Methodebeschrijving (optioneel, 2026-10-29):** `maak_sso_rapport_pdf(..., methodebeschrijving=False)` voegt bij `True` een laatste pagina toe (`_methode_onderdelen`), afgestemd op de instellingen: model (binomiaal/Poisson), kalibratiemethode (momentmatching: samengestelde verdeling, Beta/Gamma-moment-matching, klem- en blinde-vlek-afhandeling bij vaste 95%; eenvoudig/naïef: poolingformule, geen klem-afhandeling, meestal conservatief maar bij zeer kleine N_klant niet gegarandeerd) en de drie aannames (willekeurige verspreiding/random injectie, vlakke prior, elke post volledig goed of fout met Var(X) ≤ p(1-p)). De tekst staat hard in `rapport_pdf.py`; bij inhoudelijke wijzigingen aan `moment_match_SSO`/`naief_SSO` moet die handmatig mee. In de app: checkbox `sso_rapport_methode` (wist de opgeslagen PDF bij wijziging) boven de knop "PDF-rapport maken".
 
 **App-koppeling:** bij een geslaagde berekening bewaart `app.py` een **momentopname** van de invoer (`st.session_state.sso_rapport_invoer`, kopieën van de tabellen) zodat het rapport bij de resultaten blijft passen als de invoer daarna wordt aangepast. De PDF wordt op verzoek gebouwd (knop "PDF-rapport maken" -> `sso_rapport_pdf` in session state -> `st.download_button`), niet bij elke rerun, omdat het tekenen van de kanskrommen enkele seconden kost. De opgeslagen PDF wordt gewist bij elke nieuwe berekening.
 
@@ -433,3 +433,5 @@ De gebruiker werkt nooit tegelijk met de assistent aan het project: als er wijzi
 - **Behandel zulke wijzigingen als uitgangspunt:** niet terugdraaien, niet overschrijven, en bij een nieuwe aanpassing van een bestand uitgaan van de actuele inhoud (niet van het geheugen). Een mislukte exacte-tekstvervanging (`edit`/`assert old in s`) betekent vrijwel altijd dat de gebruiker die plek heeft gewijzigd: opnieuw lezen, niet forceren.
 - **Commits:** `git add -A` is toegestaan; de wijzigingen van de gebruiker mogen in dezelfde commit mee. Noem ze kort in het commitbericht of de samenvatting als ze inhoudelijk zijn, en draai de tests als ze code raken.
 - **Bestaande bestanden nooit in hun geheel overschrijven** op basis van een eerder gelezen versie; altijd gerichte bewerkingen op de actuele inhoud.
+
+**Labels berekeningsmethode (2026-10-30, door de gebruiker bepaald):** de radio "berekeningsmethode" in de SSO-tab toont `["naief", "momentmatching"]` in die volgorde (bewust omgedraaid; de eerste optie is de app-standaard, dus de app start nu met `naief`, terwijl de Python-functies `momentmatching` als default houden) met de labels "gebruik afgeleide n_klant en k_klant, conservatief" resp. "idem, maar scherper en complexer". De naïeve methode wordt dus niet meer als "ter vergelijking"/"niet aanbevolen" gepresenteerd, en momentmatching niet meer als "de aanbevolen methode": beide zijn gelijkwaardige keuzes (eenvoudig en meestal conservatief vs. scherper en complexer). Bewust niet te sterk geformuleerd om de gebruiker niet te belasten: "conservatief" is een waarneming (in 60 doorgerekende (n,k,N_klant,model)-combinaties was de naïeve grens altijd ≥ momentmatching), geen bewijs; bij een zeer kleine N_klant (bijv. 1) kan de naïeve grens te laag uitvallen. Dezelfde toon staat in het Theorie-tabblad (onderdelen 2 en 3), in de PDF-methodebeschrijving (`_methode_onderdelen`, `_KALIBRATIE_LABELS`) en in de docstring van `naief_match_SSO`; bij een wijziging van de labels in de radio moeten die mee.
