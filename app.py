@@ -613,7 +613,7 @@ def _teken_sso_geldsteekproefschema():
     ax.text(
         0,
         straal + 0.55,
-        "Totale massa posten SSO, opgebouwd uit eurocenten",
+        "Totale massa posten SSO ($N$ totaal); elke post bestaat uit eurocenten",
         ha="center",
         fontsize=10,
         color="#3b6ea5",
