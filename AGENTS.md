@@ -171,7 +171,7 @@ Beide functies bevatten een uitgebreid validatieblok (in `INVOER_CONTROLE`), dat
 
 **Alleen eval_stratified:**
 - `n_laag` < 0 → `ValueError`
-- `n_laag` geen geheel getal → `ValueError`
+- `n_laag` mag niet-geheel zijn (sinds 2026-10-30; `eval_stratified` rekent met Beta-/Gamma-verdelingen, dus een effectieve steekproefomvang is toegestaan)
 - `k_laag` < 0 → `ValueError`
 - `k_laag` > `n_laag` → `ValueError`
 
@@ -435,3 +435,5 @@ De gebruiker werkt nooit tegelijk met de assistent aan het project: als er wijzi
 - **Bestaande bestanden nooit in hun geheel overschrijven** op basis van een eerder gelezen versie; altijd gerichte bewerkingen op de actuele inhoud.
 
 **Labels berekeningsmethode (2026-10-30, door de gebruiker bepaald):** de radio "berekeningsmethode" in de SSO-tab toont `["naief", "momentmatching"]` in die volgorde (bewust omgedraaid; de eerste optie is de app-standaard, dus de app start nu met `naief`, terwijl de Python-functies `momentmatching` als default houden) met de labels "gebruik afgeleide n_klant en k_klant, conservatief" resp. "idem, maar scherper en complexer". De naïeve methode wordt dus niet meer als "ter vergelijking"/"niet aanbevolen" gepresenteerd, en momentmatching niet meer als "de aanbevolen methode": beide zijn gelijkwaardige keuzes (eenvoudig en meestal conservatief vs. scherper en complexer). Bewust niet te sterk geformuleerd om de gebruiker niet te belasten: "conservatief" is een waarneming (in 60 doorgerekende (n,k,N_klant,model)-combinaties was de naïeve grens altijd ≥ momentmatching), geen bewijs; bij een zeer kleine N_klant (bijv. 1) kan de naïeve grens te laag uitvallen. Dezelfde toon staat in het Theorie-tabblad (onderdelen 2 en 3), in de PDF-methodebeschrijving (`_methode_onderdelen`, `_KALIBRATIE_LABELS`) en in de docstring van `naief_match_SSO`; bij een wijziging van de labels in de radio moeten die mee.
+
+**Geen afronding van `n_eff` meer (2026-10-30).** `bouw_strata_SSO_klant` rondde `n_eff` af op een geheel `n_laag` (eis van `eval_stratified`) terwijl `k_eff` ongeafgerond bleef. Dat verstoorde de gekalibreerde variantie en het gemiddelde: met de CSV `SSO2.csv` (n=108, k=2, N_klant 84.000-147.000) lag "Klanten samen" (0,044248) onder "Hele SSO" (0,044280), terwijl de som van de klantgrenzen daar niet onder hoort te liggen. Nu accepteert `eval_stratified` een niet-geheel `n_laag` (alleen de gehele-getallencontrole is vervallen; `n_laag >= 0` en `k_laag <= n_laag` blijven) en geeft `bouw_strata_SSO_klant` `n_laag = max(n_eff, k_eff)` ongeafgerond door. Resultaat: Klanten samen 0,044283 (momentmatching) / 0,044292 (naief) >= Hele SSO 0,044280. In `evalueer_SSO_totaal` blijft `n` wel geheel (echte steekproefomvang).

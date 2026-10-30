@@ -1,4 +1,3 @@
-import math
 import warnings
 
 import pandas as pd
@@ -88,10 +87,10 @@ def bouw_strata_SSO_klant(
 
     Let op
     ------
-    ``eval_stratified`` vereist een geheel getal voor ``n_laag`` dat niet
-    kleiner is dan ``k_laag``, terwijl (n_eff, k_eff) reële, gekalibreerde
-    waarden zijn. ``n_laag`` wordt daarom naar boven afgerond tot
-    tenminste ``ceil(k_eff)``; ``k_laag`` (= k_eff) blijft ongeafrond.
+    ``eval_stratified`` accepteert een niet-geheel ``n_laag`` (het rekent met
+    Beta-/Gamma-verdelingen), dus (n_eff, k_eff) worden ongeafgerond
+    doorgegeven; afronden zou de gekalibreerde variantie en het gemiddelde
+    verstoren. ``n_laag`` is minstens ``k_laag`` (eis van ``eval_stratified``).
 
     Als ``moment_match_SSO`` voor een type post moet klemmen, vuurt die
     functie een ``RuntimeWarning`` af; deze functie vangt die op en vuurt
@@ -153,7 +152,7 @@ def bouw_strata_SSO_klant(
                 warnings.warn(
                     f"Type post '{naam}': {w.message}", RuntimeWarning, stacklevel=2
                 )
-        n_laag = max(round(n_eff), math.ceil(k_eff))
+        n_laag = max(n_eff, k_eff)
 
         rij = {
             "naam": naam,

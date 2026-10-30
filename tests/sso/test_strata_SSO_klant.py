@@ -1,4 +1,3 @@
-import math
 import unittest
 import warnings
 
@@ -20,15 +19,17 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
         self.assertEqual(list(df["waarde_laag"]), [2_000_000.0, 5_000_000.0])
 
         n_eff_0, k_eff_0 = moment_match_SSO(120, 1, 400, verdeling="binomiaal")
-        self.assertEqual(df["n_laag"].iloc[0], max(round(n_eff_0), math.ceil(k_eff_0)))
+        self.assertEqual(df["n_laag"].iloc[0], max(n_eff_0, k_eff_0))
         self.assertAlmostEqual(df["k_laag"].iloc[0], k_eff_0)
 
-    def test_n_laag_is_geheel_getal_en_niet_kleiner_dan_k_laag(self):
+    def test_n_laag_is_ongeafgerond_en_niet_kleiner_dan_k_laag(self):
         post_typen = [
             dict(naam="Emolumenten", n=120, k=1, N_klant=401, waarde_laag=2_000_000.0),
         ]
         df = bouw_strata_SSO_klant(post_typen)
-        self.assertEqual(df["n_laag"].iloc[0], round(df["n_laag"].iloc[0]))
+        n_eff, _ = moment_match_SSO(120, 1, 401, verdeling="binomiaal")
+        self.assertAlmostEqual(df["n_laag"].iloc[0], n_eff)
+        self.assertNotEqual(df["n_laag"].iloc[0], round(df["n_laag"].iloc[0]))
         self.assertGreaterEqual(df["n_laag"].iloc[0], df["k_laag"].iloc[0])
 
     def test_model_poisson_geeft_andere_kalibratie_dan_binomiaal(self):

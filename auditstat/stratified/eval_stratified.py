@@ -210,11 +210,10 @@ def eval_stratified(
         if (steekproeven["waarde_laag"] < 0).any():
             raise ValueError("Kolom 'waarde_laag' mag geen negatieve waarden bevatten.")
 
-        # Controleer n_laag: >= 0 en geen gebroken waarden.
+        # Controleer n_laag: >= 0. Niet-gehele waarden zijn toegestaan
+        # (effectieve steekproefomvang, bijv. uit de SSO-kalibratie).
         if (steekproeven["n_laag"] < 0).any():
             raise ValueError("Kolom 'n_laag' mag geen negatieve waarden bevatten.")
-        if not (steekproeven["n_laag"] == steekproeven["n_laag"].round()).all():
-            raise ValueError("Kolom 'n_laag' mag alleen gehele getallen bevatten.")
 
         # Controleer k_laag: >= 0 en niet groter dan n_laag.
         if (steekproeven["k_laag"] < 0).any():

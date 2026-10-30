@@ -649,13 +649,13 @@ def test_eval_kolominhoud_negatieve_n_laag_wordt_geweigerd():
         eval_stratified(data)
 
 
-def test_eval_kolominhoud_gebroken_n_laag_wordt_geweigerd():
-    """Een niet-geheel getal in n_laag wordt geweigerd."""
+def test_eval_gebroken_n_laag_wordt_geaccepteerd():
+    """Een niet-geheel n_laag (effectieve steekproefomvang) is toegestaan."""
     data = get_geldige_steekproef()
     data["n_laag"] = data["n_laag"].astype(float)
     data.loc[0, "n_laag"] = 30.5
-    with pytest.raises(ValueError, match="gehele getallen"):
-        eval_stratified(data)
+    res = eval_stratified(data)
+    assert 0 < res["max_fout_convolutie"] < 1
 
 
 def test_eval_kolominhoud_negatieve_k_laag_wordt_geweigerd():
