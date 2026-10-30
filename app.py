@@ -3231,20 +3231,19 @@ with tab_theorie:
         st.markdown("Dit wordt uitgebeeld in onderstaand plaatje.")
         st.pyplot(_teken_sso_steekproefschema())
         st.caption(
-            "Schematische weergave: de grote cirkel is de "
-            "totale massa posten van de SSO, met daarin één pool van "
-            "posten die standaard grijs is. De klant-ovalen (middelgroot) "
-            "en de SSO-steekproef-ovaal (heel klein) staan bewust *buiten* "
-            "die massa getekend; alleen de posten waar een pijl "
-            "daadwerkelijk naartoe loopt krijgen een kleur \u2014 de rest "
-            "blijft grijs, óók al hoort elke grijze post in werkelijkheid "
-            "ook al bij een klant. Dat beeldt de willekeurige verspreiding "
-            "uit: wélke "
-            "posten bij een klant horen, of in de steekproef zitten, ligt "
-            "niet vast in een patroon. Eén steekproefpijl landt bewust op "
-            "een al door een klantpijl ontsloten post (zwart omcirkeld) "
-            "\u2014 een steekproefpost kan heel goed samenvallen met een "
-            "post die ook al aantoonbaar bij een specifieke klant hoort."
+            "Schematische weergave van de situatie rond de SSO-steekproef. "
+            "De grote cirkel bevat de totale massa posten van de SSO. Zowel "
+            "de klantposten als de steekproefposten zijn te beschouwen als "
+            "steekproeven op de massa posten van de SSO. Dit is aangegeven "
+            "door de klant-ovalen (rechts) en de SSO-steekproefovaal "
+            "(links) buiten de massa te tekenen, en pijlen van de "
+            "klantovalen en de steekproefovaal naar de bijbehorende posten "
+            "in de SSO-massa te trekken. We "
+            "zien \u00e9\u00e9n situatie getekend waarin een pijl vanuit "
+            "de SSO-steekproef en een pijl vanuit een klant dezelfde post "
+            "treffen (zwart omcirkeld). In werkelijkheid geldt voor elke "
+            "post getrokken uit de SSO dat die post een post van een klant "
+            "van de SSO is."
         )
         st.markdown(
             "Echter, er is een complicatie. De steekproef die we over de "
