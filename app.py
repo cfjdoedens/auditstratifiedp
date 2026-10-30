@@ -2820,11 +2820,10 @@ with tab_sso:
             })
         st.table(pd.DataFrame(sso_totalen_rijen))
         st.caption(
-            "Klanten samen is de som van de afzonderlijke klantgrenzen "
-            "(de foutfractie is gewogen naar de massa van elke klant) en "
-            "daardoor ruimer dan een gezamenlijke grens voor de klanten "
-            "samen. Hele SSO is een eigenstandige berekening op de "
-            "gegevens van de hele SSO."
+            "Klanten samen telt de grenzen van de klanten bij elkaar op. "
+            "Dat is een voorzichtige schatting: de werkelijke grens voor "
+            "alle klanten samen is meestal lager. Hele SSO is een aparte "
+            "berekening op de gegevens van de hele SSO."
         )
 
         if maak_sso_rapport_pdf is None:

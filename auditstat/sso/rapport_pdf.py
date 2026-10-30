@@ -605,14 +605,14 @@ def maak_sso_rapport_pdf(
         )
     )
     toelichting = (
-        "Klanten samen is de som van de afzonderlijke klantgrenzen (de "
-        "foutfractie is gewogen naar de massa van elke klant) en daardoor "
-        "ruimer dan een gezamenlijke grens voor de klanten samen."
+        "Klanten samen telt de grenzen van de klanten bij elkaar op. Dat is "
+        "een voorzichtige schatting: de werkelijke grens voor alle klanten "
+        "samen is meestal lager."
     )
     if resultaat_totaal is not None:
         toelichting += (
-            " Hele SSO is een eigenstandige berekening op de gegevens van "
-            "de hele SSO."
+            " Hele SSO is een aparte berekening op de gegevens van de "
+            "hele SSO."
         )
     onderdelen.append(Paragraph(toelichting, stijlen["klein"]))
 
