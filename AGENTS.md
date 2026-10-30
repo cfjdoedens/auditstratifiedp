@@ -258,7 +258,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-277 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+279 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -417,7 +417,7 @@ Bij het eMudhra/emSign CA-incident (gecompromitteerde intermediate CA, risico op
 
 Getest in `tests/sso/test_evalueer_SSO_totaal.py` en `tests/sso/test_rapport_pdf.py`; app-flow (ja/nee, incl. PDF) met `AppTest` gecontroleerd.
 
-**Hele SSO als eerste regel van de resultaatsamenvatting (2026-10-29):** onder het kopje "Resultaat" (app) staat "Hele SSO" als eerste regel van de samenvattingstabel, gevolgd door de klanten; in het PDF-rapport geldt hetzelfde voor de tabel onder het kopje "Resultaat" (voorheen "Resultaat per klant"). De regel verschijnt alleen als `sso_totaal_res`/`resultaat_totaal` beschikbaar is. De naam "Hele SSO" (`HELE_SSO_NAAM` in `evalueer_SSO_totaal.py`, hoofdletterongevoelig via `is_gereserveerde_klantnaam`) is daarom **verboden als klantnaam**: geweigerd bij CSV-import (`lees_sso_invoer_csv`, test `test_klantnaam_hele_sso_is_gereserveerd`), teruggedraaid in de twee klantentabel-callbacks en geweigerd bij submit-validatie (beide onderscheid-paden).
+**Samenvatting onder "Resultaat" (2026-10-30, vervangt "Hele SSO als eerste regel" van 2026-10-29):** de tabel toont alleen de klanten; daaronder (app: `st.divider()`, rapport: tweede tabel "Totaal") staan twee regels: "Klanten samen" (`KLANTEN_SAMEN_NAAM`; `klanten_samen(resultaten)` in `evalueer_SSO_totaal.py`: som van `max_fout_convolutie_geld`, fractie = som euro / som `waarde_populatie`, dus gewogen naar de massa van elke klant) en "Hele SSO" (de eigenstandige berekening). Een korte toelichting eronder zegt dat "Klanten samen" de som van de afzonderlijke klantgrenzen is en daardoor ruimer dan een gezamenlijke grens. "Klanten samen" is (nog) niet als klantnaam gereserveerd. Oorspronkelijke bepaling hierover ("Hele SSO" als eerste regel): onder het kopje "Resultaat" (app) staat "Hele SSO" als eerste regel van de samenvattingstabel, gevolgd door de klanten; in het PDF-rapport geldt hetzelfde voor de tabel onder het kopje "Resultaat" (voorheen "Resultaat per klant"). De regel verschijnt alleen als `sso_totaal_res`/`resultaat_totaal` beschikbaar is. De naam "Hele SSO" (`HELE_SSO_NAAM` in `evalueer_SSO_totaal.py`, hoofdletterongevoelig via `is_gereserveerde_klantnaam`) is daarom **verboden als klantnaam**: geweigerd bij CSV-import (`lees_sso_invoer_csv`, test `test_klantnaam_hele_sso_is_gereserveerd`), teruggedraaid in de twee klantentabel-callbacks en geweigerd bij submit-validatie (beide onderscheid-paden).
 
 **`sso_error` wordt na de berekening getoond (2026-10-29):** het `st.error(sso_error)`-blok staat direct vóór de resultaatsectie, ná het `if sso_bereken:`-blok. Daarvoor stond het erboven, waardoor fouten van de berekeningsknop pas bij de volgende interactie zichtbaar werden (met AppTest aangetoond).
 

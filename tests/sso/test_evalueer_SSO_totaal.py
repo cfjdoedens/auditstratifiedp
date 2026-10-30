@@ -71,3 +71,38 @@ def test_lege_lijst_wordt_geweigerd():
 def test_poisson_model_werkt():
     res = evalueer_SSO_totaal([_post()], model="poisson")
     assert res["max_fout_convolutie"] > 0
+
+
+def test_klanten_samen_telt_euros_op_en_weegt_fractie_naar_massa():
+    from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (
+        evalueer_SSO_klant_gestratificeerd,
+    )
+    from auditstat.sso.evalueer_SSO_totaal import klanten_samen
+
+    res = {
+        "A": evalueer_SSO_klant_gestratificeerd(
+            [dict(naam="x", n=200, k=4, N_klant=3000, waarde_laag=1_500_000.0)]
+        ),
+        "B": evalueer_SSO_klant_gestratificeerd(
+            [dict(naam="x", n=200, k=4, N_klant=2000, waarde_laag=1_000_000.0)]
+        ),
+    }
+    fractie, euro, massa = klanten_samen(res)
+    assert euro == pytest.approx(
+        res["A"]["max_fout_convolutie_geld"] + res["B"]["max_fout_convolutie_geld"]
+    )
+    assert massa == pytest.approx(2_500_000.0)
+    assert fractie == pytest.approx(euro / massa)
+    # gewogen gemiddelde van de klantfracties, gewicht = massa
+    verwacht = (
+        res["A"]["max_fout_convolutie"] * 1_500_000.0
+        + res["B"]["max_fout_convolutie"] * 1_000_000.0
+    ) / 2_500_000.0
+    assert fractie == pytest.approx(verwacht)
+
+
+def test_klanten_samen_zonder_resultaten_geeft_value_error():
+    from auditstat.sso.evalueer_SSO_totaal import klanten_samen
+
+    with pytest.raises(ValueError):
+        klanten_samen({})

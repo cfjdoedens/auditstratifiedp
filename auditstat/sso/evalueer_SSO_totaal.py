@@ -7,6 +7,38 @@ from auditstat.stratified.eval_stratified import eval_stratified
 HELE_SSO_NAAM = "Hele SSO"
 
 
+# Naam van de regel met de samengetelde klantresultaten in samenvattingen.
+KLANTEN_SAMEN_NAAM = "Klanten samen"
+
+
+def klanten_samen(resultaten: dict) -> tuple[float, float, float]:
+    """Tel de resultaten van de afzonderlijke klanten bij elkaar op.
+
+    Parameters
+    ----------
+    resultaten : dict
+        Per klantnaam het resultaat van ``evalueer_SSO_klant_gestratificeerd``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        ``(max_fout_fractie, max_fout_euro, massa)``: de som van de
+        maximale fouten in euro's, de som van de massa (``waarde_populatie``)
+        en de gewogen foutfractie (som euro's gedeeld door som massa, dus
+        gewogen naar de massa van elke klant).
+
+        Let op: dit is de som van de afzonderlijke klantgrenzen en dus
+        geen gezamenlijke grens met dezelfde zekerheid; die zou lager zijn.
+    """
+    if not resultaten:
+        raise ValueError("Geen klantresultaten om samen te tellen.")
+    euro = float(sum(r["max_fout_convolutie_geld"] for r in resultaten.values()))
+    massa = float(
+        sum(r["steekproeven"]["waarde_populatie"].sum() for r in resultaten.values())
+    )
+    return (euro / massa if massa else 0.0), euro, massa
+
+
 def is_gereserveerde_klantnaam(naam) -> bool:
     """True als ``naam`` (hoofdletterongevoelig, zonder omringende spaties) ``HELE_SSO_NAAM`` is."""
     return str(naam).strip().casefold() == HELE_SSO_NAAM.casefold()

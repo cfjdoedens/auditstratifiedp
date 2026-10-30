@@ -46,6 +46,11 @@ except ImportError as exc:  # pragma: no cover - afhankelijk van de omgeving
     ) from exc
 
 from auditstat._formatting import nl_getal
+from auditstat.sso.evalueer_SSO_totaal import (
+    HELE_SSO_NAAM,
+    KLANTEN_SAMEN_NAAM,
+    klanten_samen,
+)
 from auditstat.sso.invoer_csv import _tekst
 from auditstat.stratified.plot_kanskromme import plot_kanskromme
 
@@ -571,16 +576,45 @@ def maak_sso_rapport_pdf(
                     nl_getal(res["max_fout_convolutie"], 4),
                     nl_getal(res["max_fout_convolutie_geld"], 2),
                 ]
-                for klant, res in (
-                    ([("Hele SSO", resultaat_totaal)] if resultaat_totaal else [])
-                    + list(resultaten.items())
-                )
+                for klant, res in resultaten.items()
             ],
             [breedte * 0.4, breedte * 0.3, breedte * 0.3],
             stijlen,
             rechts={1, 2},
         )
     )
+
+    samen_fractie, samen_euro, _ = klanten_samen(resultaten)
+    totalen_rijen = [
+        [KLANTEN_SAMEN_NAAM, nl_getal(samen_fractie, 4), nl_getal(samen_euro, 2)]
+    ]
+    if resultaat_totaal is not None:
+        totalen_rijen.append([
+            HELE_SSO_NAAM,
+            nl_getal(resultaat_totaal["max_fout_convolutie"], 4),
+            nl_getal(resultaat_totaal["max_fout_convolutie_geld"], 2),
+        ])
+    onderdelen.append(Spacer(1, 10))
+    onderdelen.append(
+        _tabel(
+            ["Totaal", "Maximale fout (fractie)", "Maximale fout (euro\u2019s)"],
+            totalen_rijen,
+            [breedte * 0.4, breedte * 0.3, breedte * 0.3],
+            stijlen,
+            rechts={1, 2},
+        )
+    )
+    toelichting = (
+        "Klanten samen is de som van de afzonderlijke klantgrenzen (de "
+        "foutfractie is gewogen naar de massa van elke klant) en daardoor "
+        "ruimer dan een gezamenlijke grens voor de klanten samen."
+    )
+    if resultaat_totaal is not None:
+        toelichting += (
+            " Hele SSO is een eigenstandige berekening op de gegevens van "
+            "de hele SSO."
+        )
+    onderdelen.append(Paragraph(toelichting, stijlen["klein"]))
 
     if resultaat_totaal is not None:
         onderdelen.append(

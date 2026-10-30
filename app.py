@@ -22,8 +22,10 @@ for _poging in (1, 2):
         )
         from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
             HELE_SSO_NAAM,
+            KLANTEN_SAMEN_NAAM,
             evalueer_SSO_totaal,
             is_gereserveerde_klantnaam,
+            klanten_samen,
         )
         from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
             lees_sso_invoer_csv,
@@ -2035,7 +2037,7 @@ with tab_sso:
             "berekeningsmethode",
             ["naief", "momentmatching"],
             format_func=lambda m: {
-                "naief": "gebruik afgeleide n_klant en k_klant, conservatief",
+                "naief": "gebruik afgeleide n_klant en k_klant, meestal conservatief",
                 "momentmatching": "idem, maar scherper en complexer",
             }[m],
             key="sso_kalibratiemethode",
@@ -2787,20 +2789,43 @@ with tab_sso:
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
         st.subheader("Resultaat")
-        sso_samenvatting_bronnen = list(sso_klanten_res.items())
-        if st.session_state.sso_totaal_res is not None:
-            sso_samenvatting_bronnen.insert(
-                0, ("Hele SSO", st.session_state.sso_totaal_res)
-            )
         sso_samenvatting = pd.DataFrame([
             {
                 "klant": klant,
                 "max_fout_fractie": _nl(res["max_fout_convolutie"], 4),
                 "max_fout_euro": _nl(res["max_fout_convolutie_geld"], 2),
             }
-            for klant, res in sso_samenvatting_bronnen
+            for klant, res in sso_klanten_res.items()
         ])
         st.table(sso_samenvatting)
+
+        st.divider()
+        sso_samen_fractie, sso_samen_euro, _ = klanten_samen(sso_klanten_res)
+        sso_totalen_rijen = [
+            {
+                "klant": KLANTEN_SAMEN_NAAM,
+                "max_fout_fractie": _nl(sso_samen_fractie, 4),
+                "max_fout_euro": _nl(sso_samen_euro, 2),
+            }
+        ]
+        if st.session_state.sso_totaal_res is not None:
+            sso_totalen_rijen.append({
+                "klant": HELE_SSO_NAAM,
+                "max_fout_fractie": _nl(
+                    st.session_state.sso_totaal_res["max_fout_convolutie"], 4
+                ),
+                "max_fout_euro": _nl(
+                    st.session_state.sso_totaal_res["max_fout_convolutie_geld"], 2
+                ),
+            })
+        st.table(pd.DataFrame(sso_totalen_rijen))
+        st.caption(
+            "Klanten samen is de som van de afzonderlijke klantgrenzen "
+            "(de foutfractie is gewogen naar de massa van elke klant) en "
+            "daardoor ruimer dan een gezamenlijke grens voor de klanten "
+            "samen. Hele SSO is een eigenstandige berekening op de "
+            "gegevens van de hele SSO."
+        )
 
         if maak_sso_rapport_pdf is None:
             st.caption(
