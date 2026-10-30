@@ -2963,31 +2963,30 @@ with tab_theorie:
     ):
         st.markdown(
             "Een shared service organisatie (SSO) verwerkt posten voor "
-            "meerdere klanten tegelijk, en trekt daar **één gezamenlijke "
-            "steekproef** uit: een steekproef van omvang $n$ uit de totale "
-            "SSO-populatie, met $k$ geconstateerde fouten. Om iets te "
-            "zeggen over **één specifieke klant**, moet je er rekening mee "
-            "houden dat die klant maar een deel ($N_\\text{klant}$ posten) "
-            "van die totale populatie vormt. Dat geeft twee lagen van "
-            "onzekerheid:"
+            "meerdere klanten tegelijk."
         )
         st.markdown(
-            "**Essentiële aanname.** De hele methode steunt op één "
-            "aanname: de posten van **elke afzonderlijke klant** liggen "
-            "zelf willekeurig verspreid tussen de posten van de totale "
-            "SSO-massa \u2014 ze vormen een *random injectie* (in "
-            "wiskundige zin: elke post komt op een eigen, niet-gedeeld "
-            "punt terecht, zonder herkenbaar patroon) op die totale massa, "
-            "precies zoals de SSO-brede steekproef dat ook is. Omdat elke "
-            "post bovendien bij precies één klant hoort, landt een post "
-            "uit de SSO-brede steekproef altijd op een al bestaande, aan "
-            "een klant toebehorende plek \u2014 nooit op een \u201cvrije\u201d "
-            "plek die bij niemand hoort. Die combinatie \u2014 willekeurig "
-            "verspreid, én altijd bij een klant horend \u2014 is precies "
-            "wat de uit $(n,k)$ geschatte foutkans $p$ ook geldig maakt "
-            "als uitgangspunt voor wat er binnen de posten van één klant "
-            "aan fouten te verwachten is."
+            "We mogen ervan uitgaan dat de behandeling van elke post "
+            "onafhankelijk is van de klant van wie die post komt."
         )
+        st.markdown(
+            "We willen nu een uitspraak doen over de kwaliteit van die "
+            "verwerking per klant. We nemen daarom een steekproef over de "
+            "posten van de hele SSO. Nu moeten we nog bepalen hoe we de "
+            "uitkomsten van deze steekproef kunnen toebedelen aan de "
+            "afzonderlijke klanten. Dat doen we door aan te nemen dat de "
+            "posten van een afzonderlijke klant te beschouwen zijn als een "
+            "steekproef uit het totale aantal posten dat door de SSO wordt "
+            "verwerkt. Dit mogen we doen vanwege de aanname dat elke post "
+            "binnen de SSO onafhankelijk wordt behandeld van de klant van "
+            "wie die post afkomstig is. We hebben dus de situatie dat er "
+            "ter controle \u00e9\u00e9n steekproef wordt getrokken op de "
+            "SSO en tegelijkertijd dat er voor elke klant ook een "
+            "steekproef wordt getrokken op de SSO. Toevallig kan het dus "
+            "zijn dat voor een individuele klant geldt dat sommige van "
+            "zijn posten ook getrokken zijn in de algemene steekproef."
+        )
+        st.markdown("Dit wordt uitgebeeld in onderstaand plaatje.")
         st.pyplot(_teken_sso_steekproefschema())
         st.caption(
             "Schematische weergave (niet op schaal): de grote cirkel is de "
@@ -2997,12 +2996,41 @@ with tab_theorie:
             "die massa getekend; alleen de posten waar een pijl "
             "daadwerkelijk naartoe loopt krijgen een kleur \u2014 de rest "
             "blijft grijs, óók al hoort elke grijze post in werkelijkheid "
-            "ook al bij een klant. Dat beeldt de random injectie uit: wélke "
+            "ook al bij een klant. Dat beeldt de willekeurige verspreiding "
+            "uit: wélke "
             "posten bij een klant horen, of in de steekproef zitten, ligt "
             "niet vast in een patroon. Eén steekproefpijl landt bewust op "
             "een al door een klantpijl ontsloten post (zwart omcirkeld) "
             "\u2014 een steekproefpost kan heel goed samenvallen met een "
             "post die ook al aantoonbaar bij een specifieke klant hoort."
+        )
+        st.markdown(
+            "Echter, er is een complicatie. De steekproef die we over de "
+            "SSO trekken is een geldsteekproef en geen postensteekproef. "
+            "De posten van een individuele klant blijven te beschouwen als "
+            "postensteekproeven op de totale SSO-posten. Daardoor wordt "
+            "het wat lastiger om op grond van dit model de fouten die in "
+            "de steekproef over de hele SSO zijn gevonden, te vertalen "
+            "naar de foutfractie in geld per klant van de SSO."
+        )
+        st.markdown(
+            "We maken daarom de volgende vereenvoudigende aannames:"
+        )
+        st.markdown(
+            "De posten van de klanten van de SSO zijn relatief klein, "
+            "waardoor alle eurocenten die gestoken worden op de hele "
+            "SSO-massa altijd in een andere klantpost terechtkomen (anders "
+            "gezegd: het steekproefinterval is veel groter dan elke post). "
+            "Bovendien zijn alle posten ongeveer even groot, zodat een "
+            "eurosteek en een postensteek ongeveer overeenkomen."
+        )
+        st.markdown(
+            "Over de foutkans zijn dan twee lagen van onzekerheid te "
+            "onderscheiden. Om iets te zeggen over **één specifieke "
+            "klant** moet je er rekening mee houden dat die klant maar een "
+            "deel ($N_\\text{klant}$ posten) van de totale SSO-populatie "
+            "vormt, waaruit een steekproef van omvang $n$ met $k$ "
+            "geconstateerde fouten is getrokken:"
         )
         st.markdown(
             "- **Laag 1 — de ware SSO-brede foutkans** $p$: gegeven $(n,k)$ "
