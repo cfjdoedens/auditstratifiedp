@@ -325,10 +325,13 @@ def _methode_onderdelen(
                 "van de klant is."
             ),
             alinea(
-                "De formule is gemotiveerd door twee grensgevallen "
-                "(N_klant veel groter dan n: n_eff nadert n; N_klant veel "
-                "kleiner dan n: n_eff nadert N_klant) en is geen afleiding "
-                "uit een kansmodel. In de praktijk geeft ze meestal een "
+                "De formule volgt uit het gelijkstellen van varianties in "
+                "eerste orde: de variantie van de SSO-foutfractie "
+                "(p(1-p)/n) en de steekproefvariantie van de klant rond "
+                "die fractie (p(1-p)/N_klant) tellen op, en n_eff is de "
+                "steekproefomvang met die totale variantie. Ze is niet "
+                "gekalibreerd op de volledige samengestelde verdeling. "
+                "In de praktijk geeft ze meestal een "
                 "conservatieve grens, ruimer dan die van de scherpere maar "
                 "complexere kalibratiemethode. Onder zeer extreme "
                 "omstandigheden, bij een zeer kleine N_klant (bijvoorbeeld 1 "
@@ -611,8 +614,7 @@ def maak_sso_rapport_pdf(
     )
     if resultaat_totaal is not None:
         toelichting += (
-            " Hele SSO is een aparte berekening op de gegevens van de "
-            "hele SSO."
+            " Hele SSO is een aparte berekening op de gegevens van de hele SSO."
         )
     onderdelen.append(Paragraph(toelichting, stijlen["klein"]))
 

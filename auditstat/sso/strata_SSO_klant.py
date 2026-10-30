@@ -69,7 +69,7 @@ def bouw_strata_SSO_klant(
         - ``"momentmatching"``: ``moment_match_SSO`` (scherper maar
           complexer; matcht gemiddelde én variantie van de werkelijke
           compound-verdeling).
-        - ``"naief"``: ``naief_match_SSO`` (eenvoudige poolingheuristiek,
+        - ``"naief"``: ``naief_match_SSO`` (eenvoudige poolingformule, eerste-orde variantie-matching,
           meestal conservatiever; zie die functie voor de onderbouwing en
           de beperkingen ervan).
 

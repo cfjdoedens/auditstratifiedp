@@ -266,256 +266,21 @@ def _sso_ongeveer_gelijk(
     return math.isclose(a, b, rel_tol=rel_tol, abs_tol=1e-6)
 
 
-def _teken_sso_steekproefschema():
-    """Schematische weergave van de essentiële aanname achter de SSO-methode.
-
-    Binnen de grote cirkel (de totale massa posten van de SSO, in het
-    midden) staat één pool van posten, standaard grijs. Alleen de posten
-    die daadwerkelijk via een pijl "ontsloten" worden \u2014 vanuit een
-    klant-ovaal (rechts van de cirkel) of vanuit de SSO-steekproef-ovaal
-    (links van de cirkel, verticaal gecentreerd) \u2014 krijgen een kleur;
-    de rest blijft grijs, ook al "hoort" elke grijze post in werkelijkheid
-    óók al bij een klant. Dat beeldt de random injectie uit: welke posten
-    precies bij een klant horen, of in de steekproef zitten, ligt niet vast
-    in een patroon. Eén steekproefpijl landt bewust op een post die al door
-    een klantpijl is ontsloten (zwart omcirkeld) \u2014 om te laten zien
-    dat een steekproefpost heel goed kan samenvallen met een post die ook
-    al aantoonbaar bij een specifieke klant hoort.
-    """
-    rng = np.random.default_rng(4821)
-    fig, ax = plt.subplots(figsize=(8.5, 5.8))
-    cx, cy, straal = 0.0, 0.0, 3.6
-
-    def _punten_in_cirkel(n, rng, r_max_frac=0.92):
-        punten = []
-        while len(punten) < n:
-            hoek = rng.uniform(0, 2 * math.pi)
-            r = straal * r_max_frac * math.sqrt(rng.uniform(0, 1))
-            punten.append((cx + r * math.cos(hoek), cy + r * math.sin(hoek)))
-        return punten
-
-    # Eén achtergrondpool van alle posten in de totale massa \u2014
-    # standaard grijs; alleen "ontsloten" posten krijgen later een kleur.
-    alle_posten = _punten_in_cirkel(150, rng)
-    for x, y in alle_posten:
-        ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=0.11,
-                height=0.08,
-                facecolor="#b0b0b0",
-                alpha=0.55,
-                edgecolor="none",
-                zorder=2,
-            )
-        )
-
-    klant_kleuren = {"Klant A": "#e8a33d", "Klant B": "#4caf7d", "Klant C": "#c768a8"}
-    klant_aantallen = {"Klant A": 4, "Klant B": 4, "Klant C": 3}
-
-    beschikbare_idx = list(range(len(alle_posten)))
-    rng.shuffle(beschikbare_idx)
-    idx_cursor = 0
-    klant_doel_idx = {}
-    for naam, n in klant_aantallen.items():
-        klant_doel_idx[naam] = beschikbare_idx[idx_cursor : idx_cursor + n]
-        idx_cursor += n
-
-    for naam, idxs in klant_doel_idx.items():
-        kleur = klant_kleuren[naam]
-        for i in idxs:
-            x, y = alle_posten[i]
-            ax.add_patch(
-                Ellipse(
-                    (x, y),
-                    width=0.15,
-                    height=0.11,
-                    facecolor=kleur,
-                    edgecolor="none",
-                    zorder=4,
-                )
-            )
-
-    ax.add_patch(
-        Circle(
-            (cx, cy), straal, fill=False, edgecolor="#3b6ea5", linewidth=1.8, zorder=5
-        )
-    )
-    ax.text(
-        cx,
-        straal + 0.9,
-        "Totale massa posten SSO ($N$ totaal)",
-        ha="center",
-        fontsize=10,
-        color="#3b6ea5",
-    )
-
-    def _punten_in_ellips(cx_, cy_, w, h, n, rng):
-        punten = []
-        while len(punten) < n:
-            x = rng.uniform(cx_ - w / 2, cx_ + w / 2)
-            y = rng.uniform(cy_ - h / 2, cy_ + h / 2)
-            if ((x - cx_) / (w / 2)) ** 2 + ((y - cy_) / (h / 2)) ** 2 <= 0.85:
-                punten.append((x, y))
-        return punten
-
-    def _teken_pijlen(bron_cx, bron_cy, w, h, kleur, doel_punten, rad=0.1):
-        bronpunten = _punten_in_ellips(
-            bron_cx, bron_cy, w * 0.7, h * 0.7, len(doel_punten), rng
-        )
-        for (bx, by), (tx, ty) in zip(bronpunten, doel_punten, strict=True):
-            ax.add_patch(
-                Ellipse(
-                    (bx, by),
-                    width=0.14,
-                    height=0.1,
-                    facecolor=kleur,
-                    edgecolor="none",
-                    zorder=6,
-                )
-            )
-            ax.add_patch(
-                FancyArrowPatch(
-                    (bx, by),
-                    (tx, ty),
-                    arrowstyle="-|>",
-                    mutation_scale=8,
-                    color=kleur,
-                    linewidth=0.9,
-                    alpha=0.7,
-                    zorder=5.5,
-                    connectionstyle=f"arc3,rad={rad}",
-                )
-            )
-
-    # Klant-ovalen (middelgroot), rechts van de grote cirkel: hun posten
-    # komen via een random injectie terecht op specifieke, nu gekleurde
-    # posten.
-    klant_bronnen = [
-        ("Klant A", 6.0, 2.6, 2.3, 1.9),
-        ("Klant B", 6.0, -0.2, 2.3, 1.9),
-        ("Klant C", 6.0, -2.9, 2.1, 1.7),
-    ]
-    for naam, bx_c, by_c, w, h in klant_bronnen:
-        kleur = klant_kleuren[naam]
-        ax.add_patch(
-            Ellipse(
-                (bx_c, by_c),
-                width=w,
-                height=h,
-                facecolor=kleur,
-                alpha=0.25,
-                edgecolor=kleur,
-                linewidth=1.5,
-                zorder=2,
-            )
-        )
-        ax.text(
-            bx_c,
-            by_c + h / 2 + 0.25,
-            naam,
-            ha="center",
-            fontsize=8.5,
-            color=kleur,
-            fontweight="bold",
-        )
-        doelpunten = [alle_posten[i] for i in klant_doel_idx[naam]]
-        _teken_pijlen(bx_c, by_c, w, h, kleur, doelpunten, rad=-0.1)
-
-    # SSO-steekproef (heel klein), links van de grote cirkel en verticaal
-    # gecentreerd: vier pijlen naar nieuwe, nog ongekleurde posten, en
-    # \u00e9\u00e9n pijl (als voorbeeld) naar een al door een klant
-    # ontsloten post \u2014 om te laten zien dat een steekproefpost heel
-    # goed kan samenvallen met een post die ook al aantoonbaar bij een
-    # specifieke klant hoort.
-    alle_klant_idx = [i for idxs in klant_doel_idx.values() for i in idxs]
-    gedeeld_idx = int(rng.choice(alle_klant_idx))
-    overige_idx = [i for i in beschikbare_idx[idx_cursor:] if i != gedeeld_idx]
-    nieuwe_idx = [int(i) for i in rng.choice(overige_idx, size=4, replace=False)]
-    steekproef_doel_idx = [*nieuwe_idx, gedeeld_idx]
-
-    kleur_s = "#c0392b"
-    for i in nieuwe_idx:
-        x, y = alle_posten[i]
-        ax.add_patch(
-            Ellipse(
-                (x, y),
-                width=0.15,
-                height=0.11,
-                facecolor=kleur_s,
-                edgecolor="none",
-                zorder=4,
-            )
-        )
-
-    # Markeer de gedeelde post duidelijk: een dunne zwarte rand eromheen,
-    # plus een kort label.
-    gx, gy = alle_posten[gedeeld_idx]
-    ax.add_patch(
-        Ellipse(
-            (gx, gy),
-            width=0.3,
-            height=0.22,
-            facecolor="none",
-            edgecolor="black",
-            linewidth=1.3,
-            zorder=7,
-        )
-    )
-    ax.annotate(
-        "steekproefpost die toevallig\nbij deze klant blijkt te horen",
-        xy=(gx, gy),
-        xytext=(gx - 2.6, gy + 1.3),
-        fontsize=7.5,
-        color="#333333",
-        ha="center",
-        arrowprops={"arrowstyle": "-", "color": "#333333", "linewidth": 0.7},
-        zorder=7,
-    )
-
-    sx_c, sy_c, sw, sh = -6.0, 0.0, 2.0, 2.0
-    ax.add_patch(
-        Ellipse(
-            (sx_c, sy_c),
-            width=sw,
-            height=sh,
-            facecolor=kleur_s,
-            alpha=0.25,
-            edgecolor=kleur_s,
-            linewidth=1.5,
-            zorder=2,
-        )
-    )
-    ax.text(
-        sx_c,
-        sy_c + sh / 2 + 0.25,
-        "SSO-steekproef ($n$)",
-        ha="center",
-        fontsize=8.5,
-        color=kleur_s,
-        fontweight="bold",
-    )
-    steekproef_doelpunten = [alle_posten[i] for i in steekproef_doel_idx]
-    _teken_pijlen(sx_c, sy_c, sw, sh, kleur_s, steekproef_doelpunten, rad=0.1)
-
-    ax.set_xlim(-8.8, 8.8)
-    ax.set_ylim(-5.5, 5.7)
-    ax.set_aspect("equal")
-    ax.axis("off")
-    fig.tight_layout()
-    return fig
-
-
-def _teken_sso_geldsteekproefschema():
-    """Schematische weergave van het verschil tussen geld- en postensteken.
+def _teken_sso_schema(met_centen: bool):
+    """Schematische weergave van de SSO-steekproef en de klanten.
 
     Binnen de grote cirkel (de totale SSO-massa) liggen posten van ongeveer
-    gelijke grootte; elke post bestaat uit eurocenten (kleine stippen). De
-    SSO-steekproef (links) is een geldsteekproef: elke pijl wijst naar één
-    eurocent, en dat is steeds een eurocent in een andere post. De klanten
-    (rechts) steken daarentegen op hele posten: de pijl wijst naar de post
-    zelf, die daardoor volledig gekleurd wordt. Eén steekproefeurocent valt
-    bewust in een post die ook door een klant is gestoken (zwart omcirkeld).
+    gelijke grootte (grijze ovaaltjes). Klanten (rechts) en de SSO-steekproef
+    (links) staan buiten de massa; pijlen wijzen naar de posten waarop
+    gestoken wordt. Eén steekproefpost valt bewust samen met een post van een
+    klant (zwart omcirkeld). De indeling (posten, klantposten,
+    steekproefposten) is voor beide varianten gelijk, zodat het tweede plaatje
+    het eerste uitwerkt.
+
+    Zonder ``met_centen``: de steekproefposten zijn rood gekleurd en de
+    pijlen wijzen naar hele posten. Met ``met_centen``: elke post bestaat uit
+    eurocenten (stippen); de SSO-steekproef is een geldsteekproef en steekt
+    op één eurocent per post, de klanten steken op hele posten.
     """
     rng = np.random.default_rng(7305)
     fig, ax = plt.subplots(figsize=(9.0, 6.4))
@@ -572,6 +337,8 @@ def _teken_sso_geldsteekproefschema():
     # Posten tekenen.
     for i, (px, py) in enumerate(posten):
         kleur = kleur_van_post.get(i)
+        if kleur is None and not met_centen and i in steekproef_posten:
+            kleur = kleur_s
         ax.add_patch(
             Ellipse(
                 (px, py),
@@ -584,15 +351,17 @@ def _teken_sso_geldsteekproefschema():
                 zorder=2,
             )
         )
-        for j, (cx_, cy_) in enumerate(centen[i]):
-            if gestoken_cent.get(i) == j:
-                continue
-            ax.plot(cx_, cy_, "o", color="#6e6e6e", markersize=1.6, zorder=3)
+        if met_centen:
+            for j, (cx_, cy_) in enumerate(centen[i]):
+                if gestoken_cent.get(i) == j:
+                    continue
+                ax.plot(cx_, cy_, "o", color="#6e6e6e", markersize=1.6, zorder=3)
 
     # Gestoken eurocenten van de SSO-steekproef.
-    for i in steekproef_posten:
-        cx_, cy_ = centen[i][gestoken_cent[i]]
-        ax.plot(cx_, cy_, "o", color=kleur_s, markersize=4.2, zorder=6)
+    if met_centen:
+        for i in steekproef_posten:
+            cx_, cy_ = centen[i][gestoken_cent[i]]
+            ax.plot(cx_, cy_, "o", color=kleur_s, markersize=4.2, zorder=6)
 
     gx, gy = posten[gedeeld_idx]
     ax.add_patch(
@@ -613,7 +382,9 @@ def _teken_sso_geldsteekproefschema():
     ax.text(
         0,
         straal + 0.55,
-        "Totale massa posten SSO ($N$ totaal); elke post bestaat uit eurocenten",
+        "Totale massa posten SSO ($N$ totaal); elke post bestaat uit eurocenten"
+        if met_centen
+        else "Totale massa posten SSO ($N$ totaal)",
         ha="center",
         fontsize=10,
         color="#3b6ea5",
@@ -695,56 +466,70 @@ def _teken_sso_geldsteekproefschema():
     ax.text(
         sx_c,
         sy_c + sh / 2 + 0.25,
-        "SSO-steekproef ($n$ eurocenten)",
+        "SSO-steekproef ($n$ eurocenten)" if met_centen else "SSO-steekproef ($n$)",
         ha="center",
         fontsize=8.5,
         color=kleur_s,
         fontweight="bold",
     )
-    doelen_s = [centen[i][gestoken_cent[i]] for i in steekproef_posten]
+    if met_centen:
+        doelen_s = [centen[i][gestoken_cent[i]] for i in steekproef_posten]
+    else:
+        doelen_s = [posten[i] for i in steekproef_posten]
     _pijlen(sx_c, sy_c, sw, sh, kleur_s, doelen_s, rad=0.1)
 
-    legenda = [
-        Line2D(
-            [],
-            [],
-            marker="o",
-            color="none",
-            markerfacecolor="#6e6e6e",
-            markersize=3,
-            label="eurocent",
-        ),
-        Line2D(
-            [],
-            [],
-            marker="o",
-            color="none",
-            markerfacecolor=kleur_s,
-            markersize=6,
-            label="eurocent in de SSO-steekproef",
-        ),
-        Patch(
-            facecolor="#e8a33d",
-            alpha=0.75,
-            edgecolor="#9a9a9a",
-            label="post die een klant steekt (de hele post)",
-        ),
-    ]
-    ax.legend(
-        handles=legenda,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.02),
-        ncol=3,
-        fontsize=8,
-        frameon=False,
-    )
+    if met_centen:
+        legenda = [
+            Line2D(
+                [],
+                [],
+                marker="o",
+                color="none",
+                markerfacecolor="#6e6e6e",
+                markersize=3,
+                label="eurocent",
+            ),
+            Line2D(
+                [],
+                [],
+                marker="o",
+                color="none",
+                markerfacecolor=kleur_s,
+                markersize=6,
+                label="eurocent in de SSO-steekproef",
+            ),
+            Patch(
+                facecolor="#e8a33d",
+                alpha=0.75,
+                edgecolor="#9a9a9a",
+                label="post die een klant steekt (de hele post)",
+            ),
+        ]
+        ax.legend(
+            handles=legenda,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.02),
+            ncol=3,
+            fontsize=8,
+            frameon=False,
+        )
 
     ax.set_xlim(-9.0, 9.0)
-    ax.set_ylim(-5.6, 5.6)
+    ax.set_ylim(-5.6 if met_centen else -4.8, 5.6)
     ax.set_aspect("equal")
     ax.axis("off")
     fig.tight_layout()
     return fig
+
+
+def _teken_sso_steekproefschema():
+    """Eerste plaatje: de SSO-steekproef en de klanten op de massa posten."""
+    return _teken_sso_schema(met_centen=False)
+
+
+def _teken_sso_geldsteekproefschema():
+    """Tweede plaatje: dezelfde situatie, met eurocenten in de posten."""
+    return _teken_sso_schema(met_centen=True)
 
 
 def on_eval_tabel_change():
@@ -3262,8 +3047,8 @@ with tab_theorie:
             "kleine stippen). De SSO-steekproef (rood) steekt op "
             "eurocenten: elke pijl wijst naar één eurocent, die in een "
             "post ligt. De klanten steken juist op posten: hun pijlen "
-            "wijzen naar een hele post, die daardoor volledig gekleurd is. "
-            "Eén steekproefeurocent valt bewust in een post die ook al bij "
+            "wijzen naar een hele post, die, om dat aan te duiden, volledig gekleurd is. "
+            "Eén steekproefeurocent valt in een post die ook al bij "
             "een klant is gestoken (zwart omcirkeld)."
         )
         st.markdown("We maken daarom de volgende vereenvoudigende aannames:")
@@ -3306,46 +3091,124 @@ with tab_theorie:
     with st.expander("2. Eenvoudige methode: de n_klant-poolingformule"):
         st.markdown(
             "Een eenvoudige benadering kent de klant een **effectieve "
-            "steekproefomvang** $n_\\text{eff}$ toe, gebaseerd op een "
-            "parallelformule (vergelijkbaar met weerstanden in parallel):"
+            "steekproefomvang** $n_\\text{klant}$ toe (in de code "
+            "$n_\\text{eff}$), zodat een gewone Beta-verdeling (of "
+            "Gamma-verdeling bij het Poisson-model) dezelfde onzekerheid "
+            "heeft als de klant werkelijk heeft. Dat doen we door de "
+            "varianties gelijk te stellen."
+        )
+        st.markdown(
+            "**Afleiding (binomiaal).** De foutfractie bij de klant heeft "
+            "twee bronnen van onzekerheid:"
+        )
+        st.markdown(
+            "- De ware SSO-brede foutkans $p$ is onzeker. De variantie van "
+            "de posterior is bij benadering $\\frac{p(1-p)}{n}$.\n"
+            "- Beschouwen we de $N_\\text{klant}$ posten van de klant als "
+            "een willekeurige trekking uit de SSO, dan komt daar de "
+            "steekproefvariantie van de klant rond de SSO-fractie bij: "
+            "bij benadering $\\frac{p(1-p)}{N_\\text{klant}}$."
+        )
+        st.markdown("Samen (wet van de totale variantie, met $p$ als bekend ingevuld):")
+        st.latex(
+            r"\mathrm{Var}_\text{totaal} \approx p(1-p)\left("
+            r"\frac{1}{n} + \frac{1}{N_\text{klant}}\right)"
+        )
+        st.markdown(
+            "Een standaardverdeling met effectieve steekproefomvang "
+            "$n_\\text{klant}$ heeft variantie "
+            "$\\frac{p(1-p)}{n_\\text{klant}}$. Gelijkstellen geeft:"
         )
         st.latex(
-            r"n_\text{eff} = \frac{n \cdot N_\text{klant}}{n + N_\text{klant}}"
-            r"\,,\qquad k_\text{eff} = k \cdot \frac{n_\text{eff}}{n}"
+            r"\frac{1}{n_\text{klant}} = \frac{1}{n} + "
+            r"\frac{1}{N_\text{klant}} \;\Longrightarrow\; "
+            r"n_\text{klant} = \frac{n \cdot N_\text{klant}}"
+            r"{n + N_\text{klant}}"
         )
         st.markdown(
-            "Deze formule is **niet afgeleid uit een kansmodel** — het is "
-            "een plausibiliteitsargument op basis van twee grensgevallen:"
+            "Dat is de parallelformule (vergelijkbaar met weerstanden in "
+            "parallel). Voor het **Poisson-model** (rate $\\lambda = np$) "
+            "zijn de varianties $\\frac{p}{n}$ en "
+            "$\\frac{p}{N_\\text{klant}}$, en komt dezelfde formule "
+            "uit. Beide modellen geven dus dezelfde formule, in eerste "
+            "orde: we gebruiken $\\frac{p(1-p)}{n}$ voor de posterior-"
+            "variantie en laten kleine correcties (zoals de $+2$ in de "
+            "variantie van de Beta-verdeling) weg."
         )
         st.markdown(
-            "- Is $N_\\text{klant}$ veel groter dan $n$ (een grote klant "
-            "binnen een kleine SSO-steekproef), dan nadert $n_\\text{eff}$ "
-            "tot $n$: de SSO-steekproef zelf blijft dan de beperkende "
-            "factor.\n"
-            "- Is $N_\\text{klant}$ veel kleiner dan $n$ (een kleine klant "
-            "binnen een grote SSO-steekproef), dan nadert $n_\\text{eff}$ "
-            "tot $N_\\text{klant}$: bij een (vrijwel) volledige controle "
-            "van een kleine populatie kan de effectieve steekproefomvang "
-            "nooit groter zijn dan die populatie zelf."
-        )
-        st.markdown(
+            "De grensgevallen kloppen met de intuïtie: bij "
+            "$N_\\text{klant} \\gg n$ nadert $n_\\text{klant}$ tot $n$ "
+            "(de SSO-steekproef is de beperkende factor), bij "
+            "$N_\\text{klant} \\ll n$ tot $N_\\text{klant}$ (de kleine "
+            "klantpopulatie zelf is dan de beperkende factor). "
             "$k_\\text{eff}$ wordt proportioneel meegeschaald, zodat de "
-            "geschatte foutfractie $k/n$ behouden blijft. Deze methode is "
-            "eenvoudig te doorzien en geeft in de praktijk meestal een "
-            "conservatieve grens, ruimer dan die van momentmatching "
-            "hieronder. Anders dan momentmatching is ze niet gekalibreerd "
-            "op de werkelijke variantie van de samengestelde verdeling; "
-            "onder zeer extreme omstandigheden, bij een zeer kleine "
-            "$N_\\text{klant}$ (bijvoorbeeld 1 of enkele posten), kan de "
-            "grens daardoor te laag uitvallen. Een formeel bewijs (of "
-            "weerlegging) van de kwaliteit van deze benadering, "
-            "bijvoorbeeld in Lean, is een mogelijk vervolgtraject."
+            "geschatte foutfractie $k/n$ behouden blijft:"
+        )
+        st.latex(r"k_\text{eff} = k \cdot \frac{n_\text{eff}}{n}")
+        st.markdown(
+            "**Evaluatie voor $k=0$ bij 95% zekerheid.** Met de benadering "
+            "($n_\\text{klant}$, $k_\\text{klant}=0$), een vlakke prior "
+            "en het Poisson-model ligt de 95%-bovengrens op:"
+        )
+        st.latex(
+            r"p_\text{max,benaderd} = \frac{-\ln(0{,}05)}"
+            r"{n_\text{klant}} \approx \frac{3}{n_\text{klant}} = "
+            r"\frac{3}{n} + \frac{3}{N_\text{klant}}"
+        )
+        st.markdown(
+            "De exacte voorspellende verdeling van het aantal fouten "
+            "$K$ bij de klant is dan negatief-binomiaal (hier geometrisch) "
+            "met succeskans $q = \\frac{n}{n+N_\\text{klant}}$: "
+            "$P(K \\le X) = 1-(1-q)^{X+1}$. De kleinste gehele $X$ met "
+            "$P(K \\le X) \\ge 0{,}95$ voldoet aan:"
+        )
+        st.latex(
+            r"X+1 \;\ge\; \frac{\ln(0{,}05)}"
+            r"{\ln\!\left(\frac{N_\text{klant}}"
+            r"{n+N_\text{klant}}\right)}"
+            r"\,,\qquad p_\text{max,exact} = \frac{X}{N_\text{klant}}"
+        )
+        st.markdown(
+            "Alleen voor $N_\\text{klant} \\gg n$ vereenvoudigt dit "
+            "(met $\\ln\\frac{N_\\text{klant}}{n+N_\\text{klant}} "
+            "\\approx -\\frac{n}{N_\\text{klant}}$) tot "
+            "$p_\\text{max,exact} \\approx \\frac{3}{n} - "
+            "\\frac{1}{N_\\text{klant}}$, met een afrondingsonzekerheid "
+            "van ongeveer $\\frac{1}{N_\\text{klant}}$ omdat $X$ een "
+            "geheel getal is. Voor kleinere $N_\\text{klant}$ geldt die "
+            "vereenvoudiging niet (ze kan zelfs negatief worden); reken "
+            "dan met de algemene formule. Enkele voorbeelden "
+            "($k=0$, 95%, Poisson, vlakke prior):"
+        )
+        st.markdown(
+            "| $n$ | $N_\\text{klant}$ | benaderd | exact |\n"
+            "|---:|---:|---:|---:|\n"
+            "| 100 | 10 | 0,330 | 0,100 |\n"
+            "| 100 | 300 | 0,040 | 0,033 |\n"
+            "| 100 | 1.000 | 0,033 | 0,031 |\n"
+            "| 1.000 | 100 | 0,033 | 0,010 |"
+        )
+        st.markdown(
+            "In deze voorbeelden is de benaderde grens ruimer dan de "
+            "exacte (op posten gebaseerde) grens, en het verschil is groot "
+            "als $N_\\text{klant}$ klein is ten opzichte van $n$. Dat "
+            "past bij de waarneming dat de eenvoudige methode meestal een "
+            "conservatieve grens geeft, ruimer dan die van momentmatching "
+            "hieronder. Dit is een rekenvoorbeeld voor $k=0$, geen bewijs "
+            "voor alle $k$. Anders dan momentmatching is de formule niet "
+            "gekalibreerd op de werkelijke variantie van de samengestelde "
+            "verdeling; onder zeer extreme omstandigheden, bij een zeer "
+            "kleine $N_\\text{klant}$ (bijvoorbeeld 1 of enkele posten), "
+            "kan de grens daardoor te laag uitvallen. Een formeel bewijs "
+            "van de kwaliteit van deze benadering, bijvoorbeeld in Lean, "
+            "is een mogelijk vervolgtraject."
         )
 
     with st.expander("3. Momentmatching-kalibratie (scherper, maar complexer)"):
         st.markdown(
             "In plaats van de twee onzekerheidslagen uit punt 1 te "
-            "benaderen met een vuistregel, kalibreert momentmatching een "
+            "benaderen met de eerste-orde-formule van punt 2, kalibreert "
+            "momentmatching een "
             "effectieve $(n_\\text{eff}, k_\\text{eff})$ zodanig dat de "
             "resulterende Beta- (binomiaal model) of Gamma-verdeling "
             "(poisson model) precies **hetzelfde gemiddelde én dezelfde "
