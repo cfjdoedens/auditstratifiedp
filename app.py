@@ -2989,7 +2989,7 @@ with tab_theorie:
         st.markdown("Dit wordt uitgebeeld in onderstaand plaatje.")
         st.pyplot(_teken_sso_steekproefschema())
         st.caption(
-            "Schematische weergave (niet op schaal): de grote cirkel is de "
+            "Schematische weergave: de grote cirkel is de "
             "totale massa posten van de SSO, met daarin één pool van "
             "posten die standaard grijs is. De klant-ovalen (middelgroot) "
             "en de SSO-steekproef-ovaal (heel klein) staan bewust *buiten* "
