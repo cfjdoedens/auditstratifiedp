@@ -178,6 +178,68 @@ class TestMomentMatchSSO(unittest.TestCase):
         self.assertGreaterEqual(n_eff, k_eff)
         self.assertGreaterEqual(k_eff, 0.0)
 
+    def test_geklemd_binomiaal_matcht_exacte_grens_bij_gekozen_zekerheid(self):
+        # De klemkalibratie is exact op het doorgegeven zekerheidsniveau,
+        # niet alleen bij de standaard 95%.
+        n, k, N_klant = 120, 1, 100
+        for zekerheid in (0.90, 0.99):
+            exact = _max_fout_exact_binomiaal(n, k, N_klant, zekerheid)
+            with self.assertWarns(RuntimeWarning):
+                n_eff, k_eff = moment_match_SSO(
+                    n, k, N_klant, "binomiaal", zekerheid=zekerheid
+                )
+            self.assertEqual(k_eff, 0.0)
+            self.assertAlmostEqual(
+                beta.ppf(zekerheid, k_eff + 1, n_eff - k_eff + 1), exact, places=6
+            )
+
+    def test_geklemd_poisson_matcht_exacte_grens_bij_gekozen_zekerheid(self):
+        n, k, N_klant = 120, 1, 100
+        zekerheid = 0.99
+        exact = _max_fout_exact_poisson(n, k, N_klant, zekerheid)
+        with self.assertWarns(RuntimeWarning):
+            n_eff, k_eff = moment_match_SSO(
+                n, k, N_klant, "poisson", zekerheid=zekerheid
+            )
+        mf = gamma.ppf(zekerheid, a=k_eff + 1, scale=1.0 / n_eff)
+        self.assertAlmostEqual(mf, exact, places=6)
+
+    def test_standaardzekerheid_is_95_procent(self):
+        n, k, N_klant = 120, 1, 100
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            standaard = moment_match_SSO(n, k, N_klant, "binomiaal")
+            expliciet = moment_match_SSO(n, k, N_klant, "binomiaal", zekerheid=0.95)
+        self.assertEqual(standaard, expliciet)
+
+    def test_zekerheid_heeft_geen_invloed_zonder_klemming(self):
+        n, k, N_klant = 120, 1, 5000
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            a = moment_match_SSO(n, k, N_klant, "binomiaal", zekerheid=0.90)
+            b = moment_match_SSO(n, k, N_klant, "binomiaal", zekerheid=0.99)
+        self.assertEqual(a, b)
+
+    def test_blinde_vlek_hangt_af_van_gekozen_zekerheid(self):
+        # N_klant=5 (n=120, k=1): exacte grens is 0 bij 90% (geweigerd),
+        # maar positief bij 95% (gewoon klemgeval).
+        n, k, N_klant = 120, 1, 5
+        self.assertEqual(_max_fout_exact_binomiaal(n, k, N_klant, 0.90), 0.0)
+        with self.assertRaises(ValueError) as ctx:
+            moment_match_SSO(n, k, N_klant, "binomiaal", zekerheid=0.90)
+        self.assertIn("90%", str(ctx.exception))
+        with self.assertWarns(RuntimeWarning):
+            moment_match_SSO(n, k, N_klant, "binomiaal", zekerheid=0.95)
+
+    def test_waarschuwing_noemt_gekozen_zekerheid(self):
+        with self.assertWarnsRegex(RuntimeWarning, "99% zekerheid"):
+            moment_match_SSO(120, 1, 100, "binomiaal", zekerheid=0.99)
+
+    def test_ongeldige_zekerheid_geeft_value_error(self):
+        for z in (0, 1, -0.1, 1.5):
+            with self.assertRaises(ValueError):
+                moment_match_SSO(120, 1, 100, "binomiaal", zekerheid=z)
+
 
 if __name__ == "__main__":
     unittest.main()

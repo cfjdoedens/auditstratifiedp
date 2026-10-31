@@ -18,7 +18,10 @@ _OPTIONELE_KOLOMMEN = (
 
 
 def bouw_strata_SSO_klant(
-    post_typen, model="binomiaal", kalibratiemethode="momentmatching"
+    post_typen,
+    model="binomiaal",
+    kalibratiemethode="momentmatching",
+    zekerheid=0.95,
 ):
     """
     Bouwt een stratatabel voor één klant op basis van SSO-steekproeven per
@@ -77,6 +80,13 @@ def bouw_strata_SSO_klant(
         volledige blinde vlek (zie hieronder) is alleen van toepassing op
         ``"momentmatching"``; ``"naief"`` kent dat onderscheid niet.
 
+    zekerheid : float, standaard 0,95
+        Zekerheidsniveau waarop ``moment_match_SSO`` bij klemming op de
+        exacte grens kalibreert. Geef hier dezelfde zekerheid door als aan
+        ``eval_stratified`` (``evalueer_SSO_klant_gestratificeerd`` doet
+        dat automatisch). Heeft geen invloed bij ``"naief"`` en bij
+        momentmatching zonder klemming.
+
     Returns
     -------
     pandas.DataFrame
@@ -99,7 +109,7 @@ def bouw_strata_SSO_klant(
     welke een terugval is toegepast.
 
     Bij een volledige blinde vlek (N_klant zo klein dat zelfs de exacte
-    grens al 0 is) weigert ``moment_match_SSO`` in plaats daarvan een
+    grens bij de gekozen zekerheid al 0 is) weigert ``moment_match_SSO`` in plaats daarvan een
     resultaat te geven en gooit een ``ValueError``. Deze functie vangt die
     op en gooit 'm opnieuw met de naam van het type post ervoor, zodat de
     hele gestratificeerde evaluatie voor deze klant stopt in plaats van
@@ -139,7 +149,11 @@ def bouw_strata_SSO_klant(
                 with warnings.catch_warnings(record=True) as gevangen:
                     warnings.simplefilter("always", RuntimeWarning)
                     n_eff, k_eff = moment_match_SSO(
-                        post["n"], post["k"], post["N_klant"], verdeling=model
+                        post["n"],
+                        post["k"],
+                        post["N_klant"],
+                        verdeling=model,
+                        zekerheid=zekerheid,
                     )
             except ValueError as e:
                 # Zie moment_match_SSO: bij een volledige blinde vlek

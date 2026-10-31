@@ -34,7 +34,9 @@ def evalueer_SSO_klant_gestratificeerd(
     model : {"binomiaal", "poisson"}
         Kansmodel voor de gestratificeerde convolutieberekening.
     zekerheid : float
-        Gewenste statistische zekerheid, tussen 0 en 1.
+        Gewenste statistische zekerheid, tussen 0 en 1. Wordt ook doorgegeven
+        aan de klemkalibratie van ``moment_match_SSO``, zodat die exact
+        aansluit op dit niveau.
     methode : {"FFT paarsgewijs", "FFT samen", "direct", "Monte Carlo"}
         Methode voor de convolutieberekening.
     granulariteit : int, optioneel
@@ -50,7 +52,10 @@ def evalueer_SSO_klant_gestratificeerd(
         en de opgebouwde stratatabel onder ``"steekproeven"``.
     """
     steekproeven = bouw_strata_SSO_klant(
-        post_typen, model=model, kalibratiemethode=kalibratiemethode
+        post_typen,
+        model=model,
+        kalibratiemethode=kalibratiemethode,
+        zekerheid=zekerheid,
     )
     return eval_stratified(
         steekproeven=steekproeven,

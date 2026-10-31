@@ -121,7 +121,7 @@ $$
 \mathrm{Var}(X) = \mathbb{E}_p\!\left[\mathrm{Var}(X \mid p)\right] + \mathrm{Var}_p\!\left(\mathbb{E}[X \mid p]\right)
 $$
 
-Het resultaat is scherper dan dat van de eenvoudige methode, tegen de prijs van een ingewikkelder berekening. Dit behoudt beide onzekerheidslagen voor zover dat binnen één Beta/Gamma-verdeling mogelijk is. Bij een absoluut te kleine $N_\text{klant}$ kan het benodigde gemiddelde niet meer gecombineerd worden met de juiste variantie binnen die familie ("klemming"); de app valt dan terug op een kalibratie die exact aansluit bij de grens onder de **conservatieve aanname dat elke post volledig goed of volledig fout is** — voor elke grootheid $X \in [0,1]$ met gegeven gemiddelde $p$ geldt immers $\mathrm{Var}(X) \le p(1-p)$, met gelijkheid alleen in dat binaire geval. Zie AGENTS.md in de broncode voor de volledige onderbouwing en de randgevallen.
+Het resultaat is scherper dan dat van de eenvoudige methode, tegen de prijs van een ingewikkelder berekening. Dit behoudt beide onzekerheidslagen voor zover dat binnen één Beta/Gamma-verdeling mogelijk is. Bij een absoluut te kleine $N_\text{klant}$ kan het benodigde gemiddelde niet meer gecombineerd worden met de juiste variantie binnen die familie ("klemming"); de app valt dan terug op een kalibratie die, bij de gekozen zekerheid, exact aansluit bij de grens onder de **conservatieve aanname dat elke post volledig goed of volledig fout is** — voor elke grootheid $X \in [0,1]$ met gegeven gemiddelde $p$ geldt immers $\mathrm{Var}(X) \le p(1-p)$, met gelijkheid alleen in dat binaire geval. Zie AGENTS.md in de broncode voor de volledige onderbouwing en de randgevallen.
 
 ## 4. Evaluatie over de hele SSO
 

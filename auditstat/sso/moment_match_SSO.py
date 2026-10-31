@@ -3,14 +3,20 @@ import warnings
 
 from scipy.stats import betabinom, nbinom
 
-# Referentiezekerheid waarop, uitsluitend bij klemming (k_eff < 0), het
+# Standaardzekerheid waarop, uitsluitend bij klemming (k_eff < 0), het
 # vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de exacte
 # Beta-Binomiale/Negatief-Binomiale grens — "exact" voor het conservatieve
 # model dat elke post ofwel volledig goed, ofwel volledig fout is, zie
-# _max_fout_exact. Dit is noodzakelijkerwijs een vaste keuze:
-# moment_match_SSO kent de uiteindelijke, door de gebruiker gekozen
-# zekerheid van eval_stratified niet (die wordt pas later toegepast).
+# _max_fout_exact. Een aanroeper die de zekerheid van eval_stratified kent
+# hoort die via de parameter ``zekerheid`` van moment_match_SSO door te
+# geven, zodat de kalibratie exact aansluit op het gekozen niveau; deze
+# waarde is alleen de standaard.
 _ZEKERHEID_VOOR_KLEMKALIBRATIE = 0.95
+
+
+def _procent(zekerheid):
+    """Zekerheid als NL-percentage voor meldingen, bijv. 0,95 -> '95%'."""
+    return f"{zekerheid * 100:g}".replace(".", ",") + "%"
 
 
 def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE):
@@ -102,7 +108,9 @@ def _kalibreer_k_eff_nul_op_exacte_grens(doel_max_fout, verdeling, zekerheid):
     return n_eff, 0.0
 
 
-def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
+def moment_match_SSO(
+    n, k, N_klant, verdeling="binomiaal", zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE
+):
     """
     Kalibreert een effectieve steekproefomvang (n_eff) en een effectief
     aantal fouten (k_eff) bij de klant, zodanig dat de resulterende
@@ -144,8 +152,8 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     houdbaar (zie hieronder), en wordt in plaats daarvan direct
     gekalibreerd op de exacte grens: ``k_eff`` wordt op 0 gezet (geen
     fouten specifiek aan de klant toe te rekenen) en ``n_eff`` wordt zo
-    gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij 95%
-    zekerheid exact gelijk is aan de Beta-Binomiale resp. Negatief-
+    gekozen dat de resulterende Beta- resp. Gamma-kwantiel bij ``zekerheid``
+    (standaard 95%) exact gelijk is aan de Beta-Binomiale resp. Negatief-
     Binomiale grens (``_max_fout_exact``) — zie
     ``_kalibreer_k_eff_nul_op_exacte_grens``. "Exact" betekent hier: exact
     voor het conservatieve model achter ``_max_fout_exact`` dat elke post
@@ -166,7 +174,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     behandeling, maar gespiegeld: ``n_eff`` wordt op ``k_eff`` gezet (de
     kleinst mogelijke ``beta``-parameter binnen de door ``eval_stratified``
     vereiste ``n_laag >= k_laag``) en samen opgehoogd zodat de Beta(n_eff +
-    1, 1)-kwantiel bij 95% zekerheid exact gelijk is aan de werkelijke
+    1, 1)-kwantiel bij ``zekerheid`` exact gelijk is aan de werkelijke
     grens (``_kalibreer_n_eff_gelijk_k_eff_op_exacte_grens``). Dit geval
     komt alleen voor bij het binomiale model: bij poisson geldt n_eff >=
     k_eff altijd (gegeven k <= n kan het benodigde gemiddelde daar nooit
@@ -178,7 +186,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
     Volledige blinde vlek bij extreem kleine N_klant: geweigerd
     -------------------------------------------------------------
     Als de exacte grens zelf al 0 is (``_max_fout_exact`` geeft
-    0, wat gebeurt zodra P(0 fouten bij de klant) ≥ 95% — bij een zeer
+    0, wat gebeurt zodra P(0 fouten bij de klant) ≥ ``zekerheid`` — bij een zeer
     kleine N_klant en/of lage SSO-foutfractie), kan geen enkele continue
     verdeling nog een reëel, positief foutscenario weergeven: elk eindig,
     niet-negatief (n_eff, k_eff)-paar zou dan vrijwel 0 kans toekennen aan
@@ -215,6 +223,15 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         Moet overeenkomen met het ``model``-argument waarmee het
         resulterende (n_eff, k_eff)-paar straks aan ``eval_stratified``
         wordt doorgegeven.
+    zekerheid : float, standaard 0,95
+        Zekerheidsniveau (tussen 0 en 1) waarop, uitsluitend bij klemming
+        of bij een volledige blinde vlek, op de exacte grens wordt
+        gekalibreerd. Geef hier de zekerheid door die ook aan
+        ``eval_stratified`` wordt meegegeven: de kalibratie is exact op
+        dat niveau, en bij een ander niveau conservatief of niet
+        sluitend. Bij momentmatching zonder klemming heeft de waarde geen
+        invloed. Een hogere zekerheid maakt een volledige blinde vlek
+        minder, een lagere juist vaker waarschijnlijk.
 
     Returns
     -------
@@ -229,6 +246,8 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         raise ValueError("k mag niet negatief zijn.")
     if k > n:
         raise ValueError("k mag niet groter zijn dan n.")
+    if not 0 < zekerheid < 1:
+        raise ValueError("zekerheid moet tussen 0 en 1 liggen.")
 
     if verdeling == "binomiaal":
         alpha, beta_ = k + 1, n - k + 1
@@ -254,11 +273,11 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
 
     geklemd = False
     if k_eff < 0:
-        exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
+        exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid)
         if exact_doel <= 0.0:
             # De exacte grens is hier zelf 0 (zeer kleine N_klant en/of
-            # k = 0, zodat zelfs bij 95% zekerheid 0 fouten te verwachten
-            # zijn). Een Beta/Gamma-verdeling heeft een strikt positieve
+            # k = 0, zodat zelfs bij de gekozen zekerheid 0 fouten te
+            # verwachten zijn). Een Beta/Gamma-verdeling heeft een strikt positieve
             # drager en kan dus nooit exact kwantiel 0 weergeven: elk
             # eindig, niet-negatief (n_eff, k_eff)-paar zou dan
             # noodzakelijkerwijs vrijwel 0 kans toekennen aan ieder
@@ -271,7 +290,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
             raise ValueError(
                 f"N_klant = {N_klant:g} is zo klein dat zelfs de grens bij "
                 "de conservatieve aanname dat elke post volledig goed of "
-                "volledig fout is, bij 95% zekerheid, al 0 fouten aangeeft: "
+                f"volledig fout is, bij {_procent(zekerheid)} zekerheid, al 0 fouten aangeeft: "
                 "de SSO-steekproef geeft dan geen enkel statistisch "
                 "houvast meer voor dit type post bij deze klant, ook al "
                 "blijft de kans op een fout (hoe klein ook) reëel. Een "
@@ -280,7 +299,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
                 "plaats van te extrapoleren."
             )
         n_eff, k_eff = _kalibreer_k_eff_nul_op_exacte_grens(
-            exact_doel, verdeling, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+            exact_doel, verdeling, zekerheid
         )
         geklemd = True
     elif n_eff < k_eff:
@@ -291,7 +310,7 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
         # nooit ver genoeg boven 1 uitkomen om deze klem te bereiken), dus
         # die tak behoudt de eenvoudige klem als defensieve terugval.
         if verdeling == "binomiaal":
-            exact_doel = _max_fout_exact(n, k, N_klant, verdeling)
+            exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid)
             if exact_doel >= 1.0:
                 # Spiegelbeeld van de blinde vlek hierboven: de exacte
                 # grens is hier zelf al 1 (vrijwel zekere 100% fout), en
@@ -303,15 +322,15 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
                     f"N_klant = {N_klant:g} is zo klein, in combinatie met "
                     "een zeer hoge SSO-foutfractie, dat zelfs de grens bij "
                     "de conservatieve aanname dat elke post volledig goed "
-                    "of volledig fout is, bij 95% zekerheid, al op "
+                    f"of volledig fout is, bij {_procent(zekerheid)} zekerheid, al op "
                     "(vrijwel) 100% fout uitkomt: de SSO-steekproef geeft "
                     "dan geen enkel statistisch houvast meer voor dit type "
                     "post bij deze klant. Controleer deze posten "
                     "rechtstreeks (100%) in plaats van te extrapoleren."
                 )
-            if exact_doel >= _ZEKERHEID_VOOR_KLEMKALIBRATIE:
+            if exact_doel >= zekerheid:
                 n_eff, k_eff = _kalibreer_n_eff_gelijk_k_eff_op_exacte_grens(
-                    exact_doel, _ZEKERHEID_VOOR_KLEMKALIBRATIE
+                    exact_doel, zekerheid
                 )
             else:
                 # Zeldzaam randgeval: de exacte grens is lager dan de
@@ -326,13 +345,13 @@ def moment_match_SSO(n, k, N_klant, verdeling="binomiaal"):
 
     if geklemd:
         warnings.warn(
-            "De werkelijke spreiding van de foutfractie bij de klant kon niet "
+            f"De werkelijke spreiding van de foutfractie bij de klant kon niet "
             "exact gekalibreerd worden binnen de Beta/Gamma-familie (N_klant is "
             "te klein om de steekproefvariabiliteit van de foutfractie bij de "
             "klant nog weer te geven). Het (n_eff, k_eff)-paar is in plaats "
             "daarvan gekalibreerd op de grens bij de conservatieve aanname "
-            "dat elke post volledig goed of volledig fout is, bij 95% "
-            "zekerheid.",
+            "dat elke post volledig goed of volledig fout is, bij "
+            f"{_procent(zekerheid)} zekerheid.",
             RuntimeWarning,
             stacklevel=2,
         )

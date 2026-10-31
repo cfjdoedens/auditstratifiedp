@@ -143,6 +143,18 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
         with self.assertRaises(ValueError):
             bouw_strata_SSO_klant(post_typen, kalibratiemethode="onbekend")
 
+    def test_zekerheid_wordt_doorgegeven_aan_klemkalibratie(self):
+        post_typen = [
+            dict(naam="Emolumenten", n=120, k=1, N_klant=100, waarde_laag=2_000_000.0),
+        ]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            df_95 = bouw_strata_SSO_klant(post_typen)
+            df_99 = bouw_strata_SSO_klant(post_typen, zekerheid=0.99)
+            n_eff, k_eff = moment_match_SSO(120, 1, 100, zekerheid=0.99)
+        self.assertEqual(df_99["n_laag"].iloc[0], max(n_eff, k_eff))
+        self.assertNotEqual(df_95["n_laag"].iloc[0], df_99["n_laag"].iloc[0])
+
 
 if __name__ == "__main__":
     unittest.main()
