@@ -299,7 +299,7 @@ git push origin main   # geen tag → alleen test-workflow
 
 **Trusted Publishing registreren bij naamswijziging van het pakket.** Na het hernoemen van het PyPI-project (van `auditstratified` naar `auditstat`) moet er handmatig, eenmalig, een nieuwe "pending publisher" worden geregistreerd op https://pypi.org/manage/account/publishing/ (Project Name = `auditstat`, Owner = `cfjdoedens`, Repository = `auditstratifiedp`, Workflow = `publish.yml`, Environment = `pypi`). Zonder dit faalt de publish-stap met `400 ... Non-user identities cannot create new projects`, ook als de testmatrix wel slaagt. Dit is al gedaan voor `auditstat`; alleen relevant bij een volgende naamswijziging.
 
-**Huidige PyPI-status:** `auditstat` 0.1.9 is live (gepubliceerd 2026-10-23). Tags `v0.1.8` (publish gefaald, nooit gepubliceerd, overruled door 0.1.9) en `v0.1.9` (gepubliceerd na een `gh run rerun` nadat de trusted publisher was geregistreerd) staan beide op GitHub.
+**Huidige PyPI-status:** `auditstat` 0.1.14 is live (gepubliceerd 2026-10-31; bevat o.a. het PDF-rapport, de evaluatie over de hele SSO, de Theorie-tab uit `theorie.qmd` en de doorgegeven `zekerheid` voor de klemkalibratie). Eerder: 0.1.9 (2026-10-23). Tags `v0.1.8` (publish gefaald, nooit gepubliceerd, overruled door 0.1.9) en `v0.1.9` (gepubliceerd na een `gh run rerun` nadat de trusted publisher was geregistreerd) staan beide op GitHub.
 
 ## SSO-tab herontwerp (2026-10-27): geleide flow, theorie, methodekeuze, consistentiechecks
 
