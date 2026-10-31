@@ -34,6 +34,8 @@ auditstat/
     script_SSO.py                     # Demonstratiescript
     invoer_csv.py                     # CSV-uitwisseling van de SSO-invoer: maak_sso_invoer_csv / lees_sso_invoer_csv
     evalueer_SSO_totaal.py            # Evaluatie van de hele SSO (geen klantkalibratie): evalueer_SSO_totaal
+    schema_figuren.py                 # Schema-figuren voor de Theorie (teken_sso_schema, THEORIE_FIGUREN)
+    theorie_qmd.py                    # Kleine lezer van theorie.qmd voor de Theorie-tab
     rapport_pdf.py                    # PDF-rapport van een SSO-evaluatie (reportlab): maak_sso_rapport_pdf
 tests/
   __init__.py
@@ -54,6 +56,7 @@ tests/
     test_invoer_csv.py
     test_evalueer_SSO_totaal.py
     test_rapport_pdf.py
+theorie.qmd               # Bron van de Theorie-tab (ook los te renderen met Quarto)
 app.py                    # Streamlit-applicatie
 ruff.toml                 # Linting-configuratie
 pyproject.toml            # Pakketconfiguratie (name = "auditstat", versie 0.1.x)
@@ -258,7 +261,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-279 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+282 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -439,3 +442,7 @@ De gebruiker werkt nooit tegelijk met de assistent aan het project: als er wijzi
 **Geen afronding van `n_eff` meer (2026-10-30).** `bouw_strata_SSO_klant` rondde `n_eff` af op een geheel `n_laag` (eis van `eval_stratified`) terwijl `k_eff` ongeafgerond bleef. Dat verstoorde de gekalibreerde variantie en het gemiddelde: met de CSV `SSO2.csv` (n=108, k=2, N_klant 84.000-147.000) lag "Klanten samen" (0,044248) onder "Hele SSO" (0,044280), terwijl de som van de klantgrenzen daar niet onder hoort te liggen. Nu accepteert `eval_stratified` een niet-geheel `n_laag` (alleen de gehele-getallencontrole is vervallen; `n_laag >= 0` en `k_laag <= n_laag` blijven) en geeft `bouw_strata_SSO_klant` `n_laag = max(n_eff, k_eff)` ongeafgerond door. Resultaat: Klanten samen 0,044283 (momentmatching) / 0,044292 (naief) >= Hele SSO 0,044280. In `evalueer_SSO_totaal` blijft `n` wel geheel (echte steekproefomvang).
 
 **Afleiding poolingformule (2026-10-30, Theorie-onderdeel 2).** De naïeve formule `n_eff = n·N_klant/(n+N_klant)` is geen kale heuristiek meer maar een eerste-orde variantie-matching: de posterior-variantie van de SSO-foutkans (`≈ p(1-p)/n`) en de steekproefvariantie van de klant rond die foutkans (`≈ p(1-p)/N_klant`) tellen op (wet van de totale variantie); gelijkstellen aan `p(1-p)/n_eff` geeft de formule. Voor poisson (`p/n`, `p/N_klant`) komt in eerste orde dezelfde formule uit (niet "exact" dezelfde: de `+2` van de Beta-variantie is weggelaten). Evaluatie voor k=0, 95%, poisson, vlakke prior: benaderd `≈ 3/n + 3/N_klant`; exact (negatief-binomiaal/geometrisch) uit `X+1 ≥ ln(0,05)/ln(N/(n+N))`, `p = X/N`. De vereenvoudiging `≈ 3/n − 1/N` geldt **alleen voor N_klant ≫ n** (afrondingsonzekerheid ~1/N; voor kleine N kan ze negatief worden): n=100,N=10: benaderd 0,330 vs exact 0,100; n=100,N=300: 0,040 vs 0,033; n=100,N=1000: 0,033 vs 0,031; n=1000,N=100: 0,033 vs 0,010. Dit is een rekenvoorbeeld voor k=0, geen bewijs voor alle k. Teksten die hierop zijn afgestemd: Theorie-onderdeel 2 (`app.py`), `_methode_onderdelen` in `rapport_pdf.py`, docstrings van `naief_SSO.py` en `strata_SSO_klant.py`.
+
+## Theorie-tab uit `theorie.qmd` (2026-10-31)
+
+De tekst van het Theorie-tabblad staat niet meer in `app.py` maar in `theorie.qmd` (repo-root), zodat de gebruiker die als gewoon Quarto-document kan bewerken. `quarto render theorie.qmd` geeft een zelfstandige HTML (figuren via `{python}`-blokken); het pre-commit-hook rendert dit bestand niet. De app leest het met `auditstat/sso/theorie_qmd.py` (geen Quarto op de server nodig): titel uit de YAML-kop, tekst vóór de eerste `## ` is de inleiding (`st.caption`), elke `## `-kop is een uitklapper (de eerste open), overige tekst gaat naar `st.markdown` (`$...$` en `$$...$$` werken; `st.latex` is dus niet meer nodig). HTML-commentaar wordt genegeerd. Een `{python}`-blok met `#| label: fig-...` is een figuur: de tekenfunctie komt uit `THEORIE_FIGUREN` in `auditstat/sso/schema_figuren.py` (de figuurcode is daarheen verplaatst uit `app.py`), het bijschrift staat op **één regel** in `#| fig-cap: "..."` (geen dubbele aanhalingstekens erin). Een nieuw figuur vraagt dus: tekenfunctie + regel in `THEORIE_FIGUREN` + blok in het qmd. Getest in `tests/sso/test_theorie_qmd.py`. `theorie.qmd` moet bij de app staan (Streamlit Cloud draait vanuit de repo), niet in het PyPI-pakket.

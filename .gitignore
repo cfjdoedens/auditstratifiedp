@@ -33,3 +33,6 @@ email_boekje_basis.md
 
 # En ook:
 achtergronddoc/
+
+/.quarto/
+**/*.quarto_ipynb
