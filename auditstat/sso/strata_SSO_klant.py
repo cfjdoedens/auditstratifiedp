@@ -4,16 +4,16 @@ import pandas as pd
 
 from auditstat.sso.moment_match_SSO import moment_match_SSO
 from auditstat.sso.naief_SSO import naief_match_SSO
+from auditstat.stratified.utils import foutloze_posten_equivalent
 
 # Optionele kolommen die, indien aanwezig, worden doorgegeven aan
 # eval_stratified (dat zelf standaardwaarden invult als ze ontbreken).
+# ``ihr``, ``ibr``, ``car`` en ``materialiteit`` horen bij de eerste trap
+# (de SSO-steekproef) en worden hier al verwerkt; ze worden niet doorgegeven,
+# anders zou eval_stratified de correctie nogmaals op de klant toepassen.
 _OPTIONELE_KOLOMMEN = (
-    "ihr",
-    "ibr",
-    "car",
     "waarde_hoog",
     "fout_hoog",
-    "materialiteit",
 )
 
 
@@ -62,6 +62,15 @@ def bouw_strata_SSO_klant(
         Optioneel (standaardwaarden conform ``eval_stratified`` als ze
         ontbreken): ``ihr``, ``ibr``, ``car``, ``waarde_hoog``,
         ``fout_hoog``, ``materialiteit``.
+
+        ``ihr``, ``ibr``, ``car`` en ``materialiteit`` horen bij de eerste
+        trap, de SSO-steekproef. Het daarmee overeenkomende aantal
+        foutloze posten (``foutloze_posten_equivalent``) wordt eerst bij de
+        SSO-``n`` opgeteld (``n + extra``, ``k`` blijft); daaruit wordt dan
+        (n_eff, k_eff) voor de klant gekalibreerd. De klantsteekproef zelf
+        kent geen risicocorrectie, dus deze kolommen worden niet aan
+        ``eval_stratified`` doorgegeven (dat zou de correctie dubbel
+        toepassen, op ``n_eff``).
     model : {"binomiaal", "poisson"}, standaard "binomiaal"
         Kansmodel waarop gekalibreerd wordt. Moet overeenkomen met het
         ``model``-argument dat straks aan ``eval_stratified`` wordt
@@ -137,8 +146,21 @@ def bouw_strata_SSO_klant(
                 f"Type post '{naam}' mist verplicht(e) veld(en): {', '.join(ontbrekend)}."
             )
 
+        try:
+            extra = float(
+                foutloze_posten_equivalent(
+                    post.get("ihr", "H"),
+                    post.get("ibr", "H"),
+                    post.get("car", "H"),
+                    post.get("materialiteit", 0.01),
+                )
+            )
+        except ValueError as e:
+            raise ValueError(f"Type post '{naam}': {e}") from e
+        n_sso = post["n"] + extra
+
         if kalibratiemethode == "naief":
-            n_eff, k_eff = naief_match_SSO(post["n"], post["k"], post["N_klant"])
+            n_eff, k_eff = naief_match_SSO(n_sso, post["k"], post["N_klant"])
         else:
             # moment_match_SSO vuurt bij klemming een RuntimeWarning af
             # zonder te weten bij welk type post (naam) dat hoort. Die
@@ -149,7 +171,7 @@ def bouw_strata_SSO_klant(
                 with warnings.catch_warnings(record=True) as gevangen:
                     warnings.simplefilter("always", RuntimeWarning)
                     n_eff, k_eff = moment_match_SSO(
-                        post["n"],
+                        n_sso,
                         post["k"],
                         post["N_klant"],
                         verdeling=model,
@@ -173,6 +195,7 @@ def bouw_strata_SSO_klant(
             "waarde_laag": post["waarde_laag"],
             "n_laag": n_laag,
             "k_laag": k_eff,
+            "extra_foutloze_posten_sso": extra,
         }
         for optioneel in _OPTIONELE_KOLOMMEN:
             if optioneel in post:

@@ -337,10 +337,10 @@ def _methode_onderdelen(
                 "zeer kleine N_klant: de exacte verdeling levert dan "
                 "gewoon een (soms zeer hoge) grens op, onder aanname 3. De "
                 "risico-inschatting (ihr, ibr, car) en de materialiteit "
-                "worden bij deze methode <b>niet</b> toegepast. De "
-                "berekening van \u2018Hele SSO\u2019 (indien opgenomen) is "
-                "een aparte berekening en gebruikt die correctie wel, dus "
-                "beide uitkomsten zijn niet volledig onderling vergelijkbaar."
+                "worden toegepast op de SSO-steekproef (eerste trap): het "
+                "daarmee overeenkomende aantal foutloze posten wordt bij "
+                "de SSO-n opgeteld. De klantsteekproef zelf kent geen "
+                "risicocorrectie."
             ),
         ]
     elif kalibratie == "naief":
@@ -414,8 +414,9 @@ def _methode_onderdelen(
             "(n_eff, k_eff). De verdelingen van de foutfractie per stratum "
             "worden door convolutie (FFT) samengevoegd tot \u00e9\u00e9n verdeling "
             "van de totale fout van de klant. De risico-inschatting "
-            "(ihr, ibr, car) en de materialiteit worden verwerkt als extra "
-            "foutloze posten (HARo)."
+            "(ihr, ibr, car) en de materialiteit zijn al verwerkt in de "
+            "eerste trap: het overeenkomende aantal foutloze posten (HARo) "
+            "is bij de SSO-n opgeteld vóór de kalibratie."
         )
     onderdelen += [
         Paragraph("Combineren en uitkomst", stijlen["kop2"]),

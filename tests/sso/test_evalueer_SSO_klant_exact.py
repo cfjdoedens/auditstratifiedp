@@ -148,3 +148,36 @@ def test_hogere_zekerheid_geeft_hogere_grens():
 def test_ongeldige_invoer(post_typen, kwargs, fragment):
     with pytest.raises(ValueError, match=fragment):
         evalueer_SSO_klant_exact(post_typen, **kwargs)
+
+
+@pytest.mark.parametrize("model", ["binomiaal", "poisson"])
+def test_risicocorrectie_hoort_bij_de_eerste_trap(model):
+    """Met lage risico's wordt n verhoogd met foutloze posten (eerste trap);
+    het resultaat is dan gelijk aan de exacte grens bij n + extra."""
+    from auditstat.stratified.utils import foutloze_posten_equivalent
+
+    post = _post("a", 120, 1, 5_000, 1_000_000.0)
+    post.update(ihr="L", ibr="M", car="L", materialiteit=0.02)
+    extra = foutloze_posten_equivalent("L", "M", "L", 0.02)
+    assert extra > 0
+    res = evalueer_SSO_klant_exact([post], model=model)
+    verwacht = min(_max_fout_exact(120 + extra, 1, 5_000, model, 0.95), 1.0)
+    assert 0 <= res["max_fout_convolutie"] - verwacht < CEL
+    assert res["steekproeven"]["extra_foutloze_posten"].iloc[0] == pytest.approx(extra)
+    zonder = evalueer_SSO_klant_exact([_post("a", 120, 1, 5_000, 1_000_000.0)], model=model)
+    assert res["max_fout_convolutie"] < zonder["max_fout_convolutie"]
+
+
+def test_standaardrisico_geeft_geen_extra_posten():
+    res = evalueer_SSO_klant_exact([_post("a", 120, 1, 5_000, 1_000_000.0)])
+    assert res["steekproeven"]["extra_foutloze_posten"].iloc[0] == 0
+
+
+@pytest.mark.parametrize(
+    "veld, waarde", [("ihr", "X"), ("car", None), ("materialiteit", 0), ("materialiteit", 1.5)]
+)
+def test_ongeldig_risico_of_materialiteit(veld, waarde):
+    post = _post("a", 120, 1, 5_000, 1_000_000.0)
+    post[veld] = waarde
+    with pytest.raises(ValueError):
+        evalueer_SSO_klant_exact([post])

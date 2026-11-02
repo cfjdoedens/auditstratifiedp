@@ -1814,11 +1814,11 @@ with tab_sso:
             st.caption(
                 "De exacte methode rekent de klantverdeling per type post "
                 "zonder Beta/Gamma-benadering uit en voegt de typen posten "
-                "samen via FFT (zie tabblad \u2018Theorie\u2019). Zij past "
-                "geen risicocorrectie toe (IHR, IBR, CAR en materialiteit "
-                "tellen hier niet mee) en kent geen terugval bij een zeer "
-                "kleine N_klant; \u2018Hele SSO\u2019 wordt wel met die "
-                "correctie berekend."
+                "samen via FFT (zie tabblad \u2018Theorie\u2019). De "
+                "risicocorrectie (IHR, IBR, CAR en materialiteit) wordt "
+                "toegepast op de SSO-steekproef (eerste trap), niet op de "
+                "klantsteekproef. Er is geen terugval bij een zeer kleine "
+                "N_klant."
             )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"

@@ -6,6 +6,8 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import fftconvolve
 from scipy.special import betaln, gammaln, nbdtr
 
+from auditstat.stratified.utils import foutloze_posten_equivalent
+
 # Standaard aantal cellen van het euro-rooster waarop de strata worden
 # gecombineerd. De roosterfout is positief (conservatief) en bij 20.000
 # cellen in de gemeten voorbeelden hooguit ongeveer 0,2% van de grens.
@@ -50,6 +52,16 @@ def _controleer_post(post):
         raise ValueError(
             f"Type post '{naam}' mist verplicht(e) veld(en): {', '.join(ontbrekend)}."
         )
+    for veld in ("ihr", "ibr", "car"):
+        if post.get(veld, "H") not in ("H", "M", "L"):
+            raise ValueError(
+                f"Type post '{naam}': veld '{veld}' moet 'H', 'M' of 'L' zijn."
+            )
+    m = post.get("materialiteit", 0.01)
+    if not (0 < m < 1):
+        raise ValueError(
+            f"Type post '{naam}': materialiteit moet een fractie tussen 0 en 1 zijn."
+        )
     for veld in ("waarde_hoog", "fout_hoog"):
         if post.get(veld, 0) not in (0, 0.0, None):
             raise ValueError(
@@ -72,6 +84,17 @@ def _controleer_post(post):
         )
     if not (w > 0):
         raise ValueError(f"Type post '{naam}': waarde_laag moet groter dan 0 zijn.")
+
+
+def _extra_foutloze_posten(post):
+    return float(
+        foutloze_posten_equivalent(
+            post.get("ihr", "H"),
+            post.get("ibr", "H"),
+            post.get("car", "H"),
+            post.get("materialiteit", 0.01),
+        )
+    )
 
 
 def evalueer_SSO_klant_exact(
@@ -105,10 +128,17 @@ def evalueer_SSO_klant_exact(
     van een type post boven 1 uitkomen; die staart komt in de laatste cel
     (100% fout voor dat type post) terecht.
 
+    HARo-risicocorrectie: ``ihr``, ``ibr``, ``car`` en ``materialiteit``
+    (optioneel, standaard H/H/H en 0,01) horen bij de eerste trap, de
+    SSO-steekproef. Het aantal foutloze posten dat daarmee overeenkomt
+    (``foutloze_posten_equivalent``) wordt bij de SSO-``n`` opgeteld voordat
+    de Beta-Binomiaal/Negatief-Binomiaal wordt bepaald (``n_calc = n +
+    extra``; ``k`` blijft). De klantsteekproef zelf (``N_klant``) kent geen
+    risicocorrectie.
+
     Beperkingen: alleen het laagstratum (``waarde_hoog``/``fout_hoog`` moeten
-    0 zijn) en geen HARo-risicocorrectie (``ihr``/``ibr``/``car``/
-    ``materialiteit`` worden niet gebruikt). Het geheugengebruik schaalt met
-    ``N_klant`` (maximaal ``MAX_N_KLANT``).
+    0 zijn). Het geheugengebruik schaalt met ``N_klant`` (maximaal
+    ``MAX_N_KLANT``).
 
     Parameters
     ----------
@@ -155,7 +185,8 @@ def evalueer_SSO_klant_exact(
     kansmassa = np.array([1.0])
     for post in post_typen:
         n, k, N, w = post["n"], post["k"], int(post["N_klant"]), post["waarde_laag"]
-        cdf = _cdf_aantal_fouten(model, n, k, N)
+        n_calc = n + _extra_foutloze_posten(post)
+        cdf = _cdf_aantal_fouten(model, n_calc, k, N)
         cellen = np.arange(0, math.ceil(w / dx) + 1)
         # Cel c bevat de waarden met (j * w / N) in ((c-1)*dx, c*dx].
         j = np.floor(cellen * dx * N / w + 1e-9)
@@ -188,12 +219,14 @@ def evalueer_SSO_klant_exact(
     glad = gaussian_filter1d(kansmassa, sigma) if sigma >= 0.5 else kansmassa
     dichtheid = glad / glad.sum() / (dx / totaal)
 
+    extra = [_extra_foutloze_posten(p) for p in post_typen]
     steekproeven = pd.DataFrame({
         "naam": namen,
         "waarde_laag": [float(p["waarde_laag"]) for p in post_typen],
         "n_laag": [p["n"] for p in post_typen],
         "k_laag": [p["k"] for p in post_typen],
         "N_klant": [int(p["N_klant"]) for p in post_typen],
+        "extra_foutloze_posten": extra,
         "waarde_hoog": 0.0,
         "fout_hoog": 0.0,
     })

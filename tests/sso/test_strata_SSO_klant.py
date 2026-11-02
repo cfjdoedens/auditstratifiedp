@@ -42,22 +42,46 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
             df_binomiaal["k_laag"].iloc[0], df_poisson["k_laag"].iloc[0]
         )
 
-    def test_optionele_kolommen_worden_doorgegeven(self):
-        post_typen = [
-            dict(
-                naam="Emolumenten",
-                n=120,
-                k=1,
-                N_klant=400,
-                waarde_laag=2_000_000.0,
-                ihr="M",
-                materialiteit=0.02,
-            ),
-        ]
-        df = bouw_strata_SSO_klant(post_typen)
-        self.assertEqual(df["ihr"].iloc[0], "M")
-        self.assertEqual(df["materialiteit"].iloc[0], 0.02)
-        self.assertNotIn("ibr", df.columns)
+    def test_risicocorrectie_in_eerste_trap_niet_doorgegeven(self):
+        from auditstat.sso.naief_SSO import naief_match_SSO
+        from auditstat.stratified.utils import foutloze_posten_equivalent
+
+        post = dict(
+            naam="Emolumenten",
+            n=120,
+            k=1,
+            N_klant=400,
+            waarde_laag=2_000_000.0,
+            ihr="L",
+            ibr="M",
+            car="L",
+            materialiteit=0.02,
+        )
+        extra = foutloze_posten_equivalent("L", "M", "L", 0.02)
+        self.assertGreater(extra, 0)
+        df = bouw_strata_SSO_klant([post], kalibratiemethode="naief")
+        # Kalibratie op n + extra (eerste trap), niet n_eff + extra.
+        n_eff, k_eff = naief_match_SSO(120 + extra, 1, 400)
+        self.assertAlmostEqual(df["n_laag"].iloc[0], n_eff)
+        self.assertAlmostEqual(df["k_laag"].iloc[0], k_eff)
+        self.assertAlmostEqual(df["extra_foutloze_posten_sso"].iloc[0], extra)
+        # Niet doorgegeven, anders past eval_stratified het nogmaals toe.
+        for kolom in ("ihr", "ibr", "car", "materialiteit"):
+            self.assertNotIn(kolom, df.columns)
+
+    def test_n_eff_blijft_begrensd_door_N_klant_bij_lage_risicos(self):
+        post = dict(
+            naam="a", n=100, k=0, N_klant=10, waarde_laag=1e6,
+            ihr="L", ibr="L", car="L", materialiteit=0.01,
+        )
+        df = bouw_strata_SSO_klant([post], kalibratiemethode="naief")
+        self.assertLess(df["n_laag"].iloc[0], 10)
+
+    def test_standaardrisico_geeft_geen_extra_posten(self):
+        df = bouw_strata_SSO_klant(
+            [dict(naam="a", n=100, k=1, N_klant=500, waarde_laag=1e6)]
+        )
+        self.assertEqual(df["extra_foutloze_posten_sso"].iloc[0], 0)
 
     def test_lege_lijst(self):
         with self.assertRaises(ValueError):

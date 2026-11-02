@@ -59,7 +59,7 @@ Over de foutkans zijn dan twee lagen van onzekerheid te onderscheiden. Om iets t
 
 - **Laag 2 — hoeveel van de $N_\text{klant}$ posten van déze klant fout zijn**, *gegeven* $p$: dat is zelf weer onzeker, bijvoorbeeld binomiaal verdeeld met kans $p$ over $N_\text{klant}$ posten.
 
-De uiteindelijke verdeling van de foutfractie bij de klant is dus afhankelijk van het samenstel van beide verdelingen: eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij de klant op zijn beurt weer onzeker. Beide methoden hieronder (de eenvoudige poolingformule en momentmatching) benaderen deze samengestelde verdeling op verschillende wijze.
+De uiteindelijke verdeling van de foutfractie bij de klant is dus afhankelijk van het samenstel van beide verdelingen: eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij de klant op zijn beurt weer onzeker. De eerste twee methoden hieronder (de eenvoudige poolingformule en momentmatching) benaderen deze samengestelde verdeling op verschillende wijze; de derde (punt 5) rekent haar rechtstreeks uit.
 
 ## 2. Eenvoudige methode: de n_klant-poolingformule
 
@@ -136,6 +136,39 @@ NB:
 * $n$ moet hier een geheel getal zijn; $k$ mag niet-geheel zijn (bijv. een gewogen foutaantal).
 * De regel "Resultaat/Klanten samen" telt de maximale fouten van de klanten bij elkaar op (max_fout_euro; de max_fout_fractie is die som gedeeld door de totale massa van de klanten). Dat is een voorzichtige schatting: de werkelijke grens voor alle klanten samen is meestal lager.
 
-## 5. Exacte FFT-gebaseerde methode (in ontwikkeling)
+## 5. Exacte methode (FFT, zonder Beta/Gamma-benadering)
 
-Een derde methode — zonder de Beta/Gamma-benadering van momentmatching als tussenstap — bouwt de voorspellende verdeling van de klant-foutfractie direct op via FFT-convolutie van de twee-traps posterior uit punt 1. Dit maakt een exacte (in plaats van benaderde) berekening van de kanskromme en de maximale fout per klant mogelijk, maar vereist een andere manier van samenvoegen van de strata dan de huidige implementatie. Deze methode is nog niet beschikbaar in de app; de statistische en technische uitwerking is een apart vervolgtraject.
+De derde methode laat de tussenstap met een effectieve steekproef $(n_\text{eff}, k_\text{eff})$ helemaal weg en rekent de samengestelde verdeling uit punt 1 rechtstreeks uit.
+
+**Verdeling per type post.** Voor type post $h$ is de SSO-foutkans $p_h \sim \text{Beta}(k_h+1,\, n_h-k_h+1)$ (vlakke prior), en het aantal foute posten $X_h$ bij de klant is, gegeven $p_h$, binomiaal over $N_h$ posten. Marginaal is $X_h$ dan beta-binomiaal:
+
+$$
+X_h \sim \text{BetaBinomiaal}(N_h,\; k_h+1,\; n_h-k_h+1)
+$$
+
+Voor het Poisson-model is dat negatief-binomiaal met succeskans $\frac{n_h}{n_h+N_h}$. Dit is dezelfde verdeling als waarmee momentmatching bij klemming (te kleine $N_\text{klant}$) de grens ijkt.
+
+**Samenvoegen over typen posten.** De fout van de klant in euro's is
+
+$$
+E = \sum_h w_h \, \frac{X_h}{N_h}
+$$
+
+met $w_h$ de waarde van type post $h$ bij de klant. De steekproeven per type post zijn onafhankelijk, dus de verdeling van $E$ is de **convolutie** van de verdelingen per type post. Die wordt berekend op één euro-rooster (standaard 20.000 cellen over de totale waarde) met een FFT. De kansmassa van elke post wordt daarbij naar boven afgerond op een roostercel; de roosterfout maakt de grens dus hooguit iets te ruim, nooit te krap. In onze voorbeeldberekeningen was die fout bij 20.000 cellen hooguit ongeveer 0,2% van de grens. De maximale fout is het kwantiel van deze verdeling bij de gekozen zekerheid.
+
+**Aannames en beperkingen.**
+
+* Dezelfde aannames als bij momentmatching: vlakke prior, willekeurige verspreiding van de posten, en elke post volledig goed of volledig fout. Dat laatste is de maximaal conservatieve keuze (zie punt 3); een realistischer model voor gedeeltelijke fouten (tainting) is bewust niet toegepast, omdat een te gunstig gekozen spreiding tot een te lage grens kan leiden.
+* "Exact" betekent hier: zonder de Beta/Gamma-benadering, voor dit model. Het is geen garantie dat het model zelf klopt.
+* De risicocorrectie (IHR, IBR, CAR, materialiteit) hoort bij de eerste trap: het aantal foutloze posten dat daarmee overeenkomt wordt bij de SSO-steekproefomvang $n_h$ opgeteld, voordat de verdeling van $X_h$ wordt bepaald. De klantsteekproef zelf kent geen risicocorrectie. Alleen het laagstratum wordt ondersteund.
+* Er is geen terugval en geen weigering bij een zeer kleine $N_\text{klant}$: de exacte verdeling levert gewoon de bijbehorende, soms zeer hoge grens op.
+
+**Vergelijking met de andere methoden.** Een voorbeeldberekening (binomiaal, 95%, verzonnen cijfers, geen echte SSO-data), met de grens als fractie van de totale waarde:
+
+| Situatie | exact | momentmatching | eenvoudig |
+|---|---|---|---|
+| 1 type post, $N_\text{klant}=100.000$ ($n=108$, $k=2$) | 0,0566 | 0,0566 | 0,0567 |
+| 2 typen posten, $N_\text{klant}$ 1.800 en 1.200 | 0,0517 | 0,0516 | 0,0523 |
+| 2 typen posten, kleine $N_\text{klant}$ (100 en 50) | 0,0700 | 0,0732 | 0,0905 |
+
+Bij een grote of matige $N_\text{klant}$ verschillen de drie methoden weinig; momentmatching ligt dan soms licht onder de exacte grens (in deze voorbeelden hooguit ongeveer 0,0003). Het verschil wordt groter bij een kleine $N_\text{klant}$, waar de benaderingen conservatiever zijn dan nodig. De exacte methode is daarmee vooral nuttig als controle op de benaderingen en bij kleine klanten. Dit zijn rekenvoorbeelden, geen bewijs voor alle situaties.
