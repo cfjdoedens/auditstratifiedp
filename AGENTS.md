@@ -31,6 +31,7 @@ auditstat/
     moment_match_SSO.py              # Kalibreert (n_eff, k_eff) per type post op moment-matching (gemiddelde + variantie)
     strata_SSO_klant.py              # bouw_strata_SSO_klant: zet post_typen (per type post: n, k, N_klant, waarde_laag) om in een stratatabel
     evalueer_SSO_klant_gestratificeerd.py  # Roept bouw_strata_SSO_klant + eval_stratified aan
+    evalueer_SSO_klant_exact.py       # Exacte methode: Beta-Binomiaal per type post, FFT-convolutie op euro-rooster (nog niet in app)
     script_SSO.py                     # Demonstratiescript
     invoer_csv.py                     # CSV-uitwisseling van de SSO-invoer: maak_sso_invoer_csv / lees_sso_invoer_csv
     evalueer_SSO_totaal.py            # Evaluatie van de hele SSO (geen klantkalibratie): evalueer_SSO_totaal
@@ -53,6 +54,7 @@ tests/
     test_moment_match_SSO.py
     test_strata_SSO_klant.py
     test_evalueer_SSO_klant_gestratificeerd.py
+    test_evalueer_SSO_klant_exact.py
     test_invoer_csv.py
     test_evalueer_SSO_totaal.py
     test_rapport_pdf.py
@@ -261,7 +263,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-290 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+347 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -446,3 +448,23 @@ De gebruiker werkt nooit tegelijk met de assistent aan het project: als er wijzi
 ## Theorie-tab uit `theorie.qmd` (2026-10-31)
 
 De tekst van het Theorie-tabblad staat niet meer in `app.py` maar in `theorie.qmd` (repo-root), zodat de gebruiker die als gewoon Quarto-document kan bewerken. `quarto render theorie.qmd` geeft een zelfstandige HTML (figuren via `{python}`-blokken); het pre-commit-hook rendert dit bestand niet. De app leest het met `auditstat/sso/theorie_qmd.py` (geen Quarto op de server nodig): titel uit de YAML-kop, tekst vóór de eerste `## ` is de inleiding (`st.caption`), elke `## `-kop is een uitklapper (de eerste open), overige tekst gaat naar `st.markdown` (`$...$` en `$$...$$` werken; `st.latex` is dus niet meer nodig). HTML-commentaar wordt genegeerd. Een `{python}`-blok met `#| label: fig-...` is een figuur: de tekenfunctie komt uit `THEORIE_FIGUREN` in `auditstat/sso/schema_figuren.py` (de figuurcode is daarheen verplaatst uit `app.py`), het bijschrift staat op **één regel** in `#| fig-cap: "..."` (geen dubbele aanhalingstekens erin). Een nieuw figuur vraagt dus: tekenfunctie + regel in `THEORIE_FIGUREN` + blok in het qmd. Getest in `tests/sso/test_theorie_qmd.py`. `theorie.qmd` moet bij de app staan (Streamlit Cloud draait vanuit de repo), niet in het PyPI-pakket.
+
+## Exacte SSO-methode: `evalueer_SSO_klant_exact` (2026-11-02)
+
+`auditstat/sso/evalueer_SSO_klant_exact.py` is de derde methode naast momentmatching en naief, **zonder Beta/Gamma-tussenstap**. Per type post is het aantal foute posten bij de klant exact Beta-Binomiaal(N_klant, k+1, n-k+1) (binomiaal) resp. Negatief-Binomiaal(k+1, n/(n+N_klant)) (poisson), dezelfde verdeling als `_max_fout_exact`. De euro-fout is `som_h waarde_laag_h * X_h/N_h`; strata zijn onafhankelijk, dus FFT-convolutie van de kansmassa's op één euro-rooster (`granulariteit`, standaard 20.000 cellen over de totale `waarde_laag`). Het is een **aparte functie** (niet een `kalibratiemethode`), omdat er geen (n_eff, k_eff) en dus geen `eval_stratified` aan te pas komt; het resultaat heeft dezelfde sleutels, dus `plot_kanskromme` werkt ongewijzigd.
+
+**Modelkeuze:** het binaire (elke post goed of fout) model, dus de maximaal conservatieve spreiding. Een Beta-tainting-model met concentratie `c` is bewust **niet** gebouwd: zonder gekalibreerde data kan een te hoge `c` de spreiding onderschatten en dus een te lage grens geven, slechter dan de bestaande methoden.
+
+**Snelle cdf:** `scipy.stats.betabinom.cdf` rekent per element en nam 99% van de tijd; de Beta-Binomiaal-cdf is geen incomplete bètafunctie maar een 3F2. Daarom kansmassa's via `gammaln`/`betaln` + cumulatieve som (poisson: `scipy.special.nbdtr`). Identiek aan scipy (getest), 100-500 keer sneller.
+
+**Meetresultaten (los script, 6-7 verzonnen scenario's, geen echte SSO-data; scripts niet in de repo):**
+- FFT komt binnen MC-ruis overeen met een Monte Carlo-simulatie van hetzelfde model. MC is dus een controle op de rekenkunde, niet op het model.
+- Roosterfout is altijd positief (conservatief): bij 20.000 cellen hooguit 0,17% relatief, bij 5.000 tot ~0,8%, bij 2.000 tot 2,1%.
+- Tegenover momentmatching (binomiaal): bij grote/matige N hooguit ~0,0003 verschil (soms licht lager); bij kleine N (N=100/50) is momentmatching 4,6% te ruim en naief ~30%. De winst zit dus vooral bij kleine N_klant.
+- Rekentijd (50 klanten, 5 typen): 0,1-1,7 s (FFT) tegen 2,6-3,5 s (momentmatching) en 8-33 s (MC 4e5-1e6). Geheugen schaalt met N_klant (`MAX_N_KLANT` = 20 miljoen).
+
+**Beperkingen:** alleen het laagstratum (`waarde_hoog`/`fout_hoog` moeten 0 zijn), geen HARo-correctie (`ihr`/`ibr`/`car`/`materialiteit` genegeerd), en geen blinde-vlek-weigering of klem (bij kleine N komt gewoon de exacte, soms zeer hoge grens uit). De getekende kromme is licht glad gemaakt (kern ~ grootste stap `waarde_laag/N_klant`), omdat een stap die niet op het rooster past een kameffect geeft; de kwantielen komen uit de ongladde massa, dus de modus-lijn kan iets afwijken van de piek van de gladde kromme. Poisson: foutfractie > 1 per type post gaat naar de laatste cel.
+
+**Tests** (`tests/sso/test_evalueer_SSO_klant_exact.py`): één stratum tegen `_max_fout_exact` (0 <= verschil < 1/granulariteit, want naar boven afgerond), meerdere strata tegen Monte Carlo (tolerantie 0,001), limiet N -> oneindig tegen `Beta.ppf`, snelle cdf tegen scipy, volgorde-invariantie, normalisatie + plotbaarheid, invoervalidatie.
+
+**Nog niet gedaan:** app-integratie (derde optie in de radio berekeningsmethode, ook voor "Hele SSO" en PDF-methodetekst) en `theorie.qmd` onderdeel 5 (zegt nog "in ontwikkeling"). Rapport en app ondersteunen het resultaat (zelfde sleutels), maar het rapport toont `n_laag`/`k_laag` dan als SSO-n/k i.p.v. effectieve waarden.
