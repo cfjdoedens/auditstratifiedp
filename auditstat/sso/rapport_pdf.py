@@ -60,6 +60,7 @@ _LETTER_VET = "DejaVuSans-Bold"
 _KALIBRATIE_LABELS = {
     "momentmatching": "Momentmatching (scherper, complexer)",
     "naief": "Eenvoudig (poolingformule, conservatief)",
+    "exact": "Exact (zonder Beta/Gamma-benadering)",
 }
 
 _INSTELLING_LABELS = [
@@ -311,10 +312,38 @@ def _methode_onderdelen(
             "krap. Een op echte tainting-data gekalibreerd model is niet "
             "toegepast."
         ),
-        Paragraph("Kalibratie per klant", stijlen["kop2"]),
+        Paragraph(
+            (
+                "Verdeling per klant"
+                if kalibratie == "exact"
+                else "Kalibratie per klant"
+            ),
+            stijlen["kop2"],
+        ),
     ]
 
-    if kalibratie == "naief":
+    if kalibratie == "exact":
+        onderdelen += [
+            alinea(
+                "Gekozen methode: <b>exact</b>. Per type post is het aantal "
+                "foute posten bij de klant exact beta-binomiaal (binomiaal) "
+                "of negatief-binomiaal (Poisson), met de SSO-steekproef "
+                "(n, k) en het aantal posten van de klant (N_klant). Er is "
+                "geen tussenstap met een effectieve steekproef (n_eff, "
+                "k_eff) en dus ook geen beta- of gamma-benadering."
+            ),
+            alinea(
+                "De methode kent geen terugval en geen weigering bij een "
+                "zeer kleine N_klant: de exacte verdeling levert dan "
+                "gewoon een (soms zeer hoge) grens op, onder aanname 3. De "
+                "risico-inschatting (ihr, ibr, car) en de materialiteit "
+                "worden bij deze methode <b>niet</b> toegepast. De "
+                "berekening van \u2018Hele SSO\u2019 (indien opgenomen) is "
+                "een aparte berekening en gebruikt die correctie wel, dus "
+                "beide uitkomsten zijn niet volledig onderling vergelijkbaar."
+            ),
+        ]
+    elif kalibratie == "naief":
         onderdelen += [
             alinea(
                 "Gekozen methode: <b>eenvoudig (poolingformule)</b>. Per type post "
@@ -368,16 +397,29 @@ def _methode_onderdelen(
             ),
         ]
 
-    onderdelen += [
-        Paragraph("Combineren en uitkomst", stijlen["kop2"]),
-        alinea(
+    if kalibratie == "exact":
+        combineren = (
+            "Elk type post vormt een stratum in euro\u2019s: de fout is het "
+            "aantal foute posten gedeeld door N_klant, maal de waarde van "
+            "het type post. Omdat de steekproeven per type post "
+            "onafhankelijk zijn, is de verdeling van de totale fout van de "
+            "klant de convolutie van die verdelingen. Die wordt via FFT op "
+            "een euro-rooster berekend; de kansmassa van elke post wordt "
+            "daarbij naar boven afgerond, dus de roosterfout maakt de grens "
+            "hooguit iets te ruim, nooit te krap."
+        )
+    else:
+        combineren = (
             "Elk type post vormt een stratum in euro\u2019s met zijn "
             "(n_eff, k_eff). De verdelingen van de foutfractie per stratum "
             "worden door convolutie (FFT) samengevoegd tot \u00e9\u00e9n verdeling "
             "van de totale fout van de klant. De risico-inschatting "
             "(ihr, ibr, car) en de materialiteit worden verwerkt als extra "
             "foutloze posten (HARo)."
-        ),
+        )
+    onderdelen += [
+        Paragraph("Combineren en uitkomst", stijlen["kop2"]),
+        alinea(combineren),
         alinea(
             "De <b>maximale fout</b> in het rapport is de bovengrens van "
             f"die verdeling bij de gekozen zekerheid ({zekerheid}): met die "
@@ -666,13 +708,15 @@ def maak_sso_rapport_pdf(
 
     for klant, res in resultaten.items():
         steekproeven = res["steekproeven"]
+        exact = "N_klant" in steekproeven.columns
         rijen = [
             [
                 _tekst(r["naam"]),
                 nl_getal(r["waarde_laag"], 2),
-                nl_getal(r["n_laag"], 2),
+                nl_getal(r["n_laag"], 0 if exact else 2),
                 nl_getal(r["k_laag"], 2),
             ]
+            + ([nl_getal(r["N_klant"], 0)] if exact else [])
             for _, r in steekproeven.iterrows()
         ]
         blok = [
@@ -685,15 +729,33 @@ def maak_sso_rapport_pdf(
             ),
             Spacer(1, 6),
             _tabel(
-                ["Type post", "Waarde (euro\u2019s)", "n (effectief)", "k (effectief)"],
+                (
+                    ["Type post", "Waarde (euro\u2019s)", "n (SSO)", "k (SSO)", "N klant"]
+                    if exact
+                    else [
+                        "Type post",
+                        "Waarde (euro\u2019s)",
+                        "n (effectief)",
+                        "k (effectief)",
+                    ]
+                ),
                 rijen,
-                [breedte * 0.34, breedte * 0.26, breedte * 0.2, breedte * 0.2],
+                (
+                    [breedte * w for w in (0.28, 0.24, 0.16, 0.16, 0.16)]
+                    if exact
+                    else [breedte * 0.34, breedte * 0.26, breedte * 0.2, breedte * 0.2]
+                ),
                 stijlen,
-                rechts={1, 2, 3},
+                rechts={1, 2, 3, 4} if exact else {1, 2, 3},
             ),
             Paragraph(
-                "n en k zijn de gekalibreerde, effectieve waarden voor deze "
-                "klant (geen gehele tellingen).",
+                (
+                    "n en k zijn de SSO-steekproef voor dit type post; er is "
+                    "geen effectieve steekproef gekalibreerd."
+                    if exact
+                    else "n en k zijn de gekalibreerde, effectieve waarden voor "
+                    "deze klant (geen gehele tellingen)."
+                ),
                 stijlen["klein"],
             ),
             Spacer(1, 8),

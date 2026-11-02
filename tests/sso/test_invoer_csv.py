@@ -101,6 +101,17 @@ def test_inlezen_met_komma_als_scheidingsteken_en_windows_regeleinden():
     assert res["klanten"] is None
 
 
+def test_methode_exact_wordt_geaccepteerd(klanten, typen_posten, klanten_typen):
+    tekst = maak_sso_invoer_csv(
+        {**INSTELLINGEN, "berekeningsmethode": "exact"},
+        TOTAAL,
+        klanten,
+        typen_posten,
+        klanten_typen,
+    )
+    assert lees_sso_invoer_csv(tekst)["instellingen"]["berekeningsmethode"] == "exact"
+
+
 def test_lege_tabelrijen_worden_niet_geexporteerd(klanten, typen_posten):
     klanten = pd.concat([
         klanten,

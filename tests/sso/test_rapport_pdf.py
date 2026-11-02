@@ -10,6 +10,9 @@ import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 
+from auditstat.sso.evalueer_SSO_klant_exact import (  # noqa: E402
+    evalueer_SSO_klant_exact,
+)
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # noqa: E402
     evalueer_SSO_klant_gestratificeerd,
 )
@@ -165,6 +168,23 @@ def test_methodebeschrijving_naief_en_poisson(invoer, resultaten):
     assert "poolingformule" in tekst
     assert "negatief-binomiale" in tekst
     assert "momentmatching" not in tekst.split("Methodebeschrijving", 1)[1]
+
+
+def test_rapport_met_exacte_methode(invoer):
+    post_typen = [
+        dict(naam="Emolumenten", n=120, k=1, N_klant=1800, waarde_laag=900_000.0),
+        dict(naam="Inkoopfacturen", n=80, k=3, N_klant=1200, waarde_laag=600_000.0),
+    ]
+    resultaten = {"Klant A": evalueer_SSO_klant_exact(post_typen)}
+    invoer["instellingen"]["berekeningsmethode"] = "exact"
+    pdf = maak_sso_rapport_pdf(invoer, resultaten, methodebeschrijving=True)
+    assert pdf.startswith(b"%PDF-")
+    tekst = _pdf_tekst(pdf)
+    assert "Gekozen methode: exact" in tekst
+    assert "n (SSO)" in tekst and "N klant" in tekst
+    assert "(effectief)" not in tekst
+    assert "Verdeling per klant" in tekst
+    assert "Kalibratie per klant" not in tekst
 
 
 def test_colofon_met_versie_en_tijdstip(invoer, resultaten):

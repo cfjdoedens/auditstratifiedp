@@ -49,7 +49,7 @@ _NL_GETAL = re.compile(r"^(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$")
 _INSTELLING_VELDEN = {
     "model": ("binomiaal", "poisson"),
     "zekerheid": "getal",
-    "berekeningsmethode": ("momentmatching", "naief"),
+    "berekeningsmethode": ("momentmatching", "naief", "exact"),
     "onderscheid": ("nee", "ja"),
 }
 _TOTAAL_VELDEN = {

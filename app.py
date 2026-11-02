@@ -15,6 +15,9 @@ import streamlit as st
 # nog niet, dan volgt een duidelijke herstartmelding.
 for _poging in (1, 2):
     try:
+        from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
+            evalueer_SSO_klant_exact,
+        )
         from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
             evalueer_SSO_klant_gestratificeerd,
         )
@@ -1799,17 +1802,24 @@ with tab_sso:
         sso_zekerheid_text = st.text_input("zekerheid", key="sso_zekerheid_text")
         sso_kalibratiemethode = st.radio(
             "berekeningsmethode",
-            ["naief", "momentmatching"],
+            ["naief", "momentmatching", "exact"],
             format_func=lambda m: {
                 "naief": "gebruik afgeleide n_klant en k_klant, meestal conservatief",
                 "momentmatching": "idem, maar scherper en complexer",
+                "exact": "exacte verdeling per type post, zonder benadering",
             }[m],
             key="sso_kalibratiemethode",
         )
-        st.caption(
-            "Een exacte FFT-gebaseerde methode is in ontwikkeling \u2014 "
-            "zie tabblad \u2018Theorie\u2019."
-        )
+        if sso_kalibratiemethode == "exact":
+            st.caption(
+                "De exacte methode rekent de klantverdeling per type post "
+                "zonder Beta/Gamma-benadering uit en voegt de typen posten "
+                "samen via FFT (zie tabblad \u2018Theorie\u2019). Zij past "
+                "geen risicocorrectie toe (IHR, IBR, CAR en materialiteit "
+                "tellen hier niet mee) en kent geen terugval bij een zeer "
+                "kleine N_klant; \u2018Hele SSO\u2019 wordt wel met die "
+                "correctie berekend."
+            )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"
         )
@@ -2206,7 +2216,7 @@ with tab_sso:
                 "| onderdeel | klant | type_post | velden |\n"
                 "|---|---|---|---|\n"
                 "| `instelling` | leeg | leeg | `model` (binomiaal/poisson), "
-                "`zekerheid`, `berekeningsmethode` (momentmatching/naief), "
+                "`zekerheid`, `berekeningsmethode` (momentmatching/naief/exact), "
                 "`onderscheid` (nee/ja) |\n"
                 "| `totaal` | leeg | leeg | `n`, `k`, `N_totaal`, `massa`, "
                 "`ihr`, `ibr`, `car`, `materialiteit` |\n"
@@ -2445,12 +2455,19 @@ with tab_sso:
                 try:
                     with warnings.catch_warnings(record=True) as gevangen:
                         warnings.simplefilter("always", RuntimeWarning)
-                        resultaat = evalueer_SSO_klant_gestratificeerd(
-                            post_typen,
-                            model=sso_model,
-                            zekerheid=sso_zekerheid,
-                            kalibratiemethode=sso_kalibratiemethode,
-                        )
+                        if sso_kalibratiemethode == "exact":
+                            resultaat = evalueer_SSO_klant_exact(
+                                post_typen,
+                                model=sso_model,
+                                zekerheid=sso_zekerheid,
+                            )
+                        else:
+                            resultaat = evalueer_SSO_klant_gestratificeerd(
+                                post_typen,
+                                model=sso_model,
+                                zekerheid=sso_zekerheid,
+                                kalibratiemethode=sso_kalibratiemethode,
+                            )
                     sso_klanten_res[klant] = resultaat
                     klant_waarschuwingen = [
                         str(w.message)

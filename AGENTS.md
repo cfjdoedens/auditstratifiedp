@@ -263,7 +263,7 @@ sso_typen_posten_rijen = [
 .venv/bin/python -m pytest
 ```
 
-347 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
+349 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
 **Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
@@ -467,4 +467,6 @@ De tekst van het Theorie-tabblad staat niet meer in `app.py` maar in `theorie.qm
 
 **Tests** (`tests/sso/test_evalueer_SSO_klant_exact.py`): één stratum tegen `_max_fout_exact` (0 <= verschil < 1/granulariteit, want naar boven afgerond), meerdere strata tegen Monte Carlo (tolerantie 0,001), limiet N -> oneindig tegen `Beta.ppf`, snelle cdf tegen scipy, volgorde-invariantie, normalisatie + plotbaarheid, invoervalidatie.
 
-**Nog niet gedaan:** app-integratie (derde optie in de radio berekeningsmethode, ook voor "Hele SSO" en PDF-methodetekst) en `theorie.qmd` onderdeel 5 (zegt nog "in ontwikkeling"). Rapport en app ondersteunen het resultaat (zelfde sleutels), maar het rapport toont `n_laag`/`k_laag` dan als SSO-n/k i.p.v. effectieve waarden.
+**App-integratie (2026-11-02):** de radio "berekeningsmethode" heeft een derde optie `exact` (label "exacte verdeling per type post, zonder benadering"; volgorde naief, momentmatching, exact; de standaard blijft `naief`). Bij `exact` roept `app.py` per klant `evalueer_SSO_klant_exact` aan (zelfde `try/except ValueError`-patroon, geen waarschuwingen). Een caption onder de radio legt uit dat er geen HARo-correctie is en geen terugval bij kleine N_klant. **"Hele SSO" blijft ongewijzigd** (`evalueer_SSO_totaal`, daar is geen tweede trap en dus geen kalibratie; die berekening past de HARo-correctie wel toe), dus bij `exact` zijn "Klanten samen" en "Hele SSO" niet volledig onderling vergelijkbaar; dit staat in de caption en in de PDF-methodetekst. CSV-import/-export accepteert `berekeningsmethode = exact`. PDF-rapport: label in `_KALIBRATIE_LABELS`, aparte methodetekst (kop "Verdeling per klant" i.p.v. "Kalibratie per klant") en een steekproeventabel met `n (SSO)`, `k (SSO)`, `N klant` in plaats van effectieve waarden (herkend aan de kolom `N_klant` in `steekproeven`). Getest in `tests/sso/test_rapport_pdf.py` (`test_rapport_met_exacte_methode`), `tests/sso/test_invoer_csv.py` (`test_methode_exact_wordt_geaccepteerd`) en met `AppTest` (ja/nee-pad en PDF).
+
+**Nog niet gedaan:** `theorie.qmd` onderdeel 5 (zegt nog "in ontwikkeling").
