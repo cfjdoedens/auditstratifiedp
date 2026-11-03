@@ -59,7 +59,7 @@ Over de foutkans zijn dan twee lagen van onzekerheid te onderscheiden. Om iets t
 
 - **Laag 2 — hoeveel van de $N_\text{klant}$ posten van déze klant fout zijn**, *gegeven* $p$: dat is zelf weer onzeker, bijvoorbeeld binomiaal verdeeld met kans $p$ over $N_\text{klant}$ posten.
 
-De uiteindelijke verdeling van de foutfractie bij de klant is dus afhankelijk van het samenstel van beide verdelingen: eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij de klant op zijn beurt weer onzeker. De eerste twee methoden hieronder (de eenvoudige poolingformule en momentmatching) benaderen deze samengestelde verdeling op verschillende wijze; de derde (punt 5) rekent haar rechtstreeks uit.
+De uiteindelijke verdeling van de foutfractie bij de klant is dus afhankelijk van het samenstel van beide verdelingen: eerst is $p$ onzeker, en gegeven $p$ is het aantal fouten bij de klant op zijn beurt weer onzeker. De eerste twee methoden hieronder (de eenvoudige poolingformule en momentmatching) benaderen deze samengestelde verdeling op verschillende wijze; de derde (punt 4) rekent haar rechtstreeks uit.
 
 ## 2. Eenvoudige methode: de n_klant-poolingformule
 
@@ -123,20 +123,7 @@ $$
 
 Het resultaat is scherper dan dat van de eenvoudige methode, tegen de prijs van een ingewikkelder berekening. Dit behoudt beide onzekerheidslagen voor zover dat binnen één Beta/Gamma-verdeling mogelijk is. Bij een absoluut te kleine $N_\text{klant}$ kan het benodigde gemiddelde niet meer gecombineerd worden met de juiste variantie binnen die familie ("klemming"); de app valt dan terug op een kalibratie die, bij de gekozen zekerheid, exact aansluit bij de grens onder de **conservatieve aanname dat elke post volledig goed of volledig fout is** — voor elke grootheid $X \in [0,1]$ met gegeven gemiddelde $p$ geldt immers $\mathrm{Var}(X) \le p(1-p)$, met gelijkheid alleen in dat binaire geval. Zie AGENTS.md in de broncode voor de volledige onderbouwing en de randgevallen.
 
-## 4. Evaluatie over de hele SSO
-
-Naast de evaluatie per klant rekent de app ook de **hele SSO** door. Daar is geen tweede trap: de SSO-brede steekproef, $steek_0$, is een steekproef uit de hele SSO-populatie waarover geoordeeld wordt, dus is er geen $N_\text{klant}$ nodig.
-
-Indien er geen onderscheiden typen posten zijn, dan is er één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van de hele SSO. Daaruit volgt direct met de binomiale- of Poisson-verdeling de kanskromme.
-
-Indien er wel verschillende typen posten worden onderscheiden, dan wordt elk type post één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post bij de hele SSO. Daarna combineert dezelfde gestratificeerde convolutie als bij de klanten de strata tot één kanskromme en maximale fout. De uitkomst in de SSO-tab en ook in het pdf-rapport onder "Resultaat/Hele SSO" geeft het resultaat van deze evaluatie over de hele SSO.
-
-NB:
-
-* $n$ moet hier een geheel getal zijn; $k$ mag niet-geheel zijn (bijv. een gewogen foutaantal).
-* De regel "Resultaat/Klanten samen" telt de maximale fouten van de klanten bij elkaar op (max_fout_euro; de max_fout_fractie is die som gedeeld door de totale massa van de klanten). Dat is een voorzichtige schatting: de werkelijke grens voor alle klanten samen is meestal lager.
-
-## 5. Exacte methode (FFT, zonder Beta/Gamma-benadering)
+## 4. Exacte methode (FFT, zonder Beta/Gamma-benadering)
 
 De derde methode laat de tussenstap met een effectieve steekproef $(n_\text{eff}, k_\text{eff})$ helemaal weg en rekent de samengestelde verdeling uit punt 1 rechtstreeks uit.
 
@@ -172,3 +159,16 @@ met $w_h$ de waarde van type post $h$ bij de klant. De steekproeven per type pos
 | 2 typen posten, kleine $N_\text{klant}$ (100 en 50) | 0,0700 | 0,0732 | 0,0905 |
 
 Bij een grote of matige $N_\text{klant}$ verschillen de drie methoden weinig; momentmatching ligt dan soms licht onder de exacte grens (in deze voorbeelden hooguit ongeveer 0,0003). Het verschil wordt groter bij een kleine $N_\text{klant}$, waar de benaderingen conservatiever zijn dan nodig. De exacte methode is daarmee vooral nuttig als controle op de benaderingen en bij kleine klanten. Dit zijn rekenvoorbeelden, geen bewijs voor alle situaties.
+
+## 5. Evaluatie over de hele SSO
+
+Naast de evaluatie per klant rekent de app ook de **hele SSO** door. Daar is geen tweede trap: de SSO-brede steekproef, $steek_0$, is een steekproef uit de hele SSO-populatie waarover geoordeeld wordt, dus is er geen $N_\text{klant}$ nodig.
+
+Indien er geen onderscheiden typen posten zijn, dan is er één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van de hele SSO. Daaruit volgt direct met de binomiale- of Poisson-verdeling de kanskromme.
+
+Indien er wel verschillende typen posten worden onderscheiden, dan wordt elk type post één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post bij de hele SSO. Daarna combineert dezelfde gestratificeerde convolutie als bij de klanten de strata tot één kanskromme en maximale fout. De uitkomst in de SSO-tab en ook in het pdf-rapport onder "Resultaat/Hele SSO" geeft het resultaat van deze evaluatie over de hele SSO.
+
+NB:
+
+* $n$ moet hier een geheel getal zijn; $k$ mag niet-geheel zijn (bijv. een gewogen foutaantal).
+* De regel "Resultaat/Klanten samen" telt de maximale fouten van de klanten bij elkaar op (max_fout_euro; de max_fout_fractie is die som gedeeld door de totale massa van de klanten). Dat is een voorzichtige schatting: de werkelijke grens voor alle klanten samen is meestal lager.
