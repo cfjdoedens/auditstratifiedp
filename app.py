@@ -188,6 +188,9 @@ for key, standaard in {
     "plan_tabel_key": 0,
     "sso_typen_posten_tabel": LEGE_SSO_TYPEN_POSTEN_DF.copy(),
     "sso_typen_posten_tabel_key": 0,
+    "sso_voorbeeld_status": {
+        blok: "voorbeeld" for blok in ("totalen", "klanten", "typen", "klantentypen")
+    },
     "sso_klanten_tabel": LEGE_SSO_KLANTEN_DF.copy(),
     "sso_klanten_tabel_key": 0,
     "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
@@ -855,6 +858,89 @@ def _formatteer_nl_kolommen(df: pd.DataFrame, min_decimalen: dict) -> pd.DataFra
     return df
 
 
+def _sso_cel(waarde):
+    """Cel als vergelijkbare tekst: lege/ontbrekende cellen worden ''."""
+    if waarde is None or (not isinstance(waarde, str) and pd.isna(waarde)):
+        return ""
+    return str(waarde).strip()
+
+
+def _sso_tabel_status(huidig, voorbeeld):
+    """'voorbeeld' (identiek aan het voorbeeld), 'eigen' (geen enkele rij is
+    nog een voorbeeldrij) of 'deels' voor een invoertabel."""
+    try:
+        kolommen = list(voorbeeld.columns)
+        rijen = [
+            tuple(_sso_cel(v) for v in r)
+            for r in huidig[kolommen].itertuples(index=False, name=None)
+        ]
+    except (KeyError, AttributeError, TypeError):
+        return "eigen"
+    rijen = [r for r in rijen if any(r)]
+    voorbeeldrijen = {
+        tuple(_sso_cel(v) for v in r)
+        for r in voorbeeld.itertuples(index=False, name=None)
+    }
+    if not rijen:
+        return "eigen"
+    if set(rijen) == voorbeeldrijen and len(rijen) == len(voorbeeldrijen):
+        return "voorbeeld"
+    if not any(r in voorbeeldrijen for r in rijen):
+        return "eigen"
+    return "deels"
+
+
+def _sso_totalen_status():
+    """Idem voor de SSO-totalen (n, k, N totaal, massa, materialiteit; de
+    risicovelden tellen niet mee, want H/H/H is ook een gewone keuze)."""
+    velden = {
+        "sso_totaal_n_text": "n",
+        "sso_totaal_k_text": "k",
+        "sso_totaal_N_text": "N_totaal",
+        "sso_totaal_massa_text": "massa",
+        "sso_totaal_materialiteit_text": "materialiteit",
+    }
+    gelijk = [
+        _sso_cel(st.session_state.get(sleutel)) == SSO_TOTAAL_VOORBEELD[veld]
+        for sleutel, veld in velden.items()
+    ]
+    if all(gelijk):
+        return "voorbeeld"
+    return "deels" if any(gelijk) else "eigen"
+
+
+def _werk_sso_voorbeeld_status_bij():
+    """Bepaal per invoerblok of het nog het voorbeeld is, deels of geheel
+    door de gebruiker is ingevuld. Wordt aangeroepen na een evaluatie en na
+    het inlezen van een CSV."""
+    st.session_state.sso_voorbeeld_status = {
+        "totalen": _sso_totalen_status(),
+        "klanten": _sso_tabel_status(
+            st.session_state.sso_klanten_totaal_tabel, LEGE_SSO_KLANTEN_TOTAAL_DF
+        ),
+        "typen": _sso_tabel_status(
+            st.session_state.sso_typen_posten_tabel, LEGE_SSO_TYPEN_POSTEN_DF
+        ),
+        "klantentypen": _sso_tabel_status(
+            st.session_state.sso_klanten_tabel, LEGE_SSO_KLANTEN_DF
+        ),
+    }
+
+
+def _sso_voorbeeld_tekst(status, voorbeeldzin, uitleg=""):
+    """Caption bij een invoerblok, afhankelijk van de herkomst van de data."""
+    if status == "voorbeeld":
+        voorbeeld = voorbeeldzin
+    elif status == "deels":
+        voorbeeld = (
+            "Onderstaande gegevens zijn deels door u ingevuld, deels staan "
+            "er nog voorbeeldwaarden."
+        )
+    else:
+        voorbeeld = ""
+    return " ".join(t for t in (voorbeeld, uitleg) if t)
+
+
 def on_sso_csv_upload():
     """Lees een geüploade SSO-invoer-CSV in en zet de invoer van de SSO-tab.
 
@@ -911,6 +997,21 @@ def on_sso_csv_upload():
         st.session_state[state_naam] = _formatteer_nl_kolommen(df, decimalen)
         st.session_state[f"{state_naam}_key"] += 1
         ingelezen.append(f"{len(df)} rijen {csv_naam.replace('_', ' ')}")
+
+    # Wat uit het bestand komt is invoer van de gebruiker, ook als het
+    # toevallig gelijk is aan het voorbeeld; blokken die niet in het bestand
+    # staan houden hun huidige status.
+    status = dict(st.session_state.sso_voorbeeld_status)
+    if invoer["totaal"]:
+        status["totalen"] = "eigen"
+    for csv_naam, blok in (
+        ("klanten", "klanten"),
+        ("typen_posten", "typen"),
+        ("klanten_typen", "klantentypen"),
+    ):
+        if invoer[csv_naam] is not None:
+            status[blok] = "eigen"
+    st.session_state.sso_voorbeeld_status = status
 
     # Oude resultaten horen niet meer bij de nieuwe invoer.
     st.session_state.sso_klanten_res = {}
@@ -1834,10 +1935,7 @@ with tab_sso:
                 "massa` de bijbehorende geldwaarde. Zie tabblad "
                 "\u2018Theorie\u2019, sectie 1 voor de achtergrond."
             )
-        st.caption(
-            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
-            "pas deze (indien nodig) aan."
-        )
+        sso_voorbeeld_plek = {"totalen": st.empty()}
         c_n, c_k, c_N, c_massa = st.columns(4)
         sso_totaal_n_text = c_n.text_input(
             "n (steekproefomvang)",
@@ -1880,10 +1978,7 @@ with tab_sso:
         )
 
         st.subheader("2. Klanten")
-        st.caption(
-            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
-            "overschrijf of verwijder de rijen."
-        )
+        sso_voorbeeld_plek["klanten"] = st.empty()
         sso_klanten_totaal_tabel = st.data_editor(
             st.session_state.sso_klanten_totaal_tabel,
             width="stretch",
@@ -1924,12 +2019,7 @@ with tab_sso:
         sso_klanten_tabel = None
         if sso_onderscheid == "ja":
             st.subheader("typen posten bij de SSO")
-            st.caption(
-                "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
-                "overschrijf of verwijder de rijen. De som van n en k over "
-                "de typen posten moet overeenkomen met de SSO-brede "
-                "totalen hierboven."
-            )
+            sso_voorbeeld_plek["typen"] = st.empty()
             sso_typen_posten_tabel = st.data_editor(
                 st.session_state.sso_typen_posten_tabel,
                 width="stretch",
@@ -1972,12 +2062,7 @@ with tab_sso:
             st.session_state.sso_typen_posten_tabel = sso_typen_posten_tabel
 
             st.subheader("klanten \u00d7 typen posten")
-            st.caption(
-                "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
-                "overschrijf of verwijder de rijen. Voor elke klant moet de "
-                "som van N_klant en waarde_laag over de typen posten "
-                "overeenkomen met de klanttotalen hierboven."
-            )
+            sso_voorbeeld_plek["klantentypen"] = st.empty()
             sso_typen_posten_namen = [
                 str(n).strip()
                 for n in sso_typen_posten_tabel.get("naam", [])
@@ -2563,6 +2648,45 @@ with tab_sso:
                 "typen_posten": st.session_state.sso_typen_posten_tabel.copy(),
                 "klanten_typen": st.session_state.sso_klanten_tabel.copy(),
             }
+
+    # Na een evaluatie opnieuw bepalen welke invoer nog voorbeeld is; de
+    # captions staan in plaatshouders hoger op de pagina, zodat ze in
+    # dezelfde run al kloppen.
+    if sso_bereken:
+        _werk_sso_voorbeeld_status_bij()
+    _sso_voorbeeld_uitleg = {
+        "totalen": (
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "pas deze (indien nodig) aan.",
+            "",
+        ),
+        "klanten": (
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "overschrijf of verwijder de rijen.",
+            "",
+        ),
+        "typen": (
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "overschrijf of verwijder de rijen.",
+            "De som van n en k over de typen posten moet overeenkomen met "
+            "de SSO-brede totalen hierboven.",
+        ),
+        "klantentypen": (
+            "Onderstaande gegevens zijn als voorbeeld ingevuld \u2014 "
+            "overschrijf of verwijder de rijen.",
+            "Voor elke klant moet de som van N_klant en waarde_laag over "
+            "de typen posten overeenkomen met de klanttotalen hierboven.",
+        ),
+    }
+    for _blok, _plek in sso_voorbeeld_plek.items():
+        _tekst = _sso_voorbeeld_tekst(
+            st.session_state.sso_voorbeeld_status[_blok],
+            *_sso_voorbeeld_uitleg[_blok],
+        )
+        if _tekst:
+            _plek.caption(_tekst)
+        else:
+            _plek.empty()
 
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
