@@ -3,7 +3,6 @@ import math
 import sys
 import time
 import warnings
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -33,12 +32,12 @@ for _poging in (1, 2):
             lees_sso_invoer_csv,
             maak_sso_invoer_csv,
         )
-        from auditstat.sso.maandbestand import (  # pyrefly: ignore[missing-import]
-            MAAND_KOLOMMEN,
-            lees_maandbestand,
-            maak_voorbeeld_maandbestand,
-            maandbestand_csv,
-            maandtotalen_per_type_post,
+        from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
+            POSTEN_KOLOMMEN,
+            lees_postenbestand,
+            maak_voorbeeld_postenbestand,
+            postenbestand_csv,
+            totalen_per_type_post,
         )
         from auditstat.sso.schema_figuren import (  # pyrefly: ignore[missing-import]
             THEORIE_FIGUREN,
@@ -204,9 +203,9 @@ for key, standaard in {
     "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
     "sso_klanten_totaal_tabel_key": 0,
     "sso_csv_upload_key": 0,
-    "sso_maandbestand": None,
-    "sso_maandbestand_naam": None,
-    "sso_maandbestand_fout": None,
+    "sso_postenbestand": None,
+    "sso_postenbestand_naam": None,
+    "sso_postenbestand_fout": None,
     "sso_rapport_invoer": None,
     "sso_rapport_pdf": None,
     "sso_rapport_methode": False,
@@ -1039,21 +1038,21 @@ def on_sso_csv_upload():
     )
 
 
-def on_sso_maandbestand_upload():
-    bestand = st.session_state.get('sso_maand_upload')
+def on_sso_postenbestand_upload():
+    bestand = st.session_state.get('sso_posten_upload')
     if bestand is None:
-        st.session_state.sso_maandbestand = None
-        st.session_state.sso_maandbestand_naam = None
-        st.session_state.sso_maandbestand_fout = None
+        st.session_state.sso_postenbestand = None
+        st.session_state.sso_postenbestand_naam = None
+        st.session_state.sso_postenbestand_fout = None
         return
     try:
-        gelezen = lees_maandbestand(bestand.getvalue())
+        gelezen = lees_postenbestand(bestand.getvalue())
     except ValueError as exc:
-        st.session_state.sso_maandbestand_fout = str(exc)
-        return  # Bij fout blijft een eerder geldig maandbestand bewaard.
-    st.session_state.sso_maandbestand = gelezen
-    st.session_state.sso_maandbestand_naam = bestand.name
-    st.session_state.sso_maandbestand_fout = None
+        st.session_state.sso_postenbestand_fout = str(exc)
+        return  # Bij fout blijft een eerder geldig postenbestand bewaard.
+    st.session_state.sso_postenbestand = gelezen
+    st.session_state.sso_postenbestand_naam = bestand.name
+    st.session_state.sso_postenbestand_fout = None
 
 
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
@@ -2719,13 +2718,13 @@ with tab_sso:
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
 
-    # Los maandbestand van één klant: genereren, inlezen en verkennen.
+    # Los postenbestand van één klant: genereren, inlezen en verkennen.
     # Geen automatische aanpassing van SSO-steekproefgegevens of foutgrenzen.
-    with st.expander("Maandbestand klantposten — genereren en inlezen", expanded=False):
+    with st.expander("Postenbestand — genereren en inlezen", expanded=False):
         st.caption(
-            "Afzonderlijk CSV-formaat: klant;datum;post_id;type_post;bedrag "
+            "Afzonderlijk CSV-formaat: klant;post_id;type_post;bedrag "
             "(puntkomma als scheidingsteken, bedragen in euro's). "
-            "Dit is een fictief maandvoorbeeld of een echte maandadministratie; "
+            "Een voorbeeldbestand om de grootten van de posten te bekijken; "
             "het verandert de SSO-evaluatie niet automatisch."
         )
         bestaande_klanten = sorted({
@@ -2741,49 +2740,47 @@ with tab_sso:
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             klant_voorbeeld = st.selectbox(
-                "Klant voorbeeld", bestaande_klanten or ['Klant A'], key='sso_maand_klant'
+                "Klant voorbeeld", bestaande_klanten or ['Klant A'], key='sso_posten_klant'
             )
-            maand_datum = st.date_input('Voorbeeldmaand', value=date(2026, 10, 1),
-                                        key='sso_maand_datum')
         with col_b:
             aantal_voorbeeld = st.number_input('Aantal voorbeeldposten', min_value=1,
                                                  max_value=100_000, value=250,
-                                                 step=50, key='sso_maand_aantal')
+                                                 step=50, key='sso_posten_aantal')
         with col_c:
             typen_voorbeeld = st.multiselect('Typen posten', bestaande_typen,
                                               default=bestaande_typen,
-                                              key='sso_maand_typen')
+                                              key='sso_posten_typen')
         if typen_voorbeeld:
-            voorbeeld_df = maak_voorbeeld_maandbestand(
-                klant_voorbeeld, maand_datum.year, maand_datum.month,
-                int(aantal_voorbeeld), typen_voorbeeld
+            voorbeeld_df = maak_voorbeeld_postenbestand(
+                klant_voorbeeld, int(aantal_voorbeeld), typen_voorbeeld
             )
             st.download_button(
-                'Download voorbeeld-maandbestand (CSV)',
-                data=maandbestand_csv(voorbeeld_df),
-                file_name=f"klantposten_{maand_datum:%Y_%m}.csv",
-                mime='text/csv', key='sso_maand_download'
+                'Download voorbeeld-postenbestand (CSV)',
+                data=postenbestand_csv(voorbeeld_df),
+                file_name="postenbestand.csv",
+                mime='text/csv', key='sso_posten_download'
             )
         else:
             st.warning('Selecteer ten minste één type post om een voorbeeld te genereren.')
-        st.file_uploader('Maandbestand klantposten inlezen (CSV)', type=['csv'],
-                         key='sso_maand_upload', on_change=on_sso_maandbestand_upload)
-        if st.session_state.sso_maandbestand_fout:
-            st.error('Maandbestand niet ingelezen: ' + st.session_state.sso_maandbestand_fout)
-        maand_df = st.session_state.sso_maandbestand
-        if maand_df is not None:
-            st.success(f"Ingelezen: {st.session_state.sso_maandbestand_naam} — "
-                       f"{len(maand_df):,} posten.")
-            st.metric('Totaal bedrag', '€ ' + _nl(maand_df['bedrag_cent'].sum() / 100, 2))
-            st.dataframe(maand_df[list(MAAND_KOLOMMEN)].head(100),
+        st.file_uploader('Postenbestand inlezen (CSV)', type=['csv'],
+                         key='sso_posten_upload', on_change=on_sso_postenbestand_upload)
+        if st.session_state.sso_postenbestand_fout:
+            st.error('Postenbestand niet ingelezen: ' + st.session_state.sso_postenbestand_fout)
+        posten_df = st.session_state.sso_postenbestand
+        if posten_df is not None:
+            st.success(f"Ingelezen: {st.session_state.sso_postenbestand_naam} — "
+                       f"{len(posten_df):,} posten.")
+            st.metric('Totaal bedrag', '€ ' + _nl(posten_df['bedrag_cent'].sum() / 100, 2))
+            st.dataframe(posten_df[list(POSTEN_KOLOMMEN)].head(100),
                          width='stretch', hide_index=True)
-            samenvatting = maandtotalen_per_type_post(maand_df).drop(
+            samenvatting = totalen_per_type_post(posten_df).drop(
                 columns=['bedrag_cent']
             ).assign(waarde_laag=lambda d: d['waarde_laag'].apply(lambda x: _nl(x, 2)))
-            st.markdown('**Maandtotalen per type post**')
+            st.markdown('**Totalen per type post**')
             st.dataframe(samenvatting, width='stretch', hide_index=True)
-            st.caption('Dit zijn maandtotalen, geen jaar- of SSO-populatietotalen. '
-                       'Overnemen in de klantentabel is daarom bewust niet automatisch.')
+            st.caption('Dit zijn de totalen van dit bestand, niet noodzakelijk de '
+                       'populatietotalen. Overnemen in de klantentabel is daarom '
+                       'bewust niet automatisch.')
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
