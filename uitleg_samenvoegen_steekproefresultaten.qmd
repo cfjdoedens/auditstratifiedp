@@ -140,41 +140,52 @@ De totale fout is de som van beide bedragen. De kans per combinatie is het produ
 | €100 | A €100 en B €0 | 30% × 80% = 24% |
 | €150 | A €100 en B €50 | 30% × 20% = 6% |
 
-De kansen tellen op tot 100%. De kans dat de totale fout hoogstens €100 is, is 56% + 14% + 24% = 94%. Bij 95% zekerheid is de maximale fout daarom €150. In werkelijkheid zijn er niet twee maar heel veel mogelijke bedragen per massa, waardoor de kanskromme glad is in plaats van uit vier punten te bestaan, maar het principe is hetzelfde. @fig-voorbeeld toont dezelfde getallen als grafiek.
+De kansen tellen op tot 100%. De kans dat de totale fout hoogstens €100 is, is 56% + 14% + 24% = 94%. Bij 95% zekerheid is de maximale fout daarom €150. In werkelijkheid zijn er niet twee maar heel veel mogelijke bedragen per massa, waardoor de kanskromme glad is in plaats van uit vier punten te bestaan, maar het principe is hetzelfde. @fig-voorbeeld-kans toont de kansen als grafiek.
 
 ```{python}
-#| label: fig-voorbeeld
-#| fig-cap: "Het rekenvoorbeeld met twee massa's. Boven de kans op elke totale fout. Onder de opgetelde kans: bij €100 is die 94%, nog onder de 95%, dus de maximale fout bij 95% zekerheid is €150."
-#| fig-alt: "Boven een staafdiagram van de vier mogelijke totale fouten, eronder een trapfunctie van de opgetelde kans."
+#| label: fig-voorbeeld-kans
+#| fig-cap: "Het rekenvoorbeeld met twee massa's: de kans op elke mogelijke totale fout."
+#| fig-alt: "Staafdiagram van de vier mogelijke totale fouten (€0, €50, €100 en €150) met hun kansen."
 bedragen = np.array([0, 50, 100, 150])
 kansen = np.array([0.56, 0.14, 0.24, 0.06])
 opgeteld = np.cumsum(kansen)
 
-fig, (a1, a2) = plt.subplots(2, 1, figsize=(7, 5.6), sharex=True)
-a1.bar(bedragen, kansen, width=30, color=BLAUW)
+fig, ax = plt.subplots(figsize=(7, 3.2))
+ax.bar(bedragen, kansen, width=30, color=BLAUW)
 for b, k in zip(bedragen, kansen):
-    a1.text(b, k + 0.015, f"{round(k * 100)}%", ha="center")
-a1.set_ylim(0, 0.7)
-a1.set_xlim(-35, 185)
-a1.set_title("kans op de totale fout", loc="left", fontsize=10)
-a1.set_yticks([])
+    ax.text(b, k + 0.015, f"{round(k * 100)}%", ha="center")
+ax.set_ylim(0, 0.7)
+ax.set_xlim(-35, 185)
+ax.set_yticks([])
+ax.set_xticks(bedragen)
+ax.set_xticklabels(["€" + str(b) for b in bedragen])
+ax.set_xlabel("totale fout")
+ax.set_ylabel("kans")
+fig.tight_layout()
+plt.show()
+```
 
-a2.step(np.append(bedragen, 175), np.append(opgeteld, 1.0), where="post", color="black")
-a2.axhline(0.95, color=ROOD, lw=1.2, ls="--")
-a2.text(-12, 0.96, "95% zekerheid", color=ROOD, va="bottom")
+Telt men deze kansen van links naar rechts op, dan krijgt men de kans dat de totale fout hoogstens een bepaald bedrag is (@fig-voorbeeld-opgeteld).
+
+```{python}
+#| label: fig-voorbeeld-opgeteld
+#| fig-cap: "Dezelfde kansen opgeteld: de kans dat de totale fout hoogstens een bepaald bedrag is. Bij €100 is die 94%, nog onder de 95%, dus de maximale fout bij 95% zekerheid is €150."
+#| fig-alt: "Trapfunctie van de opgetelde kans: 56% bij €0, 70% bij €50, 94% bij €100 en 100% bij €150, met een rode lijn bij 95% zekerheid en bij €150."
+fig, ax = plt.subplots(figsize=(7, 3.4))
+ax.step(np.append(bedragen, 175), np.append(opgeteld, 1.0), where="post", color="black")
+ax.axhline(0.95, color=ROOD, lw=1.2, ls="--")
+ax.text(-30, 0.96, "95% zekerheid", color=ROOD, va="bottom")
 for midden, c in zip([25, 75, 125], opgeteld[:3]):
-    a2.text(midden, c - 0.08, f"{round(c * 100)}%", ha="center")
-a2.text(165, 1.03, "100%", ha="center")
-a2.axvline(150, color=ROOD, lw=1.5)
-a2.set_ylim(0, 1.08)
-a2.set_title("opgetelde kans: de totale fout is hoogstens dit bedrag", loc="left", fontsize=10)
-a2.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{round(v * 100)}%"))
-a1.tick_params(labelbottom=True)
-a1.set_xticks(bedragen)
-a1.set_xticklabels(["€" + str(b) for b in bedragen])
-a2.set_xticks(bedragen)
-a2.set_xticklabels(["€" + str(b) for b in bedragen])
-a2.set_xlabel("totale fout")
+    ax.text(midden, c - 0.08, f"{round(c * 100)}%", ha="center")
+ax.text(165, 1.03, "100%", ha="center")
+ax.axvline(150, color=ROOD, lw=1.5)
+ax.set_xlim(-35, 185)
+ax.set_ylim(0, 1.1)
+ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{round(v * 100)}%"))
+ax.set_xticks(bedragen)
+ax.set_xticklabels(["€" + str(b) for b in bedragen])
+ax.set_xlabel("totale fout")
+ax.set_ylabel("kans op hoogstens dit bedrag")
 fig.tight_layout()
 plt.show()
 ```
