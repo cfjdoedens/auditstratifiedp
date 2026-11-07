@@ -1,0 +1,323 @@
+---
+title: "Samenvoegen van steekproefresultaten in St@pp"
+lang: nl
+format:
+  html:
+    embed-resources: true
+    toc: true
+    number-sections: false
+engine: jupyter
+execute:
+  echo: false
+  warning: false
+---
+
+```{python}
+#| label: setup
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy.stats import beta
+
+from auditstat._formatting import nl_getal, nl_tick_formatter
+from auditstat.stratified.eval_stratified import eval_stratified
+
+plt.rcParams.update({
+    "figure.dpi": 110,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "font.size": 10,
+})
+BLAUW, ROOD, GRIJS, GROEN = "#1f5fa8", "#c0392b", "#8c8c8c", "#2e8b57"
+
+
+def procent_as(ax, decimalen=1):
+    ax.xaxis.set_major_formatter(
+        plt.FuncFormatter(lambda x, _: nl_getal(x * 100, decimalen) + "%")
+    )
+
+
+def euro_as(ax):
+    ax.xaxis.set_major_formatter(
+        plt.FuncFormatter(lambda x, _: "€" + nl_getal(x, 0))
+    )
+
+
+def stratum(naam, waarde, n, k):
+    return {"naam": naam, "waarde_laag": waarde, "n_laag": n, "k_laag": k}
+```
+
+## 1. Inleiding: St@pp, de steekproef applicatie van de ADR
+
+St@pp is een applicatie ontwikkeld door de ADR om het gebruik van steekproeven te ondersteunen in het auditproces. Er zijn 5 stappen in het steekproefproces die worden ondersteund:
+
+1. plannen
+1. massa bepalen
+1. selecteren
+1. beoordelen
+1. evalueren
+
+Belangrijkste doel van het steekproefproces is om per steekproef te bepalen of de maximale fout van de te beoordelen massa al of niet onder de materialiteit ligt. De nadruk ligt daarbij in St@pp op geldsteekproeven. Maar postensteekproeven worden ook ondersteund.
+
+St@pp biedt de mogelijkheid om uitgaande van verschillende getrokken steekproeven te bepalen wat de maximale fout is van de respectieve samengenomen massa's. Hoe dat gebeurt wordt in dit document kort uitgelegd.
+
+## 2. Constructie van gezamenlijke kanskromme: convolutie
+
+Het samennemen van de resultaten van de betreffende steekproeven gaat conceptueel in twee stappen.
+
+1. In de eerste stap wordt uit het aantal getrokken posten, n, en de som van de foutfracties, k, een kanskromme geconstrueerd. Deze volgt uit een standaard statistische verdeling. Er wordt dus niet aangenomen dat de foutfractie hoog of laag is; de uitkomst volgt alleen uit de steekproef. Afhankelijk van de risico-inschatting en de materialiteit wordt het aantal getrokken posten verhoogd met een aantal foutloze posten, omdat een laag risico extra zekerheid geeft (de HARo-correctie).
+1. In de tweede stap worden de kanskrommen gecombineerd tot een nieuwe kanskromme die de kans beschrijft van de foutfractie van de samengenomen massa's. Posten die voor 100% zijn beoordeeld, dragen hun bekende fout als vast bedrag bij.
+
+Zo'n kanskromme is te beschouwen als een grafiek met op de x-as de mogelijke foutfractie van een te controleren massa, en op de y-as de relatieve kans van die foutfracties. Uit de kanskromme is belangrijke informatie af te leiden, zoals:
+
+* de meest waarschijnlijke foutfractie
+* de maximale foutfractie
+
+De meest waarschijnlijke foutfractie is te vinden als de verticale lijn die door het hoogste punt van de kanskromme gaat. De maximale fout bij bepaalde zekerheid, bijvoorbeeld 95%, is de verticale lijn waarbij 95% van het totale oppervlak onder de kanskromme links ligt. @fig-kanskromme toont dit voor een steekproef van 100 posten waarin 2 fouten zijn gevonden.
+
+```{python}
+#| label: fig-kanskromme
+#| fig-cap: "Kanskromme van de foutfractie voor één steekproef: 100 getrokken posten, waarin 2 fouten zijn gevonden. De blauwe lijn is de meest waarschijnlijke foutfractie, de rode lijn de maximale foutfractie bij 95% zekerheid (95% van het oppervlak ligt links van de rode lijn, gearceerd)."
+#| fig-alt: "Kanskromme met een piek bij 2 procent en een rode lijn bij ongeveer 6 procent."
+res1 = eval_stratified(
+    pd.DataFrame([stratum("massa", 1_000_000, 100, 2)]), vergelijk=False
+)
+x = res1["kanskromme"]["x"]
+y = res1["kanskromme"]["y"]
+modus = res1["modus_fout_convolutie"]
+maxfout = res1["max_fout_convolutie"]
+zicht = x <= 0.14
+
+fig, ax = plt.subplots(figsize=(7, 3.4))
+ax.plot(x[zicht], y[zicht], color="black", lw=1.5)
+links = zicht & (x <= maxfout)
+ax.fill_between(x[links], y[links], color=BLAUW, alpha=0.15)
+ax.axvline(modus, color=BLAUW, lw=1.5)
+ax.axvline(maxfout, color=ROOD, lw=1.5)
+ax.set_ylim(0, y[zicht].max() * 1.3)
+ax.text(modus, ax.get_ylim()[1] * 0.97, "  meest waarschijnlijk\n  " + nl_getal(modus * 100, 1) + "%",
+        color=BLAUW, va="top", ha="left")
+ax.text(maxfout, ax.get_ylim()[1] * 0.97, "  maximale fout (95%)\n  " + nl_getal(maxfout * 100, 1) + "%",
+        color=ROOD, va="top", ha="left")
+procent_as(ax, 0)
+ax.set_xlabel("foutfractie van de massa")
+ax.set_ylabel("relatieve kans")
+ax.set_yticks([])
+fig.tight_layout()
+plt.show()
+```
+
+Het samennemen van twee of meer kanskrommen heet *convolueren*. Eerst wordt elke kanskromme omgerekend naar euro's: de foutfractie maal de waarde van de massa waarover de steekproef is getrokken. Daarna worden de foutbedragen opgeteld: de kans dat de totale fout een bepaald bedrag is, is de som van de kansen van alle combinaties van deelfouten die samen dat bedrag opleveren. De massa's worden daarbij onafhankelijk van elkaar beoordeeld: de uitkomst van de steekproef in de ene massa zegt niets over de fouten in de andere.
+
+Een voorbeeld met twee massa's: massa A kan €0 of €100 fout bevatten, massa B €0 of €50. De kansen zijn:
+
+| Foutbedrag | Massa A | Massa B |
+|---|---|---|
+| €0 | 70% | 80% |
+| €50 | n.v.t. | 20% |
+| €100 | 30% | n.v.t. |
+
+De totale fout is de som van beide bedragen. De kans per combinatie is het product van de twee kansen:
+
+| Totale fout | Combinatie | Kans |
+|---|---|---|
+| €0 | A €0 en B €0 | 70% × 80% = 56% |
+| €50 | A €0 en B €50 | 70% × 20% = 14% |
+| €100 | A €100 en B €0 | 30% × 80% = 24% |
+| €150 | A €100 en B €50 | 30% × 20% = 6% |
+
+De kansen tellen op tot 100%. De kans dat de totale fout hoogstens €100 is, is 56% + 14% + 24% = 94%. Bij 95% zekerheid is de maximale fout daarom €150. In werkelijkheid zijn er niet twee maar heel veel mogelijke bedragen per massa, waardoor de kanskromme glad is in plaats van uit vier punten te bestaan, maar het principe is hetzelfde. @fig-voorbeeld toont dezelfde getallen als grafiek.
+
+```{python}
+#| label: fig-voorbeeld
+#| fig-cap: "Het rekenvoorbeeld met twee massa's. Links de kans op elke totale fout. Rechts de opgetelde kans: bij €100 is die 94%, nog onder de 95%, dus de maximale fout bij 95% zekerheid is €150."
+#| fig-alt: "Staafdiagram van de vier mogelijke totale fouten en een trapfunctie van de opgetelde kans."
+bedragen = np.array([0, 50, 100, 150])
+kansen = np.array([0.56, 0.14, 0.24, 0.06])
+opgeteld = np.cumsum(kansen)
+
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(8, 3.3))
+a1.bar(bedragen, kansen, width=30, color=BLAUW)
+for b, k in zip(bedragen, kansen):
+    a1.text(b, k + 0.015, f"{round(k * 100)}%", ha="center")
+a1.set_ylim(0, 0.7)
+a1.set_xlim(-35, 185)
+a1.set_title("kans op de totale fout", fontsize=10)
+a1.set_yticks([])
+
+a2.step(np.append(bedragen, 175), np.append(opgeteld, 1.0), where="post", color="black")
+a2.axhline(0.95, color=ROOD, lw=1.2, ls="--")
+a2.text(-12, 0.96, "95% zekerheid", color=ROOD, va="bottom")
+for midden, c in zip([25, 75, 125], opgeteld[:3]):
+    a2.text(midden, c - 0.08, f"{round(c * 100)}%", ha="center")
+a2.text(165, 1.03, "100%", ha="center")
+a2.axvline(150, color=ROOD, lw=1.5)
+a2.set_xlim(-15, 180)
+a2.set_ylim(0, 1.08)
+a2.set_title("opgetelde kans (totale fout hoogstens ...)", fontsize=10)
+a2.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{round(v * 100)}%"))
+for a in (a1, a2):
+    a.set_xticks(bedragen)
+    a.set_xticklabels(["€" + str(b) for b in bedragen])
+    a.set_xlabel("totale fout")
+fig.tight_layout()
+plt.show()
+```
+
+Tot slot wordt het totale foutbedrag gedeeld door de totale waarde van de samengenomen massa's, zodat de x-as weer een foutfractie is. @fig-convolutie laat zien hoe dat er met echte kanskrommen uitziet.
+
+```{python}
+#| label: fig-convolutie
+#| fig-cap: "Twee massa's en hun gezamenlijke kanskromme, alle in euro's. Massa A (waarde €600.000; 60 posten getrokken, 1 fout) en massa B (waarde €400.000; 40 posten getrokken, 0 fouten) hebben elk een eigen kanskromme. De onderste kromme is het resultaat van het convolueren: de kans op elk totaal foutbedrag. De rode lijn is de maximale fout bij 95% zekerheid."
+#| fig-alt: "Drie kanskrommen onder elkaar: massa A, massa B en het totaal, met een rode lijn bij de maximale fout van het totaal."
+steek = pd.DataFrame([
+    stratum("A", 600_000, 60, 1),
+    stratum("B", 400_000, 40, 0),
+])
+res2 = eval_stratified(steek, vergelijk=False)
+totaal = res2["populatie_totaal"]
+
+fig, assen = plt.subplots(3, 1, figsize=(7, 6.2), sharex=True)
+xmax = 130_000
+for ax, (naam, w, n, k) in zip(assen[:2], [("massa A", 600_000, 60, 1), ("massa B", 400_000, 40, 0)]):
+    e = np.linspace(0, xmax, 1500)
+    ax.plot(e, beta.pdf(e / w, k + 1, n - k + 1) / w, color=BLAUW)
+    ax.fill_between(e, beta.pdf(e / w, k + 1, n - k + 1) / w, color=BLAUW, alpha=0.12)
+    ax.set_title(f"{naam}", loc="left", fontsize=10)
+    ax.set_yticks([])
+
+ax = assen[2]
+ex = res2["kanskromme"]["x"] * totaal
+ey = res2["kanskromme"]["y"] / totaal
+zicht = ex <= xmax
+ax.plot(ex[zicht], ey[zicht], color="black")
+links = zicht & (ex <= res2["max_fout_convolutie_geld"])
+ax.fill_between(ex[links], ey[links], color=BLAUW, alpha=0.12)
+ax.axvline(res2["max_fout_convolutie_geld"], color=ROOD, lw=1.5)
+ax.text(res2["max_fout_convolutie_geld"], ax.get_ylim()[1] * 0.95,
+        " maximale fout (95%)\n €" + nl_getal(res2["max_fout_convolutie_geld"], 0),
+        color=ROOD, va="top")
+ax.set_title("A en B samen", loc="left", fontsize=10)
+ax.set_yticks([])
+euro_as(ax)
+ax.set_xlabel("foutbedrag")
+fig.tight_layout()
+plt.show()
+```
+
+## 3. Manieren om convolutie uit te voeren
+
+Er zijn verschillende methoden bekend om convolutie uit te voeren. Bij de ontwikkeling van St@pp zijn de volgende methoden geïmplementeerd, en onderzocht.
+
+* direct
+* Monte Carlo
+* FFT paarsgewijs
+* FFT samen
+
+Om de methoden te valideren zijn de uitkomsten van verschillende methoden met elkaar vergeleken. Afgezien van afrondingsverschillen en toevalsschommelingen kwamen de uitkomsten ervan overeen. Dit sterkt het vertrouwen in deze uitkomsten, en de gebruikte implementaties. @tbl-methoden en @fig-methoden laten dit zien voor het voorbeeld uit @fig-convolutie.
+
+```{python}
+#| label: tbl-methoden
+#| tbl-cap: "Maximale fout bij 95% zekerheid voor het voorbeeld uit de figuur hierboven, per rekenmethode. Alle methoden geven vrijwel hetzelfde antwoord. De methode 'direct' is traag en is daarom op een grover rooster (10.000 stapjes) uitgevoerd, wat een kleine afwijking naar beneden geeft."
+instellingen = [
+    ("direct", "direct", 10_000),
+    ("Monte Carlo", "Monte Carlo", 1_000_000),
+    ("FFT paarsgewijs", "FFT paarsgewijs", 100_000),
+    ("FFT samen", "FFT samen", 100_000),
+]
+resultaten = {}
+rijen = []
+for label, methode, gran in instellingen:
+    t0 = time.perf_counter()
+    r = eval_stratified(steek, methode=methode, granulariteit=gran, vergelijk=False)
+    duur = time.perf_counter() - t0
+    resultaten[label] = r
+    rijen.append({
+        "methode": label,
+        "maximale fout (€)": nl_getal(r["max_fout_convolutie_geld"], 0),
+        "maximale fout (%)": nl_getal(r["max_fout_convolutie"] * 100, 3),
+        "rekentijd (s)": "< 0,1" if duur < 0.1 else nl_getal(duur, 1),
+    })
+pd.DataFrame(rijen).style.hide(axis="index")
+```
+
+```{python}
+#| label: fig-methoden
+#| fig-cap: "De kanskromme van het totaal (A en B samen) volgens de vier methoden. De krommen vallen vrijwel samen; alleen de Monte Carlo-kromme laat kleine toevalsschommelingen zien."
+#| fig-alt: "Vier bijna identieke kanskrommen over elkaar heen."
+kleuren = {"direct": GROEN, "Monte Carlo": GRIJS, "FFT paarsgewijs": ROOD, "FFT samen": BLAUW}
+stijl = {"direct": ":", "Monte Carlo": "-", "FFT paarsgewijs": "--", "FFT samen": "-"}
+breed = {"direct": 2.4, "Monte Carlo": 1.0, "FFT paarsgewijs": 1.6, "FFT samen": 1.2}
+
+fig, ax = plt.subplots(figsize=(7, 3.4))
+for label, r in resultaten.items():
+    ex = r["kanskromme"]["x"] * totaal
+    ey = r["kanskromme"]["y"] / totaal
+    zicht = ex <= 130_000
+    ax.plot(ex[zicht], ey[zicht], color=kleuren[label], ls=stijl[label],
+            lw=breed[label], label=label)
+ax.legend(frameon=False)
+ax.set_yticks([])
+euro_as(ax)
+ax.set_xlabel("foutbedrag")
+fig.tight_layout()
+plt.show()
+```
+
+We zullen de methoden hieronder kort beschrijven.
+
+### 3.1 Direct
+
+Hierbij worden de kanskrommen langs de x-as verdeeld in kleine stapjes (een rooster). Elk punt van de ene kromme wordt opgeteld bij elk punt van de andere, en de bijbehorende kansen worden vermenigvuldigd, zoals bij 2 hierboven is beschreven. Bij meer dan twee krommen gaat dit paar voor paar.
+
+### 3.2 Monte Carlo
+
+We nemen als voorbeeld het geval van twee kanskrommen. Uitbreiding tot meer dan twee kanskrommen volgt dan logisch.
+
+Herhaal heel veel maal de toevalskeuze van een x-waarde van de ene kromme, x1, en een x-waarde van de andere kromme, x2. Hierbij is de kans op een keuze evenredig met de hoogte van de bijbehorende y1 en y2. Reken elke keuze om naar euro's door te wegen met de massa waarover de betreffende steekproef is getrokken, tel de bedragen op, en construeer uit al deze uitkomsten de nieuwe kanskromme. De kromme wordt daarbij gladgestreken. Met een vaste startwaarde is de uitkomst reproduceerbaar, maar de toevalsschommelingen verdwijnen niet.
+
+### 3.3 FFT
+
+Deze staat niet bij een van de hierboven genoemde methoden, maar ze vormt wel de grondslag voor de methoden FFT paarsgewijs en FFT samen, en wordt daarom hier beschreven. Bij Fast Fourier Transformatie, FFT, wordt een kanskromme gezien als een samenstel van golven die alle hun eigen frequentie en intensiteit hebben. Kanskrommen die je wilt convolueren zet je om naar die vorm met golven. In die vorm is convolueren een gewone vermenigvuldiging, die daar makkelijk kan worden uitgevoerd. Daarna transformeer je weer terug naar de kanskromme. De x-as wordt daarvoor in kleine stapjes verdeeld (standaard 100.000), dus de uitkomst is een benadering. Bij het standaardaantal stapjes is de afwijking in de maximale fout zeer klein (ruim onder een duizendste) en iets te laag; bij minder stapjes is ze groter. @fig-rooster toont hoe de afwijking afneemt als het aantal stapjes toeneemt.
+
+```{python}
+#| label: fig-rooster
+#| fig-cap: "Afwijking van de maximale fout door het rooster, voor één steekproef (100 posten, 2 fouten) bij verschillende aantallen stapjes. De afwijking is de verhouding tot de exacte waarde en is negatief: de berekende grens ligt iets te laag. Bij het standaardaantal van 100.000 stapjes is de afwijking ongeveer 0,01%."
+#| fig-alt: "Lijndiagram met op de x-as het aantal stapjes (logaritmisch) en op de y-as de afwijking, die richting nul gaat naarmate er meer stapjes zijn."
+exact = beta.ppf(0.95, 3, 99)
+aantallen = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000]
+afwijking = []
+for g in aantallen:
+    r = eval_stratified(
+        pd.DataFrame([stratum("massa", 1_000_000, 100, 2)]),
+        granulariteit=g, vergelijk=False,
+    )
+    afwijking.append((r["max_fout_convolutie"] / exact - 1) * 100)
+
+fig, ax = plt.subplots(figsize=(7, 3.2))
+ax.plot(aantallen, afwijking, marker="o", color=BLAUW)
+ax.axhline(0, color=GRIJS, lw=0.8)
+ax.set_xscale("log")
+ax.set_xticks(aantallen)
+ax.set_xticklabels([nl_getal(g, 0) for g in aantallen], rotation=30)
+ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: nl_getal(v, 1) + "%"))
+ax.minorticks_off()
+ax.set_xlabel("aantal stapjes op de x-as")
+ax.set_ylabel("afwijking maximale fout")
+fig.tight_layout()
+plt.show()
+```
+
+### 3.4 FFT paarsgewijs
+
+Deze methode neemt twee van de te convolueren kanskrommen en combineert deze via FFT, beschreven hierboven. Dit proces gaat net zolang door tot alle kanskrommen zijn geconvolueerd.
+
+### 3.5 FFT samen
+
+Hierbij worden de te convolueren kanskrommen niet paarsgewijs gecombineerd. Elke kanskromme wordt één keer omgezet naar de vorm met golven, de uitkomsten van alle krommen worden met elkaar vermenigvuldigd, en het product wordt één keer teruggezet naar een kanskromme.
+
+## 4. De keuze voor FFT samen
+
+Binnen St@pp is gekozen voor FFT samen. FFT samen en FFT paarsgewijs geven, afgezien van afrondingsverschillen, dezelfde uitkomst. De keuze voor FFT samen boven FFT paarsgewijs is daarom genomen op grond van efficiëntie en eenvoud: elke kanskromme hoeft maar één keer te worden omgezet naar de vorm met golven en het resultaat maar één keer terug, en er hoeft geen keuze te worden gemaakt in welke volgorde de kanskrommen paarsgewijs worden samengenomen. De keuze voor FFT is genomen omdat dit sneller is dan direct, en omdat er geen toevalsschommelingen optreden zoals bij Monte Carlo. Wel rekent FFT met kleine stapjes op de x-as, waardoor de uitkomst een zeer kleine afwijking kan hebben (zie 3.3).
