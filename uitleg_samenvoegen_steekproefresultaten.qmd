@@ -67,7 +67,7 @@ St@pp biedt de mogelijkheid om uitgaande van verschillende getrokken steekproeve
 
 Het samennemen van de resultaten van de betreffende steekproeven gaat conceptueel in twee stappen.
 
-1. In de eerste stap wordt uit het aantal getrokken posten, n, en de som van de foutfracties, k, een kanskromme geconstrueerd. Deze volgt uit een standaard statistische verdeling. Er wordt dus niet aangenomen dat de foutfractie hoog of laag is; de uitkomst volgt alleen uit de steekproef. Afhankelijk van de risico-inschatting en de materialiteit wordt het aantal getrokken posten verhoogd met een aantal foutloze posten, omdat een laag risico extra zekerheid geeft (de HARo-correctie).
+1. In de eerste stap wordt uit het aantal getrokken posten, $n$, en de som van de foutfracties, $k$, een kanskromme geconstrueerd. Deze volgt uit een standaard statistische verdeling. Er wordt dus niet aangenomen dat de foutfractie hoog of laag is; de uitkomst volgt alleen uit de steekproef. Afhankelijk van de risico-inschatting en de materialiteit wordt het aantal getrokken posten verhoogd met een aantal foutloze posten, omdat een laag risico extra zekerheid geeft.
 1. In de tweede stap worden de kanskrommen gecombineerd tot een nieuwe kanskromme die de kans beschrijft van de foutfractie van de samengenomen massa's. Posten die voor 100% zijn beoordeeld, dragen hun bekende fout als vast bedrag bij.
 
 Zo'n kanskromme is te beschouwen als een grafiek met op de x-as de mogelijke foutfractie van een te controleren massa, en op de y-as de relatieve kans van die foutfracties. Uit de kanskromme is belangrijke informatie af te leiden, zoals:
@@ -79,7 +79,7 @@ De meest waarschijnlijke foutfractie is te vinden als de verticale lijn die door
 
 ```{python}
 #| label: fig-kanskromme
-#| fig-cap: "Kanskromme van de foutfractie voor één steekproef: 100 getrokken posten, waarin 2 fouten zijn gevonden. De blauwe lijn is de meest waarschijnlijke foutfractie, de rode lijn de maximale foutfractie bij 95% zekerheid (95% van het oppervlak ligt links van de rode lijn, gearceerd)."
+#| fig-cap: "Kanskromme van de foutfractie voor één steekproef: 100 getrokken posten, waarin 2 fouten zijn gevonden. De blauwe lijn is de meest waarschijnlijke foutfractie, de rode lijn de maximale foutfractie bij 95% zekerheid (95% van het oppervlak ligt links van de rode lijn, in lichtblauw)."
 #| fig-alt: "Kanskromme met een piek bij 2 procent en een rode lijn bij ongeveer 6 procent."
 res1 = eval_stratified(
     pd.DataFrame([stratum("massa", 1_000_000, 100, 2)]), vergelijk=False
@@ -97,10 +97,22 @@ ax.fill_between(x[links], y[links], color=BLAUW, alpha=0.15)
 ax.axvline(modus, color=BLAUW, lw=1.5)
 ax.axvline(maxfout, color=ROOD, lw=1.5)
 ax.set_ylim(0, y[zicht].max() * 1.3)
-ax.text(modus, ax.get_ylim()[1] * 0.97, "  meest waarschijnlijk\n  " + nl_getal(modus * 100, 1) + "%",
-        color=BLAUW, va="top", ha="left")
-ax.text(maxfout, ax.get_ylim()[1] * 0.97, "  maximale fout (95%)\n  " + nl_getal(maxfout * 100, 1) + "%",
-        color=ROOD, va="top", ha="left")
+ax.text(
+    modus,
+    ax.get_ylim()[1] * 0.97,
+    "  meest waarschijnlijk\n  " + nl_getal(modus * 100, 1) + "%",
+    color=BLAUW,
+    va="top",
+    ha="left",
+)
+ax.text(
+    maxfout,
+    ax.get_ylim()[1] * 0.97,
+    "  maximale fout (95%)\n  " + nl_getal(maxfout * 100, 1) + "%",
+    color=ROOD,
+    va="top",
+    ha="left",
+)
 procent_as(ax, 0)
 ax.set_xlabel("foutfractie van de massa")
 ax.set_ylabel("relatieve kans")
@@ -132,19 +144,19 @@ De kansen tellen op tot 100%. De kans dat de totale fout hoogstens €100 is, is
 
 ```{python}
 #| label: fig-voorbeeld
-#| fig-cap: "Het rekenvoorbeeld met twee massa's. Links de kans op elke totale fout. Rechts de opgetelde kans: bij €100 is die 94%, nog onder de 95%, dus de maximale fout bij 95% zekerheid is €150."
-#| fig-alt: "Staafdiagram van de vier mogelijke totale fouten en een trapfunctie van de opgetelde kans."
+#| fig-cap: "Het rekenvoorbeeld met twee massa's. Boven de kans op elke totale fout. Onder de opgetelde kans: bij €100 is die 94%, nog onder de 95%, dus de maximale fout bij 95% zekerheid is €150."
+#| fig-alt: "Boven een staafdiagram van de vier mogelijke totale fouten, eronder een trapfunctie van de opgetelde kans."
 bedragen = np.array([0, 50, 100, 150])
 kansen = np.array([0.56, 0.14, 0.24, 0.06])
 opgeteld = np.cumsum(kansen)
 
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(8, 3.3))
+fig, (a1, a2) = plt.subplots(2, 1, figsize=(7, 5.6), sharex=True)
 a1.bar(bedragen, kansen, width=30, color=BLAUW)
 for b, k in zip(bedragen, kansen):
     a1.text(b, k + 0.015, f"{round(k * 100)}%", ha="center")
 a1.set_ylim(0, 0.7)
 a1.set_xlim(-35, 185)
-a1.set_title("kans op de totale fout", fontsize=10)
+a1.set_title("kans op de totale fout", loc="left", fontsize=10)
 a1.set_yticks([])
 
 a2.step(np.append(bedragen, 175), np.append(opgeteld, 1.0), where="post", color="black")
@@ -154,14 +166,15 @@ for midden, c in zip([25, 75, 125], opgeteld[:3]):
     a2.text(midden, c - 0.08, f"{round(c * 100)}%", ha="center")
 a2.text(165, 1.03, "100%", ha="center")
 a2.axvline(150, color=ROOD, lw=1.5)
-a2.set_xlim(-15, 180)
 a2.set_ylim(0, 1.08)
-a2.set_title("opgetelde kans (totale fout hoogstens ...)", fontsize=10)
+a2.set_title("opgetelde kans: de totale fout is hoogstens dit bedrag", loc="left", fontsize=10)
 a2.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{round(v * 100)}%"))
-for a in (a1, a2):
-    a.set_xticks(bedragen)
-    a.set_xticklabels(["€" + str(b) for b in bedragen])
-    a.set_xlabel("totale fout")
+a1.tick_params(labelbottom=True)
+a1.set_xticks(bedragen)
+a1.set_xticklabels(["€" + str(b) for b in bedragen])
+a2.set_xticks(bedragen)
+a2.set_xticklabels(["€" + str(b) for b in bedragen])
+a2.set_xlabel("totale fout")
 fig.tight_layout()
 plt.show()
 ```
