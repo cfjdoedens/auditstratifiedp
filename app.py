@@ -101,7 +101,7 @@ st.set_page_config(page_title="auditstat", layout="wide")
 RISK_OPTIES = ["H", "M", "L"]
 
 # Maximale massa bij de hypergeometrische verdeling (aantal roosterpunten = massa + 1).
-ENKEL_MAX_MASSA = 2_000_000
+ENKEL_OVERSTAP_MASSA = 100_000
 RISK_LABELS = {"H": "hoog (H)", "M": "midden (M)", "L": "laag (L)"}
 
 # Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de evaluatie te initialiseren.
@@ -1077,7 +1077,7 @@ st.title("auditstat")
 ) = st.tabs([
     "nog nodige zekerheid",
     "foutlozepostenequivalent",
-    "evaluatie enkele steekproef",
+    "evaluatie postensteekproef",
     "evaluatie gestratificeerd",
     "planning gestratificeerd",
     "SSO",
@@ -1197,12 +1197,18 @@ with tab_enkel:
         )
         enkel_massa = 0
         if enkel_verdeling == "hypergeometrisch":
+            # Streamlit wist de widgetstatus als het veld een run niet getoond
+            # wordt; daarom bewaren we de massa apart en zetten die terug.
+            if "enkel_massa_text" not in st.session_state:
+                st.session_state.enkel_massa_text = st.session_state.get(
+                    "enkel_massa_bewaard", "300"
+                )
             enkel_massa_text = st.text_input(
                 "massa N (totaal aantal posten)",
-                value="300",
                 key="enkel_massa_text",
                 help="Aantal posten in de populatie, bijvoorbeeld 300.",
             )
+            st.session_state.enkel_massa_bewaard = enkel_massa_text
             if enkel_massa_text.strip() == "":
                 enkel_massa = 0
             else:
@@ -1236,14 +1242,14 @@ with tab_enkel:
         if enkel_massa is None:
             enkel_fouten.append("massa N moet een geheel getal van minstens 1 zijn.")
             enkel_massa = 0
+        enkel_verdeling_gebruikt = enkel_verdeling
+        enkel_overgestapt = False
         if (
             enkel_verdeling == "hypergeometrisch"
-            and (enkel_massa or 3 * enkel_n or 100) > ENKEL_MAX_MASSA
+            and (enkel_massa or 3 * enkel_n or 100) > ENKEL_OVERSTAP_MASSA
         ):
-            enkel_fouten.append(
-                f"massa N (standaard 3 \u00d7 n) mag bij de hypergeometrische verdeling hooguit "
-                f"{_nl(ENKEL_MAX_MASSA, 0)} zijn."
-            )
+            enkel_verdeling_gebruikt = "binomiaal"
+            enkel_overgestapt = True
         if enkel_fouten:
             st.error("\n".join(enkel_fouten))
         else:
@@ -1251,7 +1257,7 @@ with tab_enkel:
                 enkel_res = eval_distribution(
                     n=enkel_n,
                     k=enkel_k,
-                    verdeling=enkel_verdeling,
+                    verdeling=enkel_verdeling_gebruikt,
                     massa=enkel_massa,
                     zekerheid=enkel_zekerheid,
                     norm=enkel_norm,
@@ -1259,6 +1265,14 @@ with tab_enkel:
             except ValueError as _fout:
                 st.error(str(_fout))
             else:
+                if enkel_overgestapt:
+                    st.info(
+                        "De massa N is groter dan "
+                        f"{_nl(ENKEL_OVERSTAP_MASSA, 0)} posten. Daarom is automatisch "
+                        "de binomiale verdeling gebruikt in plaats van de "
+                        "hypergeometrische; bij zo'n grote massa is het verschil "
+                        "verwaarloosbaar."
+                    )
                 _kolommen = st.columns(3)
                 for _kolom, _naam, _sleutel in zip(
                     _kolommen,
@@ -1273,8 +1287,8 @@ with tab_enkel:
                         )
                 if enkel_norm > 0:
                     st.metric(
-                        f"kans op een fout onder de norm ({_nl(enkel_norm * 100, 2)}%)",
-                        f"{_nl(enkel_res['kans_onder_norm'] * 100, 2)}%",
+                        f"kans op een fout boven de norm ({_nl(enkel_norm * 100, 2)}%)",
+                        f"{_nl(enkel_res['kans_boven_norm'] * 100, 2)}%",
                     )
                 _fig_enkel = plot_eval_distribution(
                     enkel_res,
@@ -1283,8 +1297,6 @@ with tab_enkel:
                 )
                 st.pyplot(_fig_enkel)
                 plt.close(_fig_enkel)
-                with st.expander("Tabel met de kansdichtheid"):
-                    st.dataframe(enkel_res["tabel"], hide_index=True)
 
 # Configureer het tredje tabblad voor de evaluatie van getrokken gestratificeerde steekproeven.
 with tab_eval:

@@ -8,7 +8,7 @@ waarschijnlijke fout.
 
 Verschillen met de SAS-macro:
 
-- De band-kans en de kans onder de norm gebruiken bij de hypergeometrische
+- De band-kans en de kans boven de norm gebruiken bij de hypergeometrische
   verdeling het juiste roostergewicht ``1/(m+1)`` (SAS gebruikte daar ``1/m``).
 - De meest waarschijnlijke fout kiest de reeks roosterpunten met (vrijwel)
   maximale dichtheid (relatieve tolerantie 1e-12) in plaats van exacte
@@ -41,13 +41,22 @@ _VERDELINGEN = {
 # Vanaf dit aantal roosterpunten wordt het gekleurde deel als vlak getekend.
 _MAX_PUNTEN_VOOR_VLAK = 200
 
+# Kleuren: gekozen deel onder de kromme (donker) en de rest (licht), en de
+# verticale lijnen.
+_KLEUR_BINNEN = "blue"
+_KLEUR_BUITEN = "lightblue"
+_KLEUR_MIN = "green"
+_KLEUR_MEEST_WAARSCHIJNLIJK = "goldenrod"
+_KLEUR_MAX = "darkorange"
+_KLEUR_NORM = "red"
+
 _GEKLEURD_DEEL = (
     "geen",
     "onder_pmax",
     "boven_pmin",
     "tussen_pmin_pmax",
     "band",
-    "onder_norm",
+    "boven_norm",
 )
 
 
@@ -114,7 +123,7 @@ def eval_distribution(
     -------
     dict met onder andere ``tabel`` (DataFrame met ``p``, ``c_raw``, ``c``,
     ``cc``: onbewerkte kans, kansdichtheid en cumulatieve kans), ``pmin``,
-    ``pmax``, ``phigh``, ``kans_onder_norm``, ``band_kans`` en de invoer.
+    ``pmax``, ``phigh``, ``kans_boven_norm``, ``band_kans`` en de invoer.
     """
     # --- Invoercontrole ---
     if verdeling not in _VERDELINGEN:
@@ -205,8 +214,8 @@ def eval_distribution(
     if regel_k_n:
         phigh = 1.0
 
-    onder_norm = p < norm
-    kans_onder_norm = float(cc[onder_norm][-1]) if onder_norm.any() else 0.0
+    boven_norm = p > norm
+    kans_boven_norm = float(np.sum(c[boven_norm]) / aantal_stukjes)
 
     in_band = (band_links <= p) & (p <= band_rechts)
     band_kans = float(np.sum(c[in_band]) / aantal_stukjes)
@@ -231,7 +240,7 @@ def eval_distribution(
         "pmin": pmin,
         "pmax": pmax,
         "phigh": phigh,
-        "kans_onder_norm": kans_onder_norm,
+        "kans_boven_norm": kans_boven_norm,
         "band_kans": band_kans,
     }
 
@@ -254,7 +263,7 @@ def plot_eval_distribution(
     toon_band: bool = False,
     toon_aantal_punten: bool = True,
     toon_verdeling: bool = True,
-    geklemd_deel: str = "onder_pmax",
+    geklemd_deel: str = "tussen_pmin_pmax",
     toon_kans: str = "dichtheid",
     clip_bij: float = 0.01,
     figsize: tuple[float, float] = (8.27, 11.69),
@@ -266,9 +275,9 @@ def plot_eval_distribution(
     res:
         Uitvoer van ``eval_distribution``.
     geklemd_deel:
-        Blauw gekleurd deel onder de kromme: een van ``"geen"``,
+        Donkerblauw gekleurd deel onder de kromme (de rest is lichtblauw; standaard tussen minimale en maximale fout): een van ``"geen"``,
         ``"onder_pmax"``, ``"boven_pmin"``, ``"tussen_pmin_pmax"``, ``"band"``,
-        ``"onder_norm"``.
+        ``"boven_norm"``.
     toon_kans:
         ``"dichtheid"`` (genormeerd, kolom ``c``) of ``"origineel"``
         (onbewerkte kans, kolom ``c_raw``).
@@ -297,7 +306,7 @@ def plot_eval_distribution(
         "boven_pmin": p >= pmin,
         "tussen_pmin_pmax": (pmin <= p) & (p <= pmax),
         "band": (res["band_links"] <= p) & (p <= res["band_rechts"]),
-        "onder_norm": p < norm,
+        "boven_norm": p > norm,
     }
 
     zichtbaar = y >= clip_bij * y.max()
@@ -305,18 +314,48 @@ def plot_eval_distribution(
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes((0.12, 0.30, 0.82, 0.55))
 
-    if geklemd_deel != "geen":
-        gekozen = maskers[geklemd_deel] & zichtbaar
-        if len(p) <= _MAX_PUNTEN_VOOR_VLAK:
-            # Weinig punten: naalden, zodat zichtbaar blijft hoeveel punten
-            # berekend zijn (zoals ``interpol=needle`` in SAS).
-            ax.vlines(ppct[gekozen], 0, y[gekozen], color="blue", linewidth=1)
-        else:
-            ax.fill_between(ppct, 0, y, where=gekozen, color="blue", linewidth=0)
-    ax.plot(ppct[zichtbaar], y[zichtbaar], color="red", linewidth=2)
+    # Het hele gebied onder de kromme is lichtblauw; het gekozen deel
+    # (standaard tussen de minimale en de maximale fout) is donkerblauw.
+    if len(p) <= _MAX_PUNTEN_VOOR_VLAK:
+        # Weinig punten: naalden, zodat zichtbaar blijft hoeveel punten
+        # berekend zijn (zoals ``interpol=needle`` in SAS).
+        ax.vlines(ppct[zichtbaar], 0, y[zichtbaar], color=_KLEUR_BUITEN, linewidth=1)
+        if geklemd_deel != "geen":
+            gekozen = maskers[geklemd_deel] & zichtbaar
+            ax.vlines(ppct[gekozen], 0, y[gekozen], color=_KLEUR_BINNEN, linewidth=1)
+    else:
+        ax.fill_between(ppct, 0, y, where=zichtbaar, color=_KLEUR_BUITEN, linewidth=0)
+        if geklemd_deel != "geen":
+            # Laat het donkere deel precies bij de lijn beginnen en eindigen,
+            # ook als de lijn tussen twee roosterpunten ligt.
+            grenzen = {
+                "onder_pmax": (-np.inf, pmax),
+                "boven_pmin": (pmin, np.inf),
+                "tussen_pmin_pmax": (pmin, pmax),
+                "band": (res["band_links"], res["band_rechts"]),
+                "boven_norm": (norm, np.inf),
+            }[geklemd_deel]
+            rand = np.array([g * 100 for g in grenzen if np.isfinite(g)])
+            rand = rand[(rand > ppct.min()) & (rand < ppct.max())]
+            x_vlak = np.union1d(ppct, rand)
+            y_vlak = np.interp(x_vlak, ppct, y)
+            gekozen_vlak = (
+                (x_vlak >= grenzen[0] * 100 - 1e-9)
+                & (x_vlak <= grenzen[1] * 100 + 1e-9)
+                & (y_vlak >= clip_bij * y.max())
+            )
+            ax.fill_between(
+                x_vlak,
+                0,
+                y_vlak,
+                where=gekozen_vlak,
+                color=_KLEUR_BINNEN,
+                linewidth=0,
+            )
+    ax.plot(ppct[zichtbaar], y[zichtbaar], color=_KLEUR_BUITEN, linewidth=2)
 
-    # Verticale groene lijnen, van links naar rechts gesorteerd.
-    lijnen: list[tuple[float, str]] = []
+    # Verticale lijnen, elk in een eigen kleur, van links naar rechts gesorteerd.
+    lijnen: list[tuple[float, str, str]] = []
     k, n = res["k"], res["n"]
     zeker = nl_getal_variabel(res["zekerheid"] * 100)
     if toon_min:
@@ -328,7 +367,7 @@ def plot_eval_distribution(
             if res["zeker_min"]
             else f"; bij een 1-zijdige zekerheid van {zeker}%, bij k > 0."
         )
-        lijnen.append((pmin, tekst))
+        lijnen.append((pmin, tekst, _KLEUR_MIN))
     if toon_max:
         tekst = f"maximale fout = {_procent(pmax)}%"
         if toon_massa:
@@ -338,7 +377,7 @@ def plot_eval_distribution(
             if res["zeker_max"]
             else f"; bij een 1-zijdige zekerheid van {zeker}%, bij k < n."
         )
-        lijnen.append((pmax, tekst))
+        lijnen.append((pmax, tekst, _KLEUR_MAX))
     if toon_meest_waarschijnlijke:
         tekst = f"meest waarschijnlijke fout = {_procent(phigh, 12)}%"
         if res["zeker_min"]:
@@ -347,16 +386,16 @@ def plot_eval_distribution(
             tekst += ", want k = n"
         if toon_massa:
             tekst += f"; dit is {nl_getal(res['massa'] * phigh, 0)} posten"
-        lijnen.append((phigh, tekst + "."))
+        lijnen.append((phigh, tekst + ".", _KLEUR_MEEST_WAARSCHIJNLIJK))
     if toon_norm and 0 < norm < 1:
-        tekst = f"norm is fout < {_procent(norm, 12)}%"
+        tekst = f"norm is fout > {_procent(norm, 12)}%"
         if toon_massa:
             tekst += f"; dit is {nl_getal(norm * res['massa'], 0)} posten"
-        tekst += f"; kans = {_procent(res['kans_onder_norm'])}%."
-        lijnen.append((norm, tekst))
+        tekst += f"; kans = {_procent(res['kans_boven_norm'])}%."
+        lijnen.append((norm, tekst, _KLEUR_NORM))
     lijnen.sort(key=lambda t: t[0])
-    for waarde, _ in lijnen:
-        ax.axvline(waarde * 100, color="green", linewidth=1)
+    for waarde, _, kleur in lijnen:
+        ax.axvline(waarde * 100, color=kleur, linewidth=1.5)
 
     ax.set_xlabel("fout%")
     ax.set_ylabel("kansdichtheid" if toon_kans == "dichtheid" else "kans")
@@ -392,22 +431,27 @@ def plot_eval_distribution(
         y_pos -= 0.012 + fontsize * 0.0016
 
     # Voetregels.
-    voet: list[str] = []
+    voet: list[tuple[str, str]] = []
     if lijnen:
-        voet.append(
-            "Verticale groene lijn:"
+        voet.append((
+            "Verticale lijn:"
             if len(lijnen) == 1
-            else "Verticale groene lijnen van links naar rechts respectievelijk:"
-        )
-        voet.extend(f"- {tekst}" for _, tekst in lijnen)
+            else "Verticale lijnen van links naar rechts respectievelijk:",
+            "black",
+        ))
+        voet.extend((f"- {tekst}", kleur) for _, tekst, kleur in lijnen)
     if toon_band:
-        voet.append(
+        voet.append((
             f"Zekerheid dat fout% tussen {_procent(res['band_links'], 12)}% en "
             f"{_procent(res['band_rechts'], 12)}% ligt (in blauwe gebied) is "
-            f"{_procent(res['band_kans'])}%."
-        )
+            f"{_procent(res['band_kans'])}%.",
+            "black",
+        ))
     if toon_aantal_punten:
-        voet.append(f"Aantal punten berekend: {nl_getal(res['aantal_punten'], 0)}.")
+        voet.append((
+            f"Aantal punten berekend: {nl_getal(res['aantal_punten'], 0)}.",
+            "black",
+        ))
     if toon_verdeling:
         naam = {
             "binomiaal": "binomiale",
@@ -415,8 +459,10 @@ def plot_eval_distribution(
             "poisson": "Poisson",
             "normaal": "normale",
         }[res["verdeling"]]
-        voet.append(f"Berekening is gebaseerd op de {naam} verdeling.")
-    for i, tekst in enumerate(voet):
-        fig.text(0.12, 0.20 - i * 0.022, tekst, ha="left", va="top", fontsize=9)
+        voet.append((f"Berekening is gebaseerd op de {naam} verdeling.", "black"))
+    for i, (tekst, kleur) in enumerate(voet):
+        fig.text(
+            0.12, 0.20 - i * 0.022, tekst, ha="left", va="top", fontsize=9, color=kleur
+        )
 
     return fig

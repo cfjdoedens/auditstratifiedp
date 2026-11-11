@@ -128,7 +128,7 @@ def test_band_en_norm():
         band_links=0,
         band_rechts=0.05,
     )
-    assert res["kans_onder_norm"] == pytest.approx(beta.cdf(0.05, 3, 99), abs=1e-3)
+    assert res["kans_boven_norm"] == pytest.approx(beta.sf(0.05, 3, 99), abs=1e-3)
     assert res["band_kans"] == pytest.approx(beta.cdf(0.05, 3, 99), abs=1e-3)
 
 
