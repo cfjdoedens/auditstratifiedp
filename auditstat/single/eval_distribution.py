@@ -1,4 +1,4 @@
-"""Evaluatie van één steekproef met de binomiale of hypergeometrische verdeling.
+"""Evaluatie van één steekproef met de binomiale, hypergeometrische, Poisson- of normale verdeling.
 
 Python-omzetting van de SAS-macro ``%eval_distribution`` (Crist-Jan Doedens,
 2010-2020). Uit een aselecte steekproef van ``n`` posten met ``k`` foute posten
@@ -22,13 +22,18 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.stats import binom, hypergeom
+from scipy.stats import binom, hypergeom, poisson
+from scipy.stats import norm as normaal_verdeling
 
 from auditstat._formatting import nl_getal, nl_getal_variabel
 
 _VERDELINGEN = {
     "binomiaal": "binomiaal",
     "b": "binomiaal",
+    "poisson": "poisson",
+    "p": "poisson",
+    "normaal": "normaal",
+    "n": "normaal",
     "hypergeometrisch": "hypergeometrisch",
     "h": "hypergeometrisch",
 }
@@ -63,7 +68,7 @@ def _signifdig(waarde: float, cijfers: int) -> float:
 def eval_distribution(
     n: int,
     k: int,
-    verdeling: str = "binomiaal",
+    verdeling: str = "hypergeometrisch",
     massa: int = 0,
     zekerheid: float = 0.95,
     norm: float = 0.0,
@@ -80,17 +85,27 @@ def eval_distribution(
     k:
         Aantal foute posten daarin (0 <= k <= n).
     verdeling:
-        ``"binomiaal"`` (``"b"``) of ``"hypergeometrisch"`` (``"h"``).
+        ``"binomiaal"`` (``"b"``), ``"hypergeometrisch"`` (``"h"``) of
+        ``"poisson"`` (``"p"``) of ``"normaal"`` (``"n"``). Normaal
+        benadert de verdeling van de foutfractie door een normale verdeling met
+        gemiddelde ``f' = k/n`` en standaardafwijking
+        ``sqrt(f' (1 - f') / n)`` (Wald): de grenzen zijn ``f' -/+ z * s`` met
+        ``z`` bij de eenzijdige ``zekerheid``; dit vraagt ``0 < k < n``, en het
+        rooster loopt over [0, 1] (afgekapt). Poisson modelleert het aantal fouten als
+        Poisson(``n`` · ``p``); het rooster loopt net als bij binomiaal over
+        [0, 1], dus een foutfractie boven 1 is uitgesloten.
     massa:
-        Aantal posten in de populatie, ``N``. Verplicht (> 0, en >= n) bij de
-        hypergeometrische verdeling; dan is het aantal roosterpunten ``massa + 1``
-        en wordt ``m`` genegeerd. Bij binomiaal alleen informatief.
+        Aantal posten in de populatie, ``N`` (>= n bij de hypergeometrische
+        verdeling). Bij hypergeometrisch is ``0`` (niet opgegeven) gelijk aan
+        ``3 * n`` (``100`` als ``n = 0``); het aantal roosterpunten is ``massa + 1`` en ``m`` wordt
+        genegeerd. Bij binomiaal, Poisson en normaal bestaat geen massa (alleen informatief). ``massa_aangenomen`` in het
+        resultaat geeft aan of de standaardwaarde ``3 * n`` is gebruikt.
     zekerheid:
         Eenzijdige zekerheid voor minimum en maximum, in [0,5; 1].
     norm:
         Normfout als fractie in [0, 1]; ``0`` betekent geen norm.
     m:
-        Aantal roosterpunten bij binomiaal (>= 2); punten liggen op
+        Aantal roosterpunten bij binomiaal, Poisson en normaal (>= 2); punten liggen op
         ``(stap - 0,5)/m``.
     band_links, band_rechts:
         Grenzen (fracties) van het interval waarvoor de kans wordt bepaald.
@@ -127,13 +142,31 @@ def eval_distribution(
         raise ValueError("band_links moet kleiner zijn dan band_rechts.")
 
     # --- Roosterpunten en onbewerkte kansen ---
-    if verdeling == "binomiaal":
+    massa_aangenomen = False
+    if verdeling in ("binomiaal", "poisson", "normaal"):
         if m < 2:
             raise ValueError("m moet >= 2 zijn.")
         p = (np.arange(1, m + 1) - 0.5) / m
-        c_raw = binom.pmf(k, n, p)
+        if verdeling == "binomiaal":
+            c_raw = binom.pmf(k, n, p)
+        elif verdeling == "poisson":
+            c_raw = poisson.pmf(k, n * p)
+        else:
+            if not 0 < k < n:
+                raise ValueError(
+                    "De normale benadering vraagt 0 < k < n (bij k = 0 of k = n "
+                    "is de standaardafwijking 0)."
+                )
+            f_gevonden = k / n
+            c_raw = normaal_verdeling.pdf(
+                p, loc=f_gevonden, scale=math.sqrt(f_gevonden * (1 - f_gevonden) / n)
+            )
         aantal_stukjes = m
     else:
+        if massa == 0:
+            # Geen massa opgegeven: standaard 3 maal n, en 100 als n = 0.
+            massa = 3 * n if n > 0 else 100
+            massa_aangenomen = True
         if massa <= 0:
             raise ValueError("massa moet > 0 zijn bij de hypergeometrische verdeling.")
         if n > massa:
@@ -154,16 +187,22 @@ def eval_distribution(
     # --- Minimum, maximum, meest waarschijnlijke fout ---
     pmin = float(p[np.argmax(cc >= 1 - zekerheid)])
     pmax = float(p[np.argmax(cc >= zekerheid)])
-    if k == 0:
+    # Bij k = 0 daalt de dichtheid monotoon (minimum 0, meest waarschijnlijk 0);
+    # bij binomiaal/hypergeometrisch is bij k = n het maximum zeker 1. Bij
+    # Poisson geldt dat laatste niet (de kans op een foutfractie boven 1 is
+    # buiten het rooster gelaten) en bij n = 0 is er geen informatie.
+    regel_k_nul = k == 0 and not (verdeling == "poisson" and n == 0)
+    regel_k_n = k == n and verdeling != "poisson"
+    if regel_k_nul:
         pmin = 0.0
-    if k == n:
+    if regel_k_n:
         pmax = 1.0
 
     hoogste = np.flatnonzero(np.isclose(c, c.max(), rtol=1e-12, atol=0))
     phigh = float((p[hoogste[0]] + p[hoogste[-1]]) / 2)
-    if k == 0:
+    if regel_k_nul:
         phigh = 0.0
-    if k == n:
+    if regel_k_n:
         phigh = 1.0
 
     onder_norm = p < norm
@@ -180,12 +219,15 @@ def eval_distribution(
         "n": n,
         "k": k,
         "massa": massa,
+        "massa_aangenomen": massa_aangenomen,
         "zekerheid": zekerheid,
         "norm": norm,
         "m": m,
         "aantal_punten": len(tabel),
         "band_links": band_links,
         "band_rechts": band_rechts,
+        "zeker_min": regel_k_nul,
+        "zeker_max": regel_k_n,
         "pmin": pmin,
         "pmax": pmax,
         "phigh": phigh,
@@ -280,36 +322,36 @@ def plot_eval_distribution(
     if toon_min:
         tekst = f"minimale fout = {_procent(pmin)}%"
         if toon_massa:
-            tekst += f"; dit is {nl_getal(res['massa'] * pmin, 0)} objecten"
+            tekst += f"; dit is {nl_getal(res['massa'] * pmin, 0)} posten"
         tekst += (
             "; bij een zekerheid van 100%, want k = 0."
-            if k == 0
+            if res["zeker_min"]
             else f"; bij een 1-zijdige zekerheid van {zeker}%, bij k > 0."
         )
         lijnen.append((pmin, tekst))
     if toon_max:
         tekst = f"maximale fout = {_procent(pmax)}%"
         if toon_massa:
-            tekst += f"; dit is {nl_getal(res['massa'] * pmax, 0)} objecten"
+            tekst += f"; dit is {nl_getal(res['massa'] * pmax, 0)} posten"
         tekst += (
             "; bij een zekerheid van 100%, want k = n."
-            if k == n
+            if res["zeker_max"]
             else f"; bij een 1-zijdige zekerheid van {zeker}%, bij k < n."
         )
         lijnen.append((pmax, tekst))
     if toon_meest_waarschijnlijke:
         tekst = f"meest waarschijnlijke fout = {_procent(phigh, 12)}%"
-        if k == 0:
+        if res["zeker_min"]:
             tekst += ", want k = 0"
-        elif k == n:
+        elif res["zeker_max"]:
             tekst += ", want k = n"
         if toon_massa:
-            tekst += f"; dit is {nl_getal(res['massa'] * phigh, 0)} objecten"
+            tekst += f"; dit is {nl_getal(res['massa'] * phigh, 0)} posten"
         lijnen.append((phigh, tekst + "."))
     if toon_norm and 0 < norm < 1:
         tekst = f"norm is fout < {_procent(norm, 12)}%"
         if toon_massa:
-            tekst += f"; dit is {nl_getal(norm * res['massa'], 0)} objecten"
+            tekst += f"; dit is {nl_getal(norm * res['massa'], 0)} posten"
         tekst += f"; kans = {_procent(res['kans_onder_norm'])}%."
         lijnen.append((norm, tekst))
     lijnen.sort(key=lambda t: t[0])
@@ -328,13 +370,13 @@ def plot_eval_distribution(
         titelregels.append((titel2, {"color": "blue", "fontsize": 16}))
     if toon_massa:
         titelregels.append((
-            f"N = aantal objecten in massa; N = {nl_getal(res['massa'], 0)}",
+            f"N = aantal posten in de massa; N = {nl_getal(res['massa'], 0)}",
             {},
         ))
     if toon_n:
-        titelregels.append((f"n = aantal getrokken objecten; n = {n}", {}))
+        titelregels.append((f"n = aantal getrokken posten; n = {n}", {}))
     if toon_k:
-        titelregels.append((f"k = aantal getrokken foutieve objecten; k = {k}", {}))
+        titelregels.append((f"k = aantal getrokken foute posten; k = {k}", {}))
     y_pos = 0.97
     for tekst, opmaak in titelregels:
         fontsize = opmaak.get("fontsize", 10)
@@ -367,7 +409,12 @@ def plot_eval_distribution(
     if toon_aantal_punten:
         voet.append(f"Aantal punten berekend: {nl_getal(res['aantal_punten'], 0)}.")
     if toon_verdeling:
-        naam = "binomiale" if res["verdeling"] == "binomiaal" else "hypergeometrische"
+        naam = {
+            "binomiaal": "binomiale",
+            "hypergeometrisch": "hypergeometrische",
+            "poisson": "Poisson",
+            "normaal": "normale",
+        }[res["verdeling"]]
         voet.append(f"Berekening is gebaseerd op de {naam} verdeling.")
     for i, tekst in enumerate(voet):
         fig.text(0.12, 0.20 - i * 0.022, tekst, ha="left", va="top", fontsize=9)

@@ -1047,7 +1047,7 @@ def on_sso_csv_upload():
 
 
 def on_sso_postenbestand_upload():
-    bestand = st.session_state.get('sso_posten_upload')
+    bestand = st.session_state.get("sso_posten_upload")
     if bestand is None:
         st.session_state.sso_postenbestand = None
         st.session_state.sso_postenbestand_naam = None
@@ -1181,36 +1181,47 @@ with tab_enkel:
         )
         enkel_verdeling = st.radio(
             "verdeling",
-            ["binomiaal", "hypergeometrisch"],
+            ["binomiaal", "hypergeometrisch", "poisson", "normaal"],
+            index=1,
             key="enkel_verdeling",
             help=(
                 "Binomiaal: de populatie is groot ten opzichte van de steekproef. "
                 "Hypergeometrisch: trekking zonder teruglegging uit een populatie "
-                "van N posten; hiervoor is de massa N nodig."
+                "van N posten. "
+                "Poisson: het aantal fouten wordt gemodelleerd als Poisson-verdeeld; "
+                "net als bij binomiaal is er geen massa N. "
+                "Normaal: normale benadering van de foutfractie (f\u2019 \u00b1 z \u00d7 "
+                "standaardafwijking), bedoeld voor een groter aantal fouten; vraagt "
+                "0 < k < n."
             ),
         )
-        enkel_massa = st.number_input(
-            "massa N (aantal posten in de populatie, 0 = onbekend)",
-            min_value=0,
-            value=0,
-            step=1,
-            key="enkel_massa",
-            help=(
-                "Optioneel bij binomiaal: als N is ingevuld, worden de grenzen ook "
-                "als aantal posten getoond. Verplicht bij hypergeometrisch."
-            ),
-        )
+        enkel_massa = 0
+        if enkel_verdeling == "hypergeometrisch":
+            enkel_massa_text = st.text_input(
+                "massa N (totaal aantal posten)",
+                value="300",
+                key="enkel_massa_text",
+                help="Aantal posten in de populatie, bijvoorbeeld 300.",
+            )
+            if enkel_massa_text.strip() == "":
+                enkel_massa = 0
+            else:
+                _massa = _parse_nl(enkel_massa_text)
+                if _massa is None or _massa != int(_massa) or _massa < 1:
+                    enkel_massa = None
+                else:
+                    enkel_massa = int(_massa)
         enkel_zekerheid_text = st.text_input(
             "zekerheid",
             value="0,95",
             key="enkel_zekerheid_text",
-            help="Eenzijdige zekerheid voor de minimale en maximale fout (bijv. 0,95).",
+            help="Eenzijdige zekerheid voor de minimale en maximale fout, bijvoorbeeld 0,95.",
         )
         enkel_norm_text = st.text_input(
             "norm (fractie, 0 = geen norm)",
             value="0",
             key="enkel_norm_text",
-            help="Normfout als fractie, bijv. 0,02. De kans op een fout onder de norm wordt getoond.",
+            help="Norm voor de fout als fractie, bijvoorbeeld 0,02.",
         )
 
     with col_rechts:
@@ -1222,9 +1233,15 @@ with tab_enkel:
             enkel_fouten.append("zekerheid is geen geldig getal.")
         if enkel_norm is None:
             enkel_fouten.append("norm is geen geldig getal.")
-        if enkel_verdeling == "hypergeometrisch" and enkel_massa > ENKEL_MAX_MASSA:
+        if enkel_massa is None:
+            enkel_fouten.append("massa N moet een geheel getal van minstens 1 zijn.")
+            enkel_massa = 0
+        if (
+            enkel_verdeling == "hypergeometrisch"
+            and (enkel_massa or 3 * enkel_n or 100) > ENKEL_MAX_MASSA
+        ):
             enkel_fouten.append(
-                f"massa N mag bij de hypergeometrische verdeling hooguit "
+                f"massa N (standaard 3 \u00d7 n) mag bij de hypergeometrische verdeling hooguit "
                 f"{_nl(ENKEL_MAX_MASSA, 0)} zijn."
             )
         if enkel_fouten:
@@ -1250,9 +1267,9 @@ with tab_enkel:
                     strict=True,
                 ):
                     _kolom.metric(_naam, f"{_nl(enkel_res[_sleutel] * 100, 2)}%")
-                    if enkel_massa > 0:
+                    if enkel_res["verdeling"] == "hypergeometrisch":
                         _kolom.caption(
-                            f"{_nl(enkel_res[_sleutel] * enkel_massa, 0)} posten"
+                            f"{_nl(enkel_res[_sleutel] * enkel_res['massa'], 0)} posten"
                         )
                 if enkel_norm > 0:
                     st.metric(
@@ -1261,7 +1278,7 @@ with tab_enkel:
                     )
                 _fig_enkel = plot_eval_distribution(
                     enkel_res,
-                    toon_massa=enkel_massa > 0,
+                    toon_massa=enkel_res["verdeling"] == "hypergeometrisch",
                     figsize=(8.27, 9.5),
                 )
                 st.pyplot(_fig_enkel)
@@ -2855,59 +2872,94 @@ with tab_sso:
             "het verandert de SSO-evaluatie niet automatisch."
         )
         bestaande_klanten = sorted({
-            str(k).strip() for k in st.session_state.sso_klanten_totaal_tabel['klant']
+            str(k).strip()
+            for k in st.session_state.sso_klanten_totaal_tabel["klant"]
             if str(k).strip()
         })
         bestaande_typen = [
-            str(t).strip() for t in st.session_state.sso_typen_posten_tabel['naam']
+            str(t).strip()
+            for t in st.session_state.sso_typen_posten_tabel["naam"]
             if str(t).strip()
         ]
         if not bestaande_typen:
-            bestaande_typen = ['Overige posten']
+            bestaande_typen = ["Overige posten"]
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             klant_voorbeeld = st.selectbox(
-                "Klant voorbeeld", bestaande_klanten or ['Klant A'], key='sso_posten_klant'
+                "Klant voorbeeld",
+                bestaande_klanten or ["Klant A"],
+                key="sso_posten_klant",
             )
         with col_b:
-            aantal_voorbeeld = st.number_input('Aantal voorbeeldposten', min_value=1,
-                                                 max_value=100_000, value=250,
-                                                 step=50, key='sso_posten_aantal')
+            aantal_voorbeeld = st.number_input(
+                "Aantal voorbeeldposten",
+                min_value=1,
+                max_value=100_000,
+                value=250,
+                step=50,
+                key="sso_posten_aantal",
+            )
         with col_c:
-            typen_voorbeeld = st.multiselect('Typen posten', bestaande_typen,
-                                              default=bestaande_typen,
-                                              key='sso_posten_typen')
+            typen_voorbeeld = st.multiselect(
+                "Typen posten",
+                bestaande_typen,
+                default=bestaande_typen,
+                key="sso_posten_typen",
+            )
         if typen_voorbeeld:
             voorbeeld_df = maak_voorbeeld_postenbestand(
                 klant_voorbeeld, int(aantal_voorbeeld), typen_voorbeeld
             )
             st.download_button(
-                'Download voorbeeld-postenbestand (CSV)',
+                "Download voorbeeld-postenbestand (CSV)",
                 data=postenbestand_csv(voorbeeld_df),
                 file_name="postenbestand.csv",
-                mime='text/csv', key='sso_posten_download'
+                mime="text/csv",
+                key="sso_posten_download",
             )
         else:
-            st.warning('Selecteer ten minste één type post om een voorbeeld te genereren.')
-        st.file_uploader('Postenbestand inlezen (CSV)', type=['csv'],
-                         key='sso_posten_upload', on_change=on_sso_postenbestand_upload)
+            st.warning(
+                "Selecteer ten minste één type post om een voorbeeld te genereren."
+            )
+        st.file_uploader(
+            "Postenbestand inlezen (CSV)",
+            type=["csv"],
+            key="sso_posten_upload",
+            on_change=on_sso_postenbestand_upload,
+        )
         if st.session_state.sso_postenbestand_fout:
-            st.error('Postenbestand niet ingelezen: ' + st.session_state.sso_postenbestand_fout)
+            st.error(
+                "Postenbestand niet ingelezen: "
+                + st.session_state.sso_postenbestand_fout
+            )
         posten_df = st.session_state.sso_postenbestand
         if posten_df is not None:
-            st.success(f"Ingelezen: {st.session_state.sso_postenbestand_naam} — "
-                       f"{len(posten_df):,} posten.")
-            st.metric('Totaal bedrag', '€ ' + _nl(posten_df['bedrag_cent'].sum() / 100, 2))
-            st.dataframe(posten_df[list(POSTEN_KOLOMMEN)].head(100),
-                         width='stretch', hide_index=True)
-            samenvatting = totalen_per_type_post(posten_df).drop(
-                columns=['bedrag_cent']
-            ).assign(waarde_laag=lambda d: d['waarde_laag'].apply(lambda x: _nl(x, 2)))
-            st.markdown('**Totalen per type post**')
-            st.dataframe(samenvatting, width='stretch', hide_index=True)
-            st.caption('Dit zijn de totalen van dit bestand, niet noodzakelijk de '
-                       'populatietotalen. Overnemen in de klantentabel is daarom '
-                       'bewust niet automatisch.')
+            st.success(
+                f"Ingelezen: {st.session_state.sso_postenbestand_naam} — "
+                f"{len(posten_df):,} posten."
+            )
+            st.metric(
+                "Totaal bedrag", "€ " + _nl(posten_df["bedrag_cent"].sum() / 100, 2)
+            )
+            st.dataframe(
+                posten_df[list(POSTEN_KOLOMMEN)].head(100),
+                width="stretch",
+                hide_index=True,
+            )
+            samenvatting = (
+                totalen_per_type_post(posten_df)
+                .drop(columns=["bedrag_cent"])
+                .assign(
+                    waarde_laag=lambda d: d["waarde_laag"].apply(lambda x: _nl(x, 2))
+                )
+            )
+            st.markdown("**Totalen per type post**")
+            st.dataframe(samenvatting, width="stretch", hide_index=True)
+            st.caption(
+                "Dit zijn de totalen van dit bestand, niet noodzakelijk de "
+                "populatietotalen. Overnemen in de klantentabel is daarom "
+                "bewust niet automatisch."
+            )
 
     sso_klanten_res = st.session_state.sso_klanten_res
     if sso_klanten_res:
