@@ -49,6 +49,9 @@ tests/
     test_valideer_granulariteit.py
     test_convolutie_analytisch.py
     test_hypothesis_properties.py
+  single/                  # Spiegelt auditstat/single/
+    __init__.py
+    test_eval_distribution.py
   sso/                     # Spiegelt auditstat/sso/
     __init__.py
     test_moment_match_SSO.py
@@ -480,3 +483,9 @@ De tekst van het Theorie-tabblad staat niet meer in `app.py` maar in `theorie.qm
 **HARo-correctie bij `exact` (2026-11-02, op aanwijzing van de gebruiker):** ihr/ibr/car/materialiteit horen bij de **eerste trap** (de SSO-steekproef); de klantsteekproef heeft er niets mee te maken. `evalueer_SSO_klant_exact` telt `foutloze_posten_equivalent(ihr, ibr, car, materialiteit)` (standaard H/H/H, 0,01 → 0 extra posten) bij de SSO-`n` op (`n_calc = n + extra`, `k` blijft) vóór de Beta-/Negatief-Binomiaal; `steekproeven` heeft een kolom `extra_foutloze_posten`. **Ook bij `naief`/`momentmatching` (zelfde dag):** `bouw_strata_SSO_klant` berekent `extra = foutloze_posten_equivalent(...)` per type post, kalibreert (n_eff, k_eff) op `n + extra` (eerste trap) en geeft `ihr`/`ibr`/`car`/`materialiteit` **niet** door aan `eval_stratified` (anders dubbel, op `n_eff`); de stratatabel heeft een kolom `extra_foutloze_posten_sso`. Voorheen werd `n_eff + extra` gebruikt (tweede trap), wat bij kleine `N_klant` een `n_eff` boven `N_klant` kon geven (bijv. n=100, N=10, extra=20: 29,1 i.p.v. 9,2). Getest in `tests/sso/test_strata_SSO_klant.py`. `evalueer_SSO_totaal` ongewijzigd (daar is `n` de SSO-`n`, correctie via `eval_stratified` is al eerste trap).
 
 `theorie.qmd` onderdeel 4 beschrijft de exacte methode (klaar).
+
+## Omzetting SAS-macro `%eval_distribution` (2026-11-11)
+
+`auditstat/single/eval_distribution.py` (eigen subpakket `auditstat.single`; tests: `tests/single/test_eval_distribution.py`) is een Python-omzetting van de SAS-macro `%eval_distribution` (één steekproef, binomiaal of hypergeometrisch, vlakke prior). `eval_distribution(n, k, verdeling, massa, zekerheid, norm, m, band_links, band_rechts)` geeft een dict met `tabel` (DataFrame `p, c_raw, c, cc`), `pmin`, `pmax`, `phigh`, `kans_onder_norm`, `band_kans`; `plot_eval_distribution(res, ...)` tekent het SAS-rapport na (matplotlib, A4, NL-notatie). Bewuste afwijkingen van SAS: bij hypergeometrisch roostergewicht `1/(m+1)` voor band/norm (SAS: `1/m`), en de meest waarschijnlijke fout met relatieve tolerantie 1e-12 i.p.v. exacte gelijkheid. Bij `n = 0` is `phigh = 1` (k = n wint van k = 0, zoals in SAS). Niet overgenomen: papersize/lettertype-opties, SAS-uitvoerbestand, `clip` werkt via `clip_bij`.
+
+**App-koppeling (2026-11-11):** tabblad "evaluatie enkele steekproef" in `app.py` (`tab_enkel`, na "foutlozepostenequivalent"): invoer n, k, verdeling, optionele massa N (0 = onbekend), zekerheid en norm; toont minimale/meest waarschijnlijke/maximale fout (met aantal posten als N bekend), kans onder de norm, de plot en de tabel. Hypergeometrisch is begrensd op `ENKEL_MAX_MASSA` = 2.000.000 (roosterpunten = N + 1). Met `AppTest` gecontroleerd, niet in de pytest-suite.

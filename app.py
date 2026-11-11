@@ -5,6 +5,7 @@ import time
 import warnings
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -15,6 +16,10 @@ import streamlit as st
 # nog niet, dan volgt een duidelijke herstartmelding.
 for _poging in (1, 2):
     try:
+        from auditstat.single.eval_distribution import (  # pyrefly: ignore[missing-import]
+            eval_distribution,
+            plot_eval_distribution,
+        )
         from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
             evalueer_SSO_klant_exact,
         )
@@ -94,6 +99,9 @@ st.set_page_config(page_title="auditstat", layout="wide")
 
 # Definieer de risicocategorieën en de bijbehorende gebruikerslabels voor de selectievelden.
 RISK_OPTIES = ["H", "M", "L"]
+
+# Maximale massa bij de hypergeometrische verdeling (aantal roosterpunten = massa + 1).
+ENKEL_MAX_MASSA = 2_000_000
 RISK_LABELS = {"H": "hoog (H)", "M": "midden (M)", "L": "laag (L)"}
 
 # Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de evaluatie te initialiseren.
@@ -1058,9 +1066,18 @@ def on_sso_postenbestand_upload():
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
 st.title("auditstat")
 
-tab_nnz, tab_fpe, tab_eval, tab_plan, tab_sso, tab_theorie = st.tabs([
+(
+    tab_nnz,
+    tab_fpe,
+    tab_enkel,
+    tab_eval,
+    tab_plan,
+    tab_sso,
+    tab_theorie,
+) = st.tabs([
     "nog nodige zekerheid",
     "foutlozepostenequivalent",
+    "evaluatie enkele steekproef",
     "evaluatie gestratificeerd",
     "planning gestratificeerd",
     "SSO",
@@ -1141,6 +1158,116 @@ with tab_fpe:
             fpe_val = foutloze_posten_equivalent(fpe_ihr, fpe_ibr, fpe_car, fpe_mat)
             st.metric("foutlozepostenequivalent", _nl(fpe_val, 0))
             st.caption("Aantal posten dat overeenkomt met de verlaagde risico\u2019s.")
+
+# Tabblad voor de evaluatie van één enkele steekproef (n, k, optioneel massa).
+with tab_enkel:
+    col_links, col_rechts = st.columns([1, 3])
+
+    with col_links:
+        st.subheader("steekproef")
+        enkel_n = st.number_input(
+            "n (aantal getrokken posten)",
+            min_value=0,
+            value=100,
+            step=1,
+            key="enkel_n",
+        )
+        enkel_k = st.number_input(
+            "k (aantal foute posten)",
+            min_value=0,
+            value=3,
+            step=1,
+            key="enkel_k",
+        )
+        enkel_verdeling = st.radio(
+            "verdeling",
+            ["binomiaal", "hypergeometrisch"],
+            key="enkel_verdeling",
+            help=(
+                "Binomiaal: de populatie is groot ten opzichte van de steekproef. "
+                "Hypergeometrisch: trekking zonder teruglegging uit een populatie "
+                "van N posten; hiervoor is de massa N nodig."
+            ),
+        )
+        enkel_massa = st.number_input(
+            "massa N (aantal posten in de populatie, 0 = onbekend)",
+            min_value=0,
+            value=0,
+            step=1,
+            key="enkel_massa",
+            help=(
+                "Optioneel bij binomiaal: als N is ingevuld, worden de grenzen ook "
+                "als aantal posten getoond. Verplicht bij hypergeometrisch."
+            ),
+        )
+        enkel_zekerheid_text = st.text_input(
+            "zekerheid",
+            value="0,95",
+            key="enkel_zekerheid_text",
+            help="Eenzijdige zekerheid voor de minimale en maximale fout (bijv. 0,95).",
+        )
+        enkel_norm_text = st.text_input(
+            "norm (fractie, 0 = geen norm)",
+            value="0",
+            key="enkel_norm_text",
+            help="Normfout als fractie, bijv. 0,02. De kans op een fout onder de norm wordt getoond.",
+        )
+
+    with col_rechts:
+        st.subheader("Resultaat")
+        enkel_zekerheid = _parse_nl(enkel_zekerheid_text)
+        enkel_norm = _parse_nl(enkel_norm_text)
+        enkel_fouten = []
+        if enkel_zekerheid is None:
+            enkel_fouten.append("zekerheid is geen geldig getal.")
+        if enkel_norm is None:
+            enkel_fouten.append("norm is geen geldig getal.")
+        if enkel_verdeling == "hypergeometrisch" and enkel_massa > ENKEL_MAX_MASSA:
+            enkel_fouten.append(
+                f"massa N mag bij de hypergeometrische verdeling hooguit "
+                f"{_nl(ENKEL_MAX_MASSA, 0)} zijn."
+            )
+        if enkel_fouten:
+            st.error("\n".join(enkel_fouten))
+        else:
+            try:
+                enkel_res = eval_distribution(
+                    n=enkel_n,
+                    k=enkel_k,
+                    verdeling=enkel_verdeling,
+                    massa=enkel_massa,
+                    zekerheid=enkel_zekerheid,
+                    norm=enkel_norm,
+                )
+            except ValueError as _fout:
+                st.error(str(_fout))
+            else:
+                _kolommen = st.columns(3)
+                for _kolom, _naam, _sleutel in zip(
+                    _kolommen,
+                    ("minimale fout", "meest waarschijnlijke fout", "maximale fout"),
+                    ("pmin", "phigh", "pmax"),
+                    strict=True,
+                ):
+                    _kolom.metric(_naam, f"{_nl(enkel_res[_sleutel] * 100, 2)}%")
+                    if enkel_massa > 0:
+                        _kolom.caption(
+                            f"{_nl(enkel_res[_sleutel] * enkel_massa, 0)} posten"
+                        )
+                if enkel_norm > 0:
+                    st.metric(
+                        f"kans op een fout onder de norm ({_nl(enkel_norm * 100, 2)}%)",
+                        f"{_nl(enkel_res['kans_onder_norm'] * 100, 2)}%",
+                    )
+                _fig_enkel = plot_eval_distribution(
+                    enkel_res,
+                    toon_massa=enkel_massa > 0,
+                    figsize=(8.27, 9.5),
+                )
+                st.pyplot(_fig_enkel)
+                plt.close(_fig_enkel)
+                with st.expander("Tabel met de kansdichtheid"):
+                    st.dataframe(enkel_res["tabel"], hide_index=True)
 
 # Configureer het tredje tabblad voor de evaluatie van getrokken gestratificeerde steekproeven.
 with tab_eval:
