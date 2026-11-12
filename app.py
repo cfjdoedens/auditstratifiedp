@@ -1077,11 +1077,11 @@ st.title("auditstat")
 ) = st.tabs([
     "nog nodige zekerheid",
     "foutlozepostenequivalent",
-    "evaluatie postensteekproef",
-    "evaluatie gestratificeerd",
-    "planning gestratificeerd",
-    "SSO",
-    "Theorie",
+    "evaluatie postensteek",
+    "evaluatie geldsteek gestratificeerd",
+    "planning geldsteek gestratificeerd",
+    "evaluatie SSO",
+    "theorie SSO",
 ])
 
 # Configureer het eerste tabblad voor de berekening van de nog nodige zekerheid.

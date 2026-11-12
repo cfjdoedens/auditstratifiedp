@@ -576,10 +576,10 @@ Deze functies worden automatisch gebruikt binnen `eval_stratified()`.
 
 # SSO-invoer opslaan en hergebruiken via CSV
 
-In het SSO-tabblad van de app kun je de volledige invoer (instellingen,
-SSO-totalen, klanten en eventueel typen posten) in één CSV-bestand
-opslaan en later weer inlezen. Dat is handig om een berekening te
-herhalen, te delen of in Excel voor te bereiden.
+In het tabblad *evaluatie SSO* van de app kun je de volledige invoer
+(instellingen, SSO-totalen, klanten en eventueel typen posten) in één
+CSV-bestand opslaan en later weer inlezen. Dat is handig om een
+berekening te herhalen, te delen of in Excel voor te bereiden.
 
 ## Stap voor stap
 
@@ -635,15 +635,15 @@ invoer = lees_sso_invoer_csv(open("sso_invoer.csv", "rb").read())
 
 # Evaluatie over de hele SSO
 
-Naast de evaluatie per klant berekent de SSO-tab bij *evalueer alle
-klanten* ook een resultaat voor de **hele SSO**, onder het kopje *Hele
-SSO*. Daar is geen klantkalibratie: de SSO-steekproef $(n, k)$ is direct
-een steekproef uit de populatie waarover geoordeeld wordt. Elk type post
-wordt één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als
-waarde de totale massa van dat type post (de som over alle klanten);
-zonder onderscheid naar typen posten is het één stratum met de
-SSO-totalen. Daarna combineert `eval_stratified` de strata tot één
-kanskromme en maximale fout.
+Naast de evaluatie per klant berekent het tabblad *evaluatie SSO* bij
+*evalueer alle klanten* ook een resultaat voor de **hele SSO**, onder
+het kopje *Hele SSO*. Daar is geen klantkalibratie: de SSO-steekproef
+$(n, k)$ is direct een steekproef uit de populatie waarover geoordeeld
+wordt. Elk type post wordt één stratum met $n_\text{laag} = n$,
+$k_\text{laag} = k$ en als waarde de totale massa van dat type post (de
+som over alle klanten); zonder onderscheid naar typen posten is het één
+stratum met de SSO-totalen. Daarna combineert `eval_stratified` de
+strata tot één kanskromme en maximale fout.
 
 De uitkomst is niet de optelsom van de klantuitkomsten, want die komen
 uit dezelfde steekproef en zijn niet onafhankelijk. `n` moet een geheel
@@ -665,7 +665,7 @@ resultaat["max_fout_convolutie"]
 
 # PDF-rapport van een SSO-evaluatie
 
-Na een berekening in het SSO-tabblad verschijnt onder de
+Na een berekening in het tabblad *evaluatie SSO* verschijnt onder de
 samenvattingstabel de knop *PDF-rapport maken*, gevolgd door
 *PDF-rapport downloaden*. Het rapport bevat de invoer waarmee is
 gerekend, de resultaten per klant, de evaluatie van de hele SSO en de

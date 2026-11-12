@@ -166,7 +166,7 @@ Naast de evaluatie per klant rekent de app ook de **hele SSO** door. Daar is gee
 
 Indien er geen onderscheiden typen posten zijn, dan is er één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van de hele SSO. Daaruit volgt direct met de binomiale- of Poisson-verdeling de kanskromme.
 
-Indien er wel verschillende typen posten worden onderscheiden, dan wordt elk type post één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post bij de hele SSO. Daarna combineert dezelfde gestratificeerde convolutie als bij de klanten de strata tot één kanskromme en maximale fout. De uitkomst in de SSO-tab en ook in het pdf-rapport onder "Resultaat/Hele SSO" geeft het resultaat van deze evaluatie over de hele SSO.
+Indien er wel verschillende typen posten worden onderscheiden, dan wordt elk type post één stratum met $n_\text{laag} = n$, $k_\text{laag} = k$ en als waarde de totale massa van dat type post bij de hele SSO. Daarna combineert dezelfde gestratificeerde convolutie als bij de klanten de strata tot één kanskromme en maximale fout. De uitkomst in het tabblad evaluatie SSO en ook in het pdf-rapport onder "Resultaat/Hele SSO" geeft het resultaat van deze evaluatie over de hele SSO.
 
 NB:
 
