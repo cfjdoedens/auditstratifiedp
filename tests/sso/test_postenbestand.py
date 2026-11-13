@@ -48,6 +48,25 @@ def test_voorbeeld_weigert_ongeldige_argumenten(kwargs):
         maak_voorbeeld_postenbestand(**args)
 
 
+@pytest.mark.parametrize("cv", [0.5, 1.0, 2.0])
+def test_voorbeeld_met_cv_geeft_ongeveer_die_cv_en_gemiddelde_500(cv):
+    df = maak_voorbeeld_postenbestand("Klant A", 100_000, ["E"], cv=cv)
+    w = df["bedrag"].str.replace(",", ".").astype(float).to_numpy()
+    assert w.mean() == pytest.approx(500, rel=0.03)
+    assert variatiecoefficient(w) == pytest.approx(cv, rel=0.1)
+
+
+def test_voorbeeld_met_cv_nul_geeft_gelijke_posten():
+    df = maak_voorbeeld_postenbestand("Klant A", 20, ["E"], cv=0)
+    assert set(df["bedrag"]) == {"500,00"}
+
+
+@pytest.mark.parametrize("cv", [-1.0, float("nan"), float("inf")])
+def test_voorbeeld_weigert_ongeldige_cv(cv):
+    with pytest.raises(ValueError, match="cv"):
+        maak_voorbeeld_postenbestand("A", 5, ["T"], cv=cv)
+
+
 def test_heen_en_terug_behoudt_bedragen_exact():
     df = maak_voorbeeld_postenbestand("Klant A", 500, ["E", "I", "O"])
     terug = lees_postenbestand(postenbestand_csv(df))

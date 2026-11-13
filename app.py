@@ -3196,7 +3196,7 @@ with tab_sso:
         ]
         if not bestaande_typen:
             bestaande_typen = ["Overige posten"]
-        col_a, col_b, col_c = st.columns(3)
+        col_a, col_b, col_c, col_d = st.columns(4)
         with col_a:
             klant_voorbeeld = st.selectbox(
                 "Klant voorbeeld",
@@ -3219,9 +3219,33 @@ with tab_sso:
                 default=bestaande_typen,
                 key="sso_posten_typen",
             )
+        with col_d:
+            cv_voorbeeld = st.number_input(
+                "CV van de postbedragen",
+                min_value=0.0,
+                max_value=10.0,
+                value=1.0,
+                step=0.1,
+                key="sso_posten_cv",
+                help=(
+                    "Variatiecoëfficiënt (standaardafwijking / gemiddelde) "
+                    "van de verzonnen bedragen; het gemiddelde is 500 euro. "
+                    "0 geeft gelijke posten. Zie het Lorenz-plaatje bovenaan "
+                    "het tabblad."
+                ),
+            )
         if typen_voorbeeld:
             voorbeeld_df = maak_voorbeeld_postenbestand(
-                klant_voorbeeld, int(aantal_voorbeeld), typen_voorbeeld
+                klant_voorbeeld,
+                int(aantal_voorbeeld),
+                typen_voorbeeld,
+                cv=float(cv_voorbeeld),
+            )
+            _bedragen = pd.to_numeric(voorbeeld_df["bedrag"].str.replace(",", "."))
+            st.caption(
+                "CV van de bedragen in dit voorbeeld: "
+                f"{_nl(float(_bedragen.std(ddof=0) / _bedragen.mean()), 2)} "
+                "(wijkt bij weinig posten af van de ingestelde CV)."
             )
             st.download_button(
                 "Download voorbeeld-postenbestand (CSV)",

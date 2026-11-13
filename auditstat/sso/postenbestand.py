@@ -30,18 +30,31 @@ def maak_voorbeeld_postenbestand(
     aantal: int,
     typen: list[str],
     seed: int = 2026,
+    cv: float | None = None,
 ) -> pd.DataFrame:
     """Reproduceerbare fictieve posten met bedragen op twee decimalen.
 
     De (lognormale) bedragen zijn verzonnen en dienen alleen als voorbeeld; ze
-    vormen geen statistische aanname.
+    vormen geen statistische aanname. Zonder ``cv`` is de mediaan 500 euro en
+    de log-standaardafwijking 0,9. Met ``cv`` (variatiecoëfficiënt, >= 0) is
+    het gemiddelde 500 euro en volgt de log-standaardafwijking uit
+    ``sigma = sqrt(ln(1 + cv²))``; ``cv = 0`` geeft gelijke posten van 500
+    euro. De CV van een eindige steekproef wijkt hiervan af, vooral bij een
+    grote CV en weinig posten.
     """
     if not klant.strip() or not typen or aantal < 1:
         raise ValueError("Geef een klant, posttype en positief aantal op.")
+    if cv is not None and (not np.isfinite(cv) or cv < 0):
+        raise ValueError("cv moet een eindig getal van minstens 0 zijn.")
     rng = np.random.default_rng(seed)
     type_idx = rng.integers(0, len(typen), size=aantal)
+    if cv is None:
+        mu, sigma = np.log(500), 0.9
+    else:
+        sigma = float(np.sqrt(np.log1p(cv**2)))
+        mu = np.log(500) - sigma**2 / 2
     centen = np.maximum(
-        1, np.rint(rng.lognormal(np.log(500), 0.9, aantal) * 100)
+        1, np.rint(rng.lognormal(mu, sigma, aantal) * 100)
     ).astype("int64")
     return pd.DataFrame({
         "klant": klant.strip(),
