@@ -2198,7 +2198,12 @@ with tab_sso:
             format_func=lambda m: {
                 "homogeen": "niveau 1: alle posten even groot",
                 "variabel": "niveau 2: variatiecoëfficiënt (CV) van de postgroottes",
-                "postenbestand": "niveau 3: postenbestand van de hele SSO",
+                "postenbestand": (
+                    "niveau 3: postenbestand van de hele SSO"
+                    if sso_kalibratiemethode == "exact"
+                    else "niveau 3: postenbestand van de hele SSO "
+                    "(alleen de CV, dus gelijk aan niveau 2)"
+                ),
             }[m],
             key="sso_postgroottes",
             help=(
@@ -2264,9 +2269,11 @@ with tab_sso:
                 st.info("Nog geen postenbestand ingelezen.")
             if sso_kalibratiemethode != "exact":
                 st.caption(
-                    "Bij deze berekeningsmethode wordt alleen de CV per type "
-                    "post uit het bestand gebruikt; de volledige verdeling "
-                    "van de postgroottes alleen bij de exacte methode."
+                    "Bij deze berekeningsmethode wordt uit het bestand alleen "
+                    "de CV per type post afgeleid. Niveau 3 geeft dan "
+                    "hetzelfde resultaat als niveau 2 met die CV; de "
+                    "volledige verdeling van de postgroottes wordt alleen "
+                    "bij de exacte methode gebruikt."
                 )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"
