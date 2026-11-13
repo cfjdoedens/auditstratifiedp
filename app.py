@@ -2227,6 +2227,7 @@ with tab_sso:
                     "anders worden alle posten samen gebruikt."
                 ),
             )
+            st.caption("Maximaal 50 MB en 1.000.000 posten per bestand.")
             st.download_button(
                 "Voorbeeld-postenbestand downloaden (CSV)",
                 data=postenbestand_csv(
@@ -3187,6 +3188,7 @@ with tab_sso:
             key="sso_posten_upload",
             on_change=on_sso_postenbestand_upload,
         )
+        st.caption("Maximaal 20 MB en 100.000 posten per bestand.")
         if st.session_state.sso_postenbestand_fout:
             st.error(
                 "Postenbestand niet ingelezen: "
