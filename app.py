@@ -40,6 +40,7 @@ for _poging in (1, 2):
         from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
             kenmerken_empirisch,
             kenmerken_gamma,
+            plot_lorenz_per_type_post,
             plot_lorenz_postgroottes,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
@@ -2503,6 +2504,28 @@ with tab_sso:
                 },
             )
             st.session_state.sso_typen_posten_tabel = sso_typen_posten_tabel
+
+            if sso_postgroottes == "variabel":
+                _cvs_per_type = {}
+                for _r in sso_typen_posten_tabel.to_dict("records"):
+                    _nm = _r.get("naam")
+                    if _nm is None or pd.isna(_nm) or not str(_nm).strip():
+                        continue
+                    _c = _parse_nl(_r.get("cv"))
+                    _cvs_per_type[str(_nm).strip()] = (
+                        _c if _c is not None and _c >= 0 else 0.0
+                    )
+                if _cvs_per_type:
+                    _fig_types = plot_lorenz_per_type_post(_cvs_per_type)
+                    st.pyplot(_fig_types)
+                    plt.close(_fig_types)
+                    st.caption(
+                        "Lorenz-curve per type post, bij de CV in de "
+                        "tabel hierboven (Gamma-model; leeg of 0 = alle posten "
+                        "even groot, de stippellijn). Hoe verder een curve "
+                        "onder de stippellijn ligt, hoe meer van de waarde in "
+                        "enkele grote posten zit."
+                    )
 
             st.subheader("klanten \u00d7 typen posten")
             sso_voorbeeld_plek["klantentypen"] = st.empty()

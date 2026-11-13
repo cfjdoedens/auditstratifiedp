@@ -86,3 +86,12 @@ def test_kenmerken_empirisch_en_compacte_figuur():
     assert k["aantal"] == 4 and k["gemiddelde"] == pytest.approx(2.5)
     fig = plot_lorenz_postgroottes(cv=1.0, compact=True)
     assert fig.get_size_inches()[0] < 6
+
+
+def test_lorenz_per_type_post_tekent_een_lijn_per_type():
+    from auditstat.sso.plot_postgroottes import plot_lorenz_per_type_post
+
+    fig = plot_lorenz_per_type_post({"A": 0.0, "B": 1.0, "C": 2.5})
+    assert len(fig.axes[0].lines) == 4  # diagonaal + 3 typen
+    with pytest.raises(ValueError):
+        plot_lorenz_per_type_post({})

@@ -229,3 +229,45 @@ def plot_lorenz_postgroottes(
         ax.legend(loc="upper left", fontsize=8, frameon=True)
     fig.tight_layout()
     return fig
+
+
+def plot_lorenz_per_type_post(cvs: dict[str, float]) -> Figure:
+    """Lorenz-curven (Gamma-model) van meerdere typen posten in één figuur.
+
+    ``cvs`` koppelt de naam van een type post aan zijn variatiecoëfficiënt;
+    een CV van 0 geeft de diagonaal (alle posten even groot).
+    """
+    if not cvs:
+        raise ValueError("Geef minstens één type post.")
+    p = np.linspace(0, 1, _PUNTEN + 1)
+    fig, ax = plt.subplots(figsize=(6.4, 5.4))
+    ax.plot([0, 1], [0, 1], color="black", linestyle="--", linewidth=1)
+    kleuren = plt.get_cmap("tab10")
+    for i, (naam, cv) in enumerate(cvs.items()):
+        cv = _controleer_cv(cv)
+        ax.plot(
+            p,
+            lorenz_gamma(cv, p),
+            color=kleuren(i % 10),
+            linewidth=2.2,
+            label=(
+                f"{naam}: CV {nl_getal_variabel(round(cv, 4))}; "
+                f"Gini {nl_getal(gini_gamma(cv), 2)}; grootste 10% = "
+                f"{nl_getal(100 * aandeel_grootste_gamma(cv, 0.1), 0)}% "
+                "van de waarde"
+            ),
+        )
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect("equal")
+    ax.xaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.yaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.set_xlabel("cumulatief aandeel van de posten (kleinste eerst)")
+    ax.set_ylabel("cumulatief aandeel van de totale waarde")
+    ax.set_title("Lorenz-curve per type post")
+    ax.grid(alpha=0.3)
+    ax.legend(
+        loc="upper center", bbox_to_anchor=(0.5, -0.15), fontsize=8, frameon=False
+    )
+    fig.tight_layout()
+    return fig
