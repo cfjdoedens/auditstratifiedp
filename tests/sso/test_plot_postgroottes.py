@@ -119,3 +119,19 @@ def test_pareto_ecdf_strip_figuren():
         plot_ecdf_postgroottes({"a": [0.0, 1.0]})
     with pytest.raises(ValueError):
         plot_strip_postgroottes({})
+
+
+def test_ecdf_en_strip_met_meerdere_typen_posten():
+    from auditstat.sso.plot_postgroottes import (
+        plot_ecdf_postgroottes,
+        plot_strip_postgroottes,
+        simuleer_gamma_posten,
+    )
+
+    g = {
+        "A": simuleer_gamma_posten(0.5, 500.0, 500),
+        "B": simuleer_gamma_posten(2.0, 400.0, 500, seed=1),
+    }
+    fig = plot_strip_postgroottes(g, compact=True)
+    assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["A", "B"]
+    assert len(plot_ecdf_postgroottes(g).axes[0].lines) == 2

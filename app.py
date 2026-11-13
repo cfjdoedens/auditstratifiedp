@@ -334,6 +334,27 @@ def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
     )
 
 
+def _toon_postgroottes_per_type(groepen: dict, gesimuleerd: bool) -> None:
+    """ECDF en strip plot met alle typen posten in één figuur."""
+    tab_e, tab_s = st.tabs(["ECDF per type post", "Strip plot per type post"])
+    with tab_e:
+        fig = plot_ecdf_postgroottes(groepen, compact=True)
+        st.pyplot(fig)
+        plt.close(fig)
+    with tab_s:
+        fig = plot_strip_postgroottes(groepen, compact=True)
+        st.pyplot(fig)
+        plt.close(fig)
+    bron = (
+        "gesimuleerde posten (Gamma-model met de CV per type post en als "
+        "gemiddelde de totale waarde / aantal posten van dat type bij de "
+        "klanten, of anders het SSO-gemiddelde)"
+        if gesimuleerd
+        else "de posten uit het bestand per type post"
+    )
+    st.caption(f"Typen posten naast elkaar, op basis van {bron}.")
+
+
 def _cv_voor_rapport(naam, cv_ruw, postgroottes: str, niveau3_cv: dict) -> str:
     """CV zoals gebruikt in de berekening, als NL-tekst voor het rapport."""
     if postgroottes == "homogeen":
@@ -2556,6 +2577,30 @@ with tab_sso:
                         _c if _c is not None and _c >= 0 else 0.0
                     )
                 if _cvs_per_type:
+                    _gem_type = {}
+                    for _r in st.session_state.sso_klanten_tabel.to_dict(
+                        "records"
+                    ):
+                        _t = str(_r.get("type_post") or "").strip()
+                        _w = _parse_nl(_r.get("waarde_laag"))
+                        _nn = _parse_nl(_r.get("N_klant"))
+                        if _t and _w is not None and _nn:
+                            _som = _gem_type.setdefault(_t, [0.0, 0.0])
+                            _som[0] += _w
+                            _som[1] += _nn
+                    _sim_types = {
+                        _nm: simuleer_gamma_posten(
+                            _cv,
+                            (
+                                _gem_type[_nm][0] / _gem_type[_nm][1]
+                                if _nm in _gem_type and _gem_type[_nm][1] > 0
+                                else (_lorenz_gemiddelde or 1.0)
+                            ),
+                            3000,
+                            seed=4417 + _i,
+                        )
+                        for _i, (_nm, _cv) in enumerate(_cvs_per_type.items())
+                    }
                     _fig_types = plot_lorenz_per_type_post(_cvs_per_type)
                     st.pyplot(_fig_types)
                     plt.close(_fig_types)
@@ -2566,6 +2611,23 @@ with tab_sso:
                         "onder de stippellijn ligt, hoe meer van de waarde in "
                         "enkele grote posten zit."
                     )
+                    _toon_postgroottes_per_type(_sim_types, True)
+            elif st.session_state.sso_niveau3_posten is not None:
+                _bestand_typen = postgroottes_per_type_post(
+                    st.session_state.sso_niveau3_posten
+                )
+                _namen_tabel = {
+                    str(n).strip()
+                    for n in sso_typen_posten_tabel.get("naam", [])
+                    if n is not None and not pd.isna(n)
+                }
+                _gekozen = {
+                    t: w for t, w in _bestand_typen.items() if t in _namen_tabel
+                } or _bestand_typen
+                _gekozen = {t: w[w > 0] for t, w in _gekozen.items()}
+                _gekozen = {t: w for t, w in _gekozen.items() if w.size}
+                if _gekozen:
+                    _toon_postgroottes_per_type(_gekozen, False)
 
             st.subheader("klanten \u00d7 typen posten")
             sso_voorbeeld_plek["klantentypen"] = st.empty()

@@ -295,6 +295,17 @@ def _controleer_waarden(waarden) -> np.ndarray:
     return w
 
 
+def _zet_logbereik(ax, groepen) -> None:
+    """Begrens de log-as tot het 0,2%-kwantiel (onder) en het maximum (boven),
+    zodat enkele extreem kleine posten de as niet ruim over nullen uitrekken."""
+    laag = min(
+        float(np.quantile(np.asarray(w, dtype=float), 0.002)) for w in groepen.values()
+    )
+    hoog = max(float(np.max(w)) for w in groepen.values())
+    if hoog > laag > 0:
+        ax.set_xlim(laag / 1.5, hoog * 1.3)
+
+
 def _afmeting(compact: bool) -> tuple[float, float]:
     return (4.6, 3.6) if compact else (7.2, 4.8)
 
@@ -368,6 +379,7 @@ def plot_ecdf_postgroottes(groepen: dict, compact: bool = False) -> Figure:
             label=naam,
         )
     ax.set_xscale("log")
+    _zet_logbereik(ax, groepen)
     ax.set_ylim(0, 1.02)
     ax.xaxis.set_major_formatter(_bedrag_formatter())
     ax.yaxis.set_major_formatter(nl_tick_formatter(1))
@@ -395,7 +407,8 @@ def plot_strip_postgroottes(
     if not groepen:
         raise ValueError("Geef minstens één groep postbedragen.")
     rng = np.random.default_rng(seed)
-    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    breed, hoog = _afmeting(compact)
+    fig, ax = plt.subplots(figsize=(breed, max(hoog, 1.4 + 0.8 * len(groepen))))
     for i, waarden in enumerate(groepen.values()):
         w = _controleer_waarden(waarden)
         punten = w if w.size <= max_punten else rng.choice(w, max_punten, replace=False)
@@ -413,6 +426,7 @@ def plot_strip_postgroottes(
     ax.plot([], [], color="green", linewidth=2, label="mediaan")
     ax.plot([], [], color="red", linewidth=2, label="gemiddelde")
     ax.set_xscale("log")
+    _zet_logbereik(ax, groepen)
     ax.set_yticks(range(len(groepen)))
     ax.set_yticklabels(list(groepen))
     ax.set_ylim(-0.6, len(groepen) - 0.4)
