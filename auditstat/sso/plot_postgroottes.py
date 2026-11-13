@@ -271,3 +271,171 @@ def plot_lorenz_per_type_post(cvs: dict[str, float]) -> Figure:
     )
     fig.tight_layout()
     return fig
+
+
+def _bedrag_formatter():
+    from matplotlib.ticker import FuncFormatter
+
+    def _fmt(x, _):
+        if x >= 10:
+            return nl_getal(x, 0)
+        if x >= 1:
+            return nl_getal(x, 1)
+        return nl_getal(x, min(8, max(2, math.ceil(-math.log10(x)))))
+
+    return FuncFormatter(_fmt)
+
+
+def _controleer_waarden(waarden) -> np.ndarray:
+    w = np.asarray(waarden, dtype=float)
+    if w.size == 0 or not np.all(np.isfinite(w)) or not np.all(w > 0):
+        raise ValueError(
+            "Postbedragen moeten een niet-lege rij positieve getallen zijn."
+        )
+    return w
+
+
+def _afmeting(compact: bool) -> tuple[float, float]:
+    return (4.6, 3.6) if compact else (7.2, 4.8)
+
+
+def plot_pareto_postgroottes(
+    waarden, groepen: int = 20, compact: bool = False
+) -> Figure:
+    """Pareto-diagram: de posten van groot naar klein in ``groepen`` gelijke groepen.
+
+    Staven: aandeel van de totale waarde per groep; lijn: cumulatief aandeel.
+    De horizontale as is het aandeel van de posten (grootste eerst).
+    """
+    w = np.sort(_controleer_waarden(waarden))[::-1]
+    groepen = max(1, min(groepen, w.size))
+    delen = np.array_split(w, groepen)
+    aandeel = np.array([d.sum() for d in delen]) / w.sum()
+    cum = np.cumsum(aandeel)
+    einde = np.cumsum([d.size for d in delen]) / w.size
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    breedte = 0.9 / groepen
+    ax.bar(
+        einde - breedte / 2 - 0.05 / groepen,
+        aandeel,
+        width=breedte,
+        color="tab:blue",
+        alpha=0.8,
+        label="aandeel van de waarde per groep",
+    )
+    ax.plot(
+        einde,
+        cum,
+        color="tab:red",
+        marker="o",
+        markersize=3,
+        label="cumulatief aandeel",
+    )
+    ax.axhline(0.8, color="0.5", linestyle=":", linewidth=1)
+    ax.set_xlim(0, 1.02)
+    ax.set_ylim(0, 1.02)
+    ax.xaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.yaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.set_xlabel(
+        "aandeel van de posten (grootste eerst)", fontsize=8 if compact else None
+    )
+    ax.set_ylabel("aandeel van de totale waarde", fontsize=8 if compact else None)
+    ax.set_title("Pareto-diagram van de postgroottes", fontsize=10 if compact else None)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right", fontsize=7 if compact else 8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_ecdf_postgroottes(groepen: dict, compact: bool = False) -> Figure:
+    """ECDF (empirische verdelingsfunctie) van de postbedragen, log-schaal.
+
+    ``groepen`` koppelt een naam aan een rij postbedragen; elke groep krijgt
+    een eigen lijn.
+    """
+    if not groepen:
+        raise ValueError("Geef minstens één groep postbedragen.")
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    for i, (naam, waarden) in enumerate(groepen.items()):
+        w = np.sort(_controleer_waarden(waarden))
+        y = np.arange(1, w.size + 1) / w.size
+        ax.step(
+            w,
+            y,
+            where="post",
+            color=plt.get_cmap("tab10")(i % 10),
+            linewidth=1.8,
+            label=naam,
+        )
+    ax.set_xscale("log")
+    ax.set_ylim(0, 1.02)
+    ax.xaxis.set_major_formatter(_bedrag_formatter())
+    ax.yaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.set_xlabel(
+        "bedrag van de post (euro, log-schaal)", fontsize=8 if compact else None
+    )
+    ax.set_ylabel("aandeel posten tot dit bedrag", fontsize=8 if compact else None)
+    ax.set_title("ECDF van de postbedragen", fontsize=10 if compact else None)
+    ax.grid(alpha=0.3, which="both")
+    if len(groepen) > 1:
+        ax.legend(fontsize=7 if compact else 8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_strip_postgroottes(
+    groepen: dict, max_punten: int = 1500, compact: bool = False, seed: int = 6283
+) -> Figure:
+    """Strip plot met log-schaal: elke post een punt (met verticale spreiding).
+
+    Per groep een rij met alle postbedragen (bij meer dan ``max_punten`` een
+    willekeurige deelverzameling), met de mediaan (groen) en het gemiddelde
+    (rood) van alle posten.
+    """
+    if not groepen:
+        raise ValueError("Geef minstens één groep postbedragen.")
+    rng = np.random.default_rng(seed)
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    for i, waarden in enumerate(groepen.values()):
+        w = _controleer_waarden(waarden)
+        punten = w if w.size <= max_punten else rng.choice(w, max_punten, replace=False)
+        y = i + rng.uniform(-0.3, 0.3, punten.size)
+        ax.scatter(
+            punten,
+            y,
+            s=4,
+            alpha=0.35,
+            color=plt.get_cmap("tab10")(i % 10),
+            linewidths=0,
+        )
+        ax.plot([np.median(w)] * 2, [i - 0.4, i + 0.4], color="green", linewidth=2)
+        ax.plot([w.mean()] * 2, [i - 0.4, i + 0.4], color="red", linewidth=2)
+    ax.plot([], [], color="green", linewidth=2, label="mediaan")
+    ax.plot([], [], color="red", linewidth=2, label="gemiddelde")
+    ax.set_xscale("log")
+    ax.set_yticks(range(len(groepen)))
+    ax.set_yticklabels(list(groepen))
+    ax.set_ylim(-0.6, len(groepen) - 0.4)
+    ax.xaxis.set_major_formatter(_bedrag_formatter())
+    ax.set_xlabel(
+        "bedrag van de post (euro, log-schaal)", fontsize=8 if compact else None
+    )
+    ax.set_title("Strip plot van de postbedragen", fontsize=10 if compact else None)
+    ax.grid(alpha=0.3, axis="x", which="both")
+    ax.legend(fontsize=7 if compact else 8, loc="upper left")
+    fig.tight_layout()
+    return fig
+
+
+def simuleer_gamma_posten(
+    cv: float, gemiddelde: float = 1.0, aantal: int = 5000, seed: int = 4417
+) -> np.ndarray:
+    """Gesimuleerde Gamma-verdeelde postbedragen (voorbeeld bij niveau 2).
+
+    Bij ``cv = 0`` zijn alle posten gelijk aan ``gemiddelde``.
+    """
+    cv = _controleer_cv(cv)
+    if cv == 0:
+        return np.full(aantal, float(gemiddelde))
+    rng = np.random.default_rng(seed)
+    return rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)

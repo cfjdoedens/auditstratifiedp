@@ -40,8 +40,12 @@ for _poging in (1, 2):
         from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
             kenmerken_empirisch,
             kenmerken_gamma,
+            plot_ecdf_postgroottes,
             plot_lorenz_per_type_post,
             plot_lorenz_postgroottes,
+            plot_pareto_postgroottes,
+            plot_strip_postgroottes,
+            simuleer_gamma_posten,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
             POSTEN_KOLOMMEN,
@@ -299,6 +303,35 @@ def _lees_cv(ruw, label: str, fouten: list) -> float:
         )
         return 0.0
     return waarde
+
+
+def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
+    """Pareto-diagram, ECDF en strip plot van postbedragen in drie tabbladen."""
+    tab_p, tab_e, tab_s = st.tabs(["Pareto", "ECDF", "Strip plot"])
+    figuren = (
+        (tab_p, lambda: plot_pareto_postgroottes(waarden, compact=True)),
+        (tab_e, lambda: plot_ecdf_postgroottes({"posten": waarden}, compact=True)),
+        (tab_s, lambda: plot_strip_postgroottes({"posten": waarden}, compact=True)),
+    )
+    for tab, maak in figuren:
+        with tab:
+            fig = maak()
+            st.pyplot(fig)
+            plt.close(fig)
+    bron = (
+        "gesimuleerde posten (5.000 trekkingen uit het Gamma-model, vaste "
+        "seed)"
+        if gesimuleerd
+        else "alle posten in het bestand"
+    )
+    st.caption(
+        f"Getoond op basis van {bron}. Pareto: de posten van groot naar "
+        "klein in 20 gelijke groepen, met per groep het aandeel van de "
+        "waarde (staven) en het cumulatieve aandeel (lijn). ECDF: het "
+        "aandeel posten tot een bepaald bedrag, log-schaal. Strip plot: "
+        "elke post een punt (bij veel posten een willekeurige "
+        "deelverzameling), met mediaan (groen) en gemiddelde (rood)."
+    )
 
 
 def _cv_voor_rapport(naam, cv_ruw, postgroottes: str, niveau3_cv: dict) -> str:
@@ -2264,6 +2297,12 @@ with tab_sso:
                     f"€ {_nl(_kenm['drempel_top10'], 2)} bij de grootste 10%."
                 )
             st.caption(_tekst)
+            _toon_postgroottes_weergaven(
+                simuleer_gamma_posten(
+                    _cv_getoond, _lorenz_gemiddelde or 1.0, 5000
+                ),
+                gesimuleerd=True,
+            )
             with st.expander("Waarom een exponentiële verdeling?"):
                 st.markdown(
                     "De exponentiële verdeling is de Gamma-verdeling met "
@@ -2341,6 +2380,7 @@ with tab_sso:
                     st.pyplot(_fig_lorenz)
                     plt.close(_fig_lorenz)
                     _ke = kenmerken_empirisch(_lorenz_posten)
+                    _toon_postgroottes_weergaven(_lorenz_posten, False)
                     st.caption(
                         f"Lorenz-curve van alle posten in het bestand. CV "
                         f"{_nl(_ke['cv'], 2)}, gemiddelde € "

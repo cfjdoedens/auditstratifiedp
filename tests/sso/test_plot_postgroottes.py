@@ -95,3 +95,27 @@ def test_lorenz_per_type_post_tekent_een_lijn_per_type():
     assert len(fig.axes[0].lines) == 4  # diagonaal + 3 typen
     with pytest.raises(ValueError):
         plot_lorenz_per_type_post({})
+
+
+def test_pareto_ecdf_strip_figuren():
+    from auditstat.sso.plot_postgroottes import (
+        plot_ecdf_postgroottes,
+        plot_pareto_postgroottes,
+        plot_strip_postgroottes,
+        simuleer_gamma_posten,
+    )
+
+    w = simuleer_gamma_posten(1.0, 500.0, 3000)
+    assert w.mean() == pytest.approx(500.0, rel=0.1)
+    assert w.std() / w.mean() == pytest.approx(1.0, rel=0.1)
+    fig = plot_pareto_postgroottes(w, compact=True)
+    lijn = fig.axes[0].lines[0]
+    assert lijn.get_ydata()[-1] == pytest.approx(1.0)
+    plot_ecdf_postgroottes({"a": w, "b": w * 2})
+    plot_strip_postgroottes({"a": w}, compact=True)
+    plot_pareto_postgroottes([1.0, 2.0, 3.0])
+    assert np.all(simuleer_gamma_posten(0.0, 7.0, 10) == 7.0)
+    with pytest.raises(ValueError):
+        plot_ecdf_postgroottes({"a": [0.0, 1.0]})
+    with pytest.raises(ValueError):
+        plot_strip_postgroottes({})
