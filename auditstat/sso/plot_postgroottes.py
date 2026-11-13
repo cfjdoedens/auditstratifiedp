@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 from scipy.special import gammainc, gammaincinv, gammaln
+from scipy.stats import gamma as gamma_verdeling
 
 from auditstat._formatting import nl_getal, nl_getal_variabel, nl_tick_formatter
 
@@ -84,10 +85,51 @@ def lorenz_empirisch(waarden, max_punten: int = _PUNTEN):
     return p[idx], cum[idx], gini, top10
 
 
+def kenmerken_gamma(cv: float, gemiddelde: float | None = None) -> dict:
+    """Kenmerken van Gamma-verdeelde postbedragen met variatiecoëfficiënt ``cv``.
+
+    Geeft ``gini`` en ``top10`` (aandeel van de waarde in de grootste 10% van
+    de posten). Is ``gemiddelde`` (euro per post) bekend, dan ook ``mediaan``
+    en ``drempel_top10`` (vanaf dit bedrag hoort een post bij de grootste
+    10%). Bij ``cv = 0`` zijn alle posten gelijk aan het gemiddelde. Bij
+    ``cv = 1`` is het de exponentiële verdeling; voor ``cv >= 1`` is de
+    dichtheid dalend (kleine posten komen het vaakst voor), voor ``cv < 1``
+    ligt de modus boven nul.
+    """
+    cv = _controleer_cv(cv)
+    res = {"gini": gini_gamma(cv), "top10": aandeel_grootste_gamma(cv, 0.1)}
+    if gemiddelde is not None:
+        if cv == 0:
+            res["mediaan"] = res["drempel_top10"] = float(gemiddelde)
+        else:
+            a = 1.0 / cv**2
+            schaal = gemiddelde * cv**2
+            res["mediaan"] = float(gamma_verdeling.ppf(0.5, a, scale=schaal))
+            res["drempel_top10"] = float(gamma_verdeling.ppf(0.9, a, scale=schaal))
+    return res
+
+
+def kenmerken_empirisch(waarden) -> dict:
+    """Kenmerken van een rij postbedragen: aantal, gemiddelde, cv, mediaan,
+    drempel van de grootste 10%, gini en aandeel van de grootste 10%."""
+    w = np.asarray(waarden, dtype=float)
+    _, _, gini, top10 = lorenz_empirisch(w)
+    return {
+        "aantal": int(w.size),
+        "gemiddelde": float(w.mean()),
+        "cv": float(w.std() / w.mean()),
+        "mediaan": float(np.median(w)),
+        "drempel_top10": float(np.quantile(w, 0.9)),
+        "gini": gini,
+        "top10": top10,
+    }
+
+
 def plot_lorenz_postgroottes(
     cv: float | None = None,
     postwaarden=None,
     referentie_cvs=(0.5, 1.0, 2.0),
+    compact: bool = False,
 ) -> Figure:
     """Lorenz-curven van postgroottes.
 
@@ -98,6 +140,7 @@ def plot_lorenz_postgroottes(
     postwaarden : optioneel, rij postbedragen (niveau 3); de empirische
         Lorenz-curve wordt erbij getekend.
     referentie_cvs : dunne grijze referentiecurven, ter oriëntatie.
+    compact : kleinere figuur met de legenda onder de grafiek, voor een smalle kolom.
 
     De legenda noemt per curve de Gini-coëfficiënt en het aandeel van de
     totale waarde in de grootste 10% van de posten.
@@ -105,7 +148,7 @@ def plot_lorenz_postgroottes(
     if cv is None and postwaarden is None:
         raise ValueError("Geef een cv, postwaarden of beide.")
     p = np.linspace(0, 1, _PUNTEN + 1)
-    fig, ax = plt.subplots(figsize=(7.2, 6.0))
+    fig, ax = plt.subplots(figsize=(4.6, 4.6) if compact else (7.2, 6.0))
     ax.plot(
         [0, 1],
         [0, 1],
@@ -116,6 +159,8 @@ def plot_lorenz_postgroottes(
     )
 
     def _label(naam, gini, top10):
+        if compact:
+            return f"{naam}\nGini {nl_getal(gini, 2)}; grootste 10% = {nl_getal(100 * top10, 0)}% van de waarde"
         return f"{naam} (Gini {nl_getal(gini, 2)}; grootste 10% = {nl_getal(100 * top10, 0)}% van de waarde)"
 
     for rcv in referentie_cvs:
@@ -159,10 +204,28 @@ def plot_lorenz_postgroottes(
     ax.set_aspect("equal")
     ax.xaxis.set_major_formatter(nl_tick_formatter(1))
     ax.yaxis.set_major_formatter(nl_tick_formatter(1))
-    ax.set_xlabel("cumulatief aandeel van de posten (kleinste eerst)")
-    ax.set_ylabel("cumulatief aandeel van de totale waarde")
-    ax.set_title("Lorenz-curve van de postgroottes")
+    ax.set_xlabel(
+        "aandeel van de posten (kleinste eerst)"
+        if compact
+        else "cumulatief aandeel van de posten (kleinste eerst)",
+        fontsize=8 if compact else None,
+    )
+    ax.set_ylabel(
+        "aandeel van de totale waarde"
+        if compact
+        else "cumulatief aandeel van de totale waarde",
+        fontsize=8 if compact else None,
+    )
+    ax.set_title("Lorenz-curve van de postgroottes", fontsize=10 if compact else None)
     ax.grid(alpha=0.3)
-    ax.legend(loc="upper left", fontsize=8, frameon=True)
+    if compact:
+        ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.18),
+            fontsize=7,
+            frameon=False,
+        )
+    else:
+        ax.legend(loc="upper left", fontsize=8, frameon=True)
     fig.tight_layout()
     return fig

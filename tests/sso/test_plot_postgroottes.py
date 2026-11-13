@@ -1,3 +1,5 @@
+import math
+
 import matplotlib
 import numpy as np
 import pytest
@@ -62,3 +64,25 @@ def test_plot_wordt_getekend():
     fig = plot_lorenz_postgroottes(cv=1.5, postwaarden=[1.0, 2.0, 10.0, 50.0])
     assert fig.axes
     plt.close(fig)
+
+
+def test_kenmerken_gamma_cv_1_is_exponentieel():
+    from auditstat.sso.plot_postgroottes import kenmerken_gamma
+
+    k = kenmerken_gamma(1.0, gemiddelde=500.0)
+    assert k["gini"] == pytest.approx(0.5)
+    assert k["mediaan"] == pytest.approx(500.0 * math.log(2))
+    assert k["drempel_top10"] == pytest.approx(500.0 * math.log(10))
+
+
+def test_kenmerken_empirisch_en_compacte_figuur():
+    from auditstat.sso.plot_postgroottes import (
+        kenmerken_empirisch,
+        plot_lorenz_postgroottes,
+    )
+
+    w = np.array([1.0, 2.0, 3.0, 4.0])
+    k = kenmerken_empirisch(w)
+    assert k["aantal"] == 4 and k["gemiddelde"] == pytest.approx(2.5)
+    fig = plot_lorenz_postgroottes(cv=1.0, compact=True)
+    assert fig.get_size_inches()[0] < 6

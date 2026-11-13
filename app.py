@@ -38,6 +38,8 @@ for _poging in (1, 2):
             maak_sso_invoer_csv,
         )
         from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
+            kenmerken_empirisch,
+            kenmerken_gamma,
             plot_lorenz_postgroottes,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
@@ -222,7 +224,7 @@ for key, standaard in {
     "sso_niveau3_posten": None,
     "sso_niveau3_naam": None,
     "sso_niveau3_fout": None,
-    "sso_postgroottes": "homogeen",
+    "sso_postgroottes": "variabel",
     "sso_totaal_cv_text": SSO_TOTAAL_VOORBEELD["cv"],
     "sso_postenbestand": None,
     "sso_postenbestand_naam": None,
@@ -2195,18 +2197,15 @@ with tab_sso:
                 "klantsteekproef. Er is geen terugval bij een zeer kleine "
                 "N_klant."
             )
+        if st.session_state.sso_postgroottes == "homogeen":
+            # oude waarde (o.a. uit een CSV): alle posten even groot = CV 0
+            st.session_state.sso_postgroottes = "variabel"
         sso_postgroottes = st.radio(
             "verdeling postgroottes",
-            ["homogeen", "variabel", "postenbestand"],
+            ["variabel", "postenbestand"],
             format_func=lambda m: {
-                "homogeen": "niveau 1: alle posten even groot",
-                "variabel": "niveau 2: variatiecoëfficiënt (CV) van de postgroottes",
-                "postenbestand": (
-                    "niveau 3: postenbestand van de hele SSO"
-                    if sso_kalibratiemethode == "exact"
-                    else "niveau 3: postenbestand van de hele SSO "
-                    "(alleen de CV, dus gelijk aan niveau 2)"
-                ),
+                "variabel": "conform CV",
+                "postenbestand": "conform voorbeeldbestand",
             }[m],
             key="sso_postgroottes",
             help=(
@@ -2214,16 +2213,77 @@ with tab_sso:
                 "posten bij de klant. Zie tabblad \u2018theorie SSO\u2019."
             ),
         )
+        _lorenz_posten = None
+        _lorenz_gemiddelde = None
+        _massa_sso = _parse_nl(st.session_state.sso_totaal_massa_text)
+        _N_sso = _parse_nl(st.session_state.sso_totaal_N_text)
+        if _massa_sso and _N_sso and _massa_sso > 0 and _N_sso > 0:
+            _lorenz_gemiddelde = _massa_sso / _N_sso
         if sso_postgroottes == "variabel":
-            st.caption(
-                "Vul hieronder de CV in: bij \u00e9\u00e9n type post in stap 1, "
-                "bij meerdere typen posten in de kolom `cv` van de tabel "
-                "met typen posten. CV = standaardafwijking / gemiddelde van "
-                "de postbedragen; leeg of 0 betekent gelijke posten."
+            if "sso_totaal_cv_text" not in st.session_state:
+                st.session_state.sso_totaal_cv_text = (
+                    st.session_state.get("sso_cv_bewaard")
+                    or SSO_TOTAAL_VOORBEELD["cv"]
+                )
+            sso_totaal_cv_text = st.text_input(
+                "CV van de postbedragen",
+                key="sso_totaal_cv_text",
+                help=(
+                    "Variatiecoëfficiënt = standaardafwijking / gemiddelde "
+                    "van de postbedragen; 0 betekent alle posten even groot. "
+                    "Geldt bij \u00e9\u00e9n type post (geen onderscheid naar "
+                    "typen posten). Bij meerdere typen posten staat de CV "
+                    "per type post in de kolom `cv` van de tabel met typen "
+                    "posten."
+                ),
             )
-        elif sso_postgroottes == "postenbestand":
+            st.session_state.sso_cv_bewaard = sso_totaal_cv_text
+            _cv_veld = _parse_nl(sso_totaal_cv_text)
+            _cv_getoond = _cv_veld if _cv_veld and _cv_veld > 0 else 1.0
+            _fig_lorenz = plot_lorenz_postgroottes(cv=_cv_getoond, compact=True)
+            st.pyplot(_fig_lorenz)
+            plt.close(_fig_lorenz)
+            _kenm = kenmerken_gamma(_cv_getoond, _lorenz_gemiddelde)
+            _tekst = (
+                "Voorbeeld-Lorenz-curve bij CV "
+                f"{_nl(_cv_getoond, 2)}"
+                + (
+                    ""
+                    if _cv_veld and _cv_veld > 0
+                    else " (exponentiële verdeling; vul een CV in om de "
+                    "curve aan te passen)"
+                )
+                + ". "
+            )
+            if _lorenz_gemiddelde is not None:
+                _tekst += (
+                    f"Met het gemiddelde van de SSO (€ {_nl(_lorenz_gemiddelde, 2)} "
+                    f"per post = totale massa / N totaal) is de mediaan "
+                    f"€ {_nl(_kenm['mediaan'], 2)} en hoort een post vanaf "
+                    f"€ {_nl(_kenm['drempel_top10'], 2)} bij de grootste 10%."
+                )
+            st.caption(_tekst)
+            with st.expander("Waarom een exponentiële verdeling?"):
+                st.markdown(
+                    "De exponentiële verdeling is de Gamma-verdeling met "
+                    "CV = 1: hoe groter het bedrag, hoe zeldzamer de post. "
+                    "Het model van niveau 2 is de Gamma-familie, dus bij "
+                    "CV = 1 precies deze verdeling. Bij een CV boven 1 is "
+                    "de dichtheid ook dalend maar met een zwaardere staart; "
+                    "bij een CV onder 1 komen posten rond het gemiddelde "
+                    "het vaakst voor. De Lorenz-curve hangt alleen van de "
+                    "CV af; het gemiddelde bepaalt alleen de bedragen in "
+                    "euro\u2019s."
+                )
+        else:
+            sso_totaal_cv_text = st.session_state.get(
+                "sso_totaal_cv_text",
+                st.session_state.get("sso_cv_bewaard")
+                or SSO_TOTAAL_VOORBEELD["cv"],
+            )
+            st.session_state.sso_cv_bewaard = sso_totaal_cv_text
             st.file_uploader(
-                "Postenbestand van de hele SSO (CSV)",
+                "Voorbeeldbestand met posten van de hele SSO (CSV)",
                 type=["csv"],
                 key="sso_niveau3_upload",
                 on_change=on_sso_niveau3_upload,
@@ -2263,68 +2323,44 @@ with tab_sso:
                     "Postenbestand niet ingelezen: "
                     + st.session_state.sso_niveau3_fout
                 )
-            if st.session_state.sso_niveau3_posten is not None:
+            _niveau3_df = st.session_state.sso_niveau3_posten
+            if _niveau3_df is None:
+                st.info("Nog geen postenbestand ingelezen.")
+            else:
                 st.success(
                     f"Ingelezen: {st.session_state.sso_niveau3_naam} \u2014 "
-                    f"{len(st.session_state.sso_niveau3_posten):,} posten."
+                    f"{len(_niveau3_df):,} posten."
                 )
-            else:
-                st.info("Nog geen postenbestand ingelezen.")
+                _lorenz_posten = (_niveau3_df["bedrag_cent"] / 100).to_numpy()
+                _lorenz_posten = _lorenz_posten[_lorenz_posten > 0]
+                if _lorenz_posten.size:
+                    _fig_lorenz = plot_lorenz_postgroottes(
+                        postwaarden=_lorenz_posten, compact=True
+                    )
+                    st.pyplot(_fig_lorenz)
+                    plt.close(_fig_lorenz)
+                    _ke = kenmerken_empirisch(_lorenz_posten)
+                    st.caption(
+                        f"Lorenz-curve van alle posten in het bestand. CV "
+                        f"{_nl(_ke['cv'], 2)}, gemiddelde € "
+                        f"{_nl(_ke['gemiddelde'], 2)}, mediaan € "
+                        f"{_nl(_ke['mediaan'], 2)}; vanaf € "
+                        f"{_nl(_ke['drempel_top10'], 2)} hoort een post bij "
+                        "de grootste 10%."
+                    )
             if sso_kalibratiemethode != "exact":
                 st.caption(
                     "Bij deze berekeningsmethode wordt uit het bestand alleen "
-                    "de CV per type post afgeleid. Niveau 3 geeft dan "
-                    "hetzelfde resultaat als niveau 2 met die CV; de "
-                    "volledige verdeling van de postgroottes wordt alleen "
-                    "bij de exacte methode gebruikt."
+                    "de CV per type post afgeleid, dus hetzelfde resultaat "
+                    "als \u2018conform CV\u2019 met die CV; de volledige "
+                    "verdeling van de postgroottes wordt alleen bij de "
+                    "exacte methode gebruikt."
                 )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"
         )
 
     with col_sso_hoofd:
-        with st.expander("Wat betekent de CV voor de postgroottes?"):
-            st.markdown(
-                "De CV (variatiecoëfficiënt) is de standaardafwijking van de "
-                "postbedragen gedeeld door hun gemiddelde. De Lorenz-curve "
-                "laat zien wat dat praktisch betekent: de posten worden van "
-                "klein naar groot gesorteerd (horizontaal) en uitgezet tegen "
-                "het deel van de totale waarde dat zij samen bevatten "
-                "(verticaal). Bij gelijke posten (CV = 0) volgt de curve de "
-                "stippellijn; hoe groter de CV, hoe verder de curve eronder "
-                "zakt, dus hoe meer van de waarde in een paar grote posten "
-                "zit."
-            )
-            _cv_standaard = _parse_nl(st.session_state.sso_totaal_cv_text)
-            _cv_lorenz = st.number_input(
-                "CV om te bekijken",
-                min_value=0.0,
-                max_value=10.0,
-                value=float(_cv_standaard) if _cv_standaard else 1.0,
-                step=0.1,
-                key="sso_lorenz_cv",
-                help="Standaard de CV uit stap 1 (als die is ingevuld).",
-            )
-            _lorenz_posten = None
-            _niveau3_df = st.session_state.sso_niveau3_posten
-            if _niveau3_df is not None:
-                _lorenz_posten = (_niveau3_df["bedrag_cent"] / 100).to_numpy()
-                _lorenz_posten = _lorenz_posten[_lorenz_posten > 0]
-                if _lorenz_posten.size == 0:
-                    _lorenz_posten = None
-            _fig_lorenz = plot_lorenz_postgroottes(
-                cv=_cv_lorenz if _cv_lorenz > 0 else None,
-                postwaarden=_lorenz_posten,
-            )
-            st.pyplot(_fig_lorenz)
-            plt.close(_fig_lorenz)
-            st.caption(
-                "Blauw: Gamma-model van niveau 2 bij de gekozen CV. Rood (als "
-                "een postenbestand is ingelezen, niveau 3): de werkelijke "
-                "verdeling van alle posten in het bestand. Grijs: "
-                "referentiecurven. Gini = 0 betekent gelijke posten, dicht "
-                "bij 1 betekent dat vrijwel alle waarde in enkele posten zit."
-            )
         st.subheader("1. Totalen voor de SSO als geheel")
         with st.expander("Hoe werkt dit?"):
             st.markdown(
@@ -2374,15 +2410,6 @@ with tab_sso:
         sso_totaal_materialiteit_text = c_mat.text_input(
             "materialiteit",
             key="sso_totaal_materialiteit_text",
-        )
-        sso_totaal_cv_text = st.text_input(
-            "cv postgroottes (alleen niveau 2, bij \u00e9\u00e9n type post)",
-            key="sso_totaal_cv_text",
-            help=(
-                "Variatiecoëfficiënt (standaardafwijking / gemiddelde) van "
-                "de postbedragen. Alleen gebruikt bij niveau 2 en als je "
-                "hieronder geen onderscheid maakt naar typen posten."
-            ),
         )
 
         st.subheader("2. Klanten")
