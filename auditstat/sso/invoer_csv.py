@@ -12,15 +12,17 @@ Kolommen: ``onderdeel;klant;type_post;veld;waarde``
 =================== ======== ========= ================================================
 onderdeel           klant    type_post veld
 =================== ======== ========= ================================================
-``instelling``      leeg     leeg      model, zekerheid, berekeningsmethode, onderscheid
-``totaal``          leeg     leeg      n, k, N_totaal, massa, ihr, ibr, car, materialiteit
+``instelling``      leeg     leeg      model, zekerheid, berekeningsmethode, onderscheid,
+                                       postgroottes
+``totaal``          leeg     leeg      n, k, N_totaal, massa, ihr, ibr, car, materialiteit, cv
 ``klant``           ingevuld leeg      N_klant, waarde_laag
-``type_post``       leeg     ingevuld  n, k, ihr, ibr, car, materialiteit
+``type_post``       leeg     ingevuld  n, k, ihr, ibr, car, materialiteit, cv
 ``klant_type_post`` ingevuld ingevuld  N_klant, waarde_laag
 =================== ======== ========= ================================================
 
-``materialiteit`` mag leeg zijn (standaardwaarde van de app); alle andere
-velden zijn verplicht zodra de bijbehorende klant/post/het totaal voorkomt.
+``materialiteit`` en ``cv`` (variatiecoëfficiënt van de postgroottes, niveau 2;
+leeg = 0) mogen leeg zijn en ``postgroottes`` (homogeen/variabel/postenbestand)
+mag ontbreken; alle andere velden zijn verplicht zodra de bijbehorende klant/post/het totaal voorkomt.
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ _INSTELLING_VELDEN = {
     "zekerheid": "getal",
     "berekeningsmethode": ("momentmatching", "naief", "exact"),
     "onderscheid": ("nee", "ja"),
+    "postgroottes": ("homogeen", "variabel", "postenbestand"),
 }
 _TOTAAL_VELDEN = {
     "n": "getal",
@@ -61,6 +64,7 @@ _TOTAAL_VELDEN = {
     "ibr": _RISICO,
     "car": _RISICO,
     "materialiteit": "getal_optioneel",
+    "cv": "getal_optioneel",
 }
 _KLANT_VELDEN = {"N_klant": "getal", "waarde_laag": "getal"}
 _TYPE_POST_VELDEN = {
@@ -70,6 +74,7 @@ _TYPE_POST_VELDEN = {
     "ibr": _RISICO,
     "car": _RISICO,
     "materialiteit": "getal_optioneel",
+    "cv": "getal_optioneel",
 }
 
 # onderdeel -> (velden, klant ingevuld?, type_post ingevuld?)
@@ -82,7 +87,7 @@ _ONDERDELEN = {
 }
 
 _KLANTEN_KOLOMMEN = ["klant", "N_klant", "waarde_laag"]
-_TYPEN_POSTEN_KOLOMMEN = ["naam", "n", "k", "ihr", "ibr", "car", "materialiteit"]
+_TYPEN_POSTEN_KOLOMMEN = ["naam", "n", "k", "ihr", "ibr", "car", "materialiteit", "cv"]
 _KLANTEN_TYPEN_KOLOMMEN = ["klant", "type_post", "N_klant", "waarde_laag"]
 
 
@@ -126,7 +131,10 @@ def maak_sso_invoer_csv(
     schrijver.writerow(KOLOMMEN)
 
     for veld in _INSTELLING_VELDEN:
-        schrijver.writerow(["instelling", "", "", veld, _tekst(instellingen.get(veld))])
+        waarde = _tekst(instellingen.get(veld))
+        if veld == "postgroottes" and not waarde:
+            waarde = "homogeen"
+        schrijver.writerow(["instelling", "", "", veld, waarde])
     for veld in _TOTAAL_VELDEN:
         schrijver.writerow(["totaal", "", "", veld, _tekst(totaal.get(veld))])
 

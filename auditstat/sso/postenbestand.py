@@ -51,6 +51,43 @@ def maak_voorbeeld_postenbestand(
     })
 
 
+def maak_voorbeeld_sso_postenbestand(
+    regels: list[tuple[str, str, int, float]],
+    sigma: float = 0.9,
+    seed: int = 2026,
+) -> pd.DataFrame:
+    """Reproduceerbaar fictief postenbestand van de hele SSO (meerdere klanten).
+
+    ``regels`` bevat per (klant, type post) het aantal posten en het
+    gewenste gemiddelde bedrag; de bedragen zijn lognormaal met
+    log-standaardafwijking ``sigma`` en verwachting gelijk aan dat
+    gemiddelde. Alleen bedoeld als voorbeeld, geen statistische aanname.
+    """
+    if not regels or sigma <= 0:
+        raise ValueError("Geef minstens één regel en een positieve sigma op.")
+    rng = np.random.default_rng(seed)
+    delen = []
+    for klant, type_post, aantal, gemiddelde in regels:
+        if not klant.strip() or not type_post.strip() or aantal < 1 or gemiddelde <= 0:
+            raise ValueError(
+                "Elke regel heeft een klant, type post, positief aantal en gemiddelde nodig."
+            )
+        mu = np.log(gemiddelde) - sigma**2 / 2
+        centen = np.maximum(
+            1, np.rint(rng.lognormal(mu, sigma, int(aantal)) * 100)
+        ).astype("int64")
+        delen.append(
+            pd.DataFrame({
+                "klant": klant.strip(),
+                "type_post": type_post.strip(),
+                "bedrag": [f"{c / 100:.2f}".replace(".", ",") for c in centen],
+            })
+        )
+    df = pd.concat(delen, ignore_index=True)
+    df.insert(1, "post_id", [f"P{i:06d}" for i in range(1, len(df) + 1)])
+    return df[list(POSTEN_KOLOMMEN)]
+
+
 def postenbestand_csv(df: pd.DataFrame) -> bytes:
     """Schrijf een postenbestand als CSV (puntkomma, UTF-8 met BOM voor Excel)."""
     return (
@@ -60,14 +97,26 @@ def postenbestand_csv(df: pd.DataFrame) -> bytes:
     )
 
 
-def lees_postenbestand(data: bytes) -> pd.DataFrame:
+MAX_BYTES_SSO = 50_000_000
+MAX_POSTEN_SSO = 1_000_000
+
+
+def lees_postenbestand(data: bytes, meerdere_klanten: bool = False) -> pd.DataFrame:
     """Lees en valideer een postenbestand; gooit ``ValueError`` bij de eerste fout.
 
     Het resultaat heeft de kolommen van ``POSTEN_KOLOMMEN`` (als tekst) plus
     ``bedrag_cent`` (geheel aantal eurocenten).
+
+    Met ``meerdere_klanten=True`` (postenbestand van de hele SSO) mag het
+    bestand meerdere klanten bevatten en gelden ruimere limieten
+    (``MAX_BYTES_SSO``, ``MAX_POSTEN_SSO``).
     """
-    if len(data) > MAX_BYTES:
-        raise ValueError("Het postenbestand mag maximaal 20 MB groot zijn.")
+    max_bytes = MAX_BYTES_SSO if meerdere_klanten else MAX_BYTES
+    max_posten = MAX_POSTEN_SSO if meerdere_klanten else MAX_POSTEN
+    if len(data) > max_bytes:
+        raise ValueError(
+            f"Het postenbestand mag maximaal {max_bytes // 1_000_000} MB groot zijn."
+        )
     try:
         df = pd.read_csv(
             io.BytesIO(data),
@@ -84,15 +133,19 @@ def lees_postenbestand(data: bytes) -> pd.DataFrame:
         )
     if df.empty:
         raise ValueError("Het postenbestand bevat geen posten.")
-    if len(df) > MAX_POSTEN:
-        raise ValueError("Het postenbestand mag maximaal 100.000 posten bevatten.")
+    if len(df) > max_posten:
+        raise ValueError(
+            f"Het postenbestand mag maximaal {max_posten:,} posten bevatten.".replace(
+                ",", "."
+            )
+        )
     for kolom in POSTEN_KOLOMMEN:
         df[kolom] = df[kolom].str.strip()
         if df[kolom].eq("").any():
             raise ValueError(f"Lege waarden in kolom '{kolom}'.")
     if df["post_id"].duplicated().any():
         raise ValueError("De kolom post_id bevat dubbele identificaties.")
-    if df["klant"].nunique() != 1:
+    if not meerdere_klanten and df["klant"].nunique() != 1:
         raise ValueError("Een postenbestand mag slechts één klant bevatten.")
     centen = []
     for i, waarde in enumerate(df["bedrag"], 1):
@@ -120,3 +173,29 @@ def totalen_per_type_post(df: pd.DataFrame) -> pd.DataFrame:
     )
     totalen["waarde_laag"] = totalen["bedrag_cent"] / 100
     return totalen
+
+
+def postgroottes_per_type_post(df: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Postbedragen (euro's) per type post, uit een postenbestand.
+
+    Voor niveau 3 van de SSO-evaluatie: de empirische verdeling van de
+    postgroottes per type post.
+    """
+    return {
+        type_post: groep["bedrag_cent"].to_numpy(dtype=float) / 100
+        for type_post, groep in df.groupby("type_post")
+    }
+
+
+def variatiecoefficient(waarden) -> float:
+    """Variatiecoëfficiënt (standaardafwijking / gemiddelde) van postbedragen.
+
+    Gebruikt de populatiestandaardafwijking (``ddof=0``): het bestand wordt
+    opgevat als de populatie van posten.
+    """
+    waarden = np.asarray(waarden, dtype=float)
+    if waarden.size == 0 or not np.all(waarden > 0):
+        raise ValueError(
+            "Postbedragen moeten een niet-lege rij positieve getallen zijn."
+        )
+    return float(waarden.std() / waarden.mean())

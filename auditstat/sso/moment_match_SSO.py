@@ -1,7 +1,10 @@
 import math
 import warnings
 
+import numpy as np
 from scipy.stats import betabinom, nbinom
+
+from auditstat.sso.compound_postwaarden import kansmassa_compound
 
 # Standaardzekerheid waarop, uitsluitend bij klemming (k_eff < 0), het
 # vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de exacte
@@ -19,7 +22,9 @@ def _procent(zekerheid):
     return f"{zekerheid * 100:g}".replace(".", ",") + "%"
 
 
-def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE):
+def _max_fout_exact(
+    n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE, cv=0.0
+):
     """De exacte maximale foutfractie bij ``zekerheid`` binnen het
     samengestelde voorspellende model van het aantal fouten bij de klant —
     Beta-Binomiaal (binomiaal) resp. Negatief-Binomiaal (poisson) — zonder
@@ -50,6 +55,15 @@ def _max_fout_exact(n, k, N_klant, verdeling, zekerheid=_ZEKERHEID_VOOR_KLEMKALI
     achtergrond waarom dit soort getrapte, exacte berekening niet
     rechtstreeks aan gebruikers wordt getoond.
     """
+    if cv > 0:
+        # Niveau 2: de fout is de som van K Gamma-verdeelde postwaarden (zie
+        # compound_postwaarden); de grens volgt uit de numerieke verdeling op
+        # een rooster van 20.000 cellen en is naar boven afgerond.
+        aantal = max(int(round(N_klant)), 1)
+        dx = aantal / 20_000
+        massa = kansmassa_compound(verdeling, n, k, aantal, aantal, ("gamma", cv), dx)
+        index = int(np.searchsorted(np.cumsum(massa), zekerheid - 1e-12))
+        return min(index, len(massa) - 1) * dx / aantal
     if verdeling == "binomiaal":
         x = betabinom.ppf(zekerheid, N_klant, k + 1, n - k + 1)
     else:
@@ -109,7 +123,12 @@ def _kalibreer_k_eff_nul_op_exacte_grens(doel_max_fout, verdeling, zekerheid):
 
 
 def moment_match_SSO(
-    n, k, N_klant, verdeling="binomiaal", zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE
+    n,
+    k,
+    N_klant,
+    verdeling="binomiaal",
+    zekerheid=_ZEKERHEID_VOOR_KLEMKALIBRATIE,
+    cv=0.0,
 ):
     """
     Kalibreert een effectieve steekproefomvang (n_eff) en een effectief
@@ -232,6 +251,15 @@ def moment_match_SSO(
         sluitend. Bij momentmatching zonder klemming heeft de waarde geen
         invloed. Een hogere zekerheid maakt een volledige blinde vlek
         minder, een lagere juist vaker waarschijnlijk.
+    cv : float, standaard 0
+        Variatiecoëfficiënt van de postgroottes (niveau 2 van de theorie).
+        De variantie van de foutfractie bij de klant wordt dan
+        ``Var(X) = Var(X | cv = 0) + cv² · E[X] / N_klant`` (afgeleid via de
+        wet van de totale variantie voor een som van ``K`` postwaarden).
+        Bij ``cv = 0`` is het resultaat ongewijzigd. Bij klemming wordt de
+        grens waarop gekalibreerd wordt dan numeriek bepaald (som van ``K``
+        Gamma-verdeelde postwaarden), niet meer met de Beta-Binomiale
+        formule.
 
     Returns
     -------
@@ -248,12 +276,15 @@ def moment_match_SSO(
         raise ValueError("k mag niet groter zijn dan n.")
     if not 0 < zekerheid < 1:
         raise ValueError("zekerheid moet tussen 0 en 1 liggen.")
+    if not cv >= 0 or cv == float("inf"):
+        raise ValueError("cv moet een eindig getal >= 0 zijn.")
 
     if verdeling == "binomiaal":
         alpha, beta_ = k + 1, n - k + 1
         s = alpha + beta_
         gemiddelde = alpha / s
         variantie = alpha * beta_ * (s + N_klant) / (s**2 * (s + 1) * N_klant)
+        variantie += cv**2 * gemiddelde / N_klant
         s_eff = gemiddelde * (1 - gemiddelde) / variantie - 1
         n_eff = s_eff - 2
         k_eff = gemiddelde * s_eff - 1
@@ -265,6 +296,7 @@ def moment_match_SSO(
         variantie_aantal = r * (1 - p_succes) / p_succes**2
         gemiddelde = gemiddelde_aantal / N_klant
         variantie = variantie_aantal / N_klant**2
+        variantie += cv**2 * gemiddelde / N_klant
         n_eff = gemiddelde / variantie
         k_eff = gemiddelde**2 / variantie - 1
 
@@ -273,7 +305,7 @@ def moment_match_SSO(
 
     geklemd = False
     if k_eff < 0:
-        exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid)
+        exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid, cv)
         if exact_doel <= 0.0:
             # De exacte grens is hier zelf 0 (zeer kleine N_klant en/of
             # k = 0, zodat zelfs bij de gekozen zekerheid 0 fouten te
@@ -310,7 +342,7 @@ def moment_match_SSO(
         # nooit ver genoeg boven 1 uitkomen om deze klem te bereiken), dus
         # die tak behoudt de eenvoudige klem als defensieve terugval.
         if verdeling == "binomiaal":
-            exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid)
+            exact_doel = _max_fout_exact(n, k, N_klant, verdeling, zekerheid, cv)
             if exact_doel >= 1.0:
                 # Spiegelbeeld van de blinde vlek hierboven: de exacte
                 # grens is hier zelf al 1 (vrijwel zekere 100% fout), en

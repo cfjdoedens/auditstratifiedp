@@ -53,7 +53,7 @@ def test_blok_zonder_label_geeft_value_error():
 
 def test_echte_theorie_qmd_is_consistent():
     t = lees_theorie_qmd(QMD)
-    assert len(t.secties) == 5
+    assert len(t.secties) == 7
     figuren = [b for s in t.secties for b in s.blokken if isinstance(b, Figuur)]
     assert {f.label for f in figuren} == set(THEORIE_FIGUREN)
     assert all(f.bijschrift for f in figuren)

@@ -41,8 +41,11 @@ for _poging in (1, 2):
             POSTEN_KOLOMMEN,
             lees_postenbestand,
             maak_voorbeeld_postenbestand,
+            maak_voorbeeld_sso_postenbestand,
             postenbestand_csv,
+            postgroottes_per_type_post,
             totalen_per_type_post,
+            variatiecoefficient,
         )
         from auditstat.sso.schema_figuren import (  # pyrefly: ignore[missing-import]
             THEORIE_FIGUREN,
@@ -149,6 +152,7 @@ LEGE_SSO_TYPEN_POSTEN_DF = pd.DataFrame({
     "ibr": ["H", "H"],
     "car": ["H", "H"],
     "materialiteit": ["0,01", "0,01"],
+    "cv": ["0,00", "0,00"],
 })
 
 LEGE_SSO_KLANTEN_DF = pd.DataFrame({
@@ -179,6 +183,7 @@ SSO_TOTAAL_VOORBEELD = {
     "N_totaal": "5.000",
     "massa": "2.500.000,00",
     "materialiteit": "0,01",
+    "cv": "0,00",
 }
 
 # Initialiseer de sessiestatus met standaardwaarden voor de plannings- en evaluatieberekening.
@@ -211,6 +216,11 @@ for key, standaard in {
     "sso_klanten_totaal_tabel": LEGE_SSO_KLANTEN_TOTAAL_DF.copy(),
     "sso_klanten_totaal_tabel_key": 0,
     "sso_csv_upload_key": 0,
+    "sso_niveau3_posten": None,
+    "sso_niveau3_naam": None,
+    "sso_niveau3_fout": None,
+    "sso_postgroottes": "homogeen",
+    "sso_totaal_cv_text": SSO_TOTAAL_VOORBEELD["cv"],
     "sso_postenbestand": None,
     "sso_postenbestand_naam": None,
     "sso_postenbestand_fout": None,
@@ -262,6 +272,36 @@ def _parse_nl(waarde) -> float | None:
         return float(tekst)
     except ValueError:
         return None
+
+
+# Sleutel voor "alle posten samen" in het postenbestand van de hele SSO.
+_ALLE_POSTEN = "\x00alle posten"
+
+
+def _lees_cv(ruw, label: str, fouten: list) -> float:
+    """CV-cel als getal >= 0; leeg is 0, een ongeldige waarde geeft een fout."""
+    if ruw is None or (not isinstance(ruw, str) and pd.isna(ruw)):
+        return 0.0
+    tekst = str(ruw).strip()
+    if tekst == "":
+        return 0.0
+    waarde = _parse_nl(tekst)
+    if waarde is None or waarde < 0:
+        fouten.append(
+            f"{label}: veld 'cv' (\"{tekst}\") is geen geldig getal van "
+            "minstens 0."
+        )
+        return 0.0
+    return waarde
+
+
+def _cv_voor_rapport(naam, cv_ruw, postgroottes: str, niveau3_cv: dict) -> str:
+    """CV zoals gebruikt in de berekening, als NL-tekst voor het rapport."""
+    if postgroottes == "homogeen":
+        return "0,00"
+    if postgroottes == "postenbestand":
+        return _nl(niveau3_cv[naam], 2) if naam in niveau3_cv else ""
+    return "" if cv_ruw is None or pd.isna(cv_ruw) else str(cv_ruw)
 
 
 def _parse_nl_kolom(series: pd.Series) -> pd.Series:
@@ -601,14 +641,26 @@ def on_sso_typen_posten_tabel_change():
     # 2. Voeg de nieuwe rijen vast onderaan toe (inclusief referentie in oude_df).
     for row in state.get("added_rows", []):
         new_row = {col: "" for col in df.columns}
-        new_row.update({"ihr": "H", "ibr": "H", "car": "H", "materialiteit": "0,01"})
+        new_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "cv": "0,00",
+        })
         for col, val in row.items():
             if val is not None:
                 new_row[col] = str(val).strip()
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
         base_row = {col: "" for col in df.columns}
-        base_row.update({"ihr": "H", "ibr": "H", "car": "H", "materialiteit": "0,01"})
+        base_row.update({
+            "ihr": "H",
+            "ibr": "H",
+            "car": "H",
+            "materialiteit": "0,01",
+            "cv": "0,00",
+        })
         oude_df = pd.concat([oude_df, pd.DataFrame([base_row])], ignore_index=True)
 
     # 3. Voer één uniforme, waterdichte validatielus uit over álle rijen.
@@ -655,6 +707,18 @@ def on_sso_typen_posten_tabel_change():
                 revert_cel("materialiteit", "materialiteit moet groter zijn dan 0")
             else:
                 df.at[idx, "materialiteit"] = _format_nl_auto(mat_str, 2)
+
+        # cv (variatiecoëfficiënt van de postgroottes, niveau 2) is optioneel
+        # (leeg = 0), maar moet, als ingevuld, een getal >= 0 zijn.
+        cv_str = str(df.at[idx, "cv"]).strip()
+        if cv_str != "":
+            cv_num = _parse_nl(cv_str)
+            if cv_num is None:
+                revert_cel("cv", f'"{cv_str}" is geen geldig getal voor cv')
+            elif cv_num < 0:
+                revert_cel("cv", "cv mag niet negatief zijn")
+            else:
+                df.at[idx, "cv"] = _format_nl_auto(cv_str, 2)
 
         # Relatieve controle ná correctie van de individuele velden.
         n_val = _parse_nl(df.at[idx, "n"])
@@ -855,6 +919,7 @@ SSO_CSV_INSTELLING_SLEUTELS = {
     "zekerheid": "sso_zekerheid_text",
     "berekeningsmethode": "sso_kalibratiemethode",
     "onderscheid": "sso_onderscheid",
+    "postgroottes": "sso_postgroottes",
 }
 SSO_CSV_TOTAAL_SLEUTELS = {
     "n": "sso_totaal_n_text",
@@ -865,6 +930,7 @@ SSO_CSV_TOTAAL_SLEUTELS = {
     "ibr": "sso_totaal_ibr",
     "car": "sso_totaal_car",
     "materialiteit": "sso_totaal_materialiteit_text",
+    "cv": "sso_totaal_cv_text",
 }
 
 
@@ -917,6 +983,7 @@ def _sso_totalen_status():
         "sso_totaal_N_text": "N_totaal",
         "sso_totaal_massa_text": "massa",
         "sso_totaal_materialiteit_text": "materialiteit",
+        "sso_totaal_cv_text": "cv",
     }
     gelijk = [
         _sso_cel(st.session_state.get(sleutel)) == SSO_TOTAAL_VOORBEELD[veld]
@@ -999,7 +1066,7 @@ def on_sso_csv_upload():
         (
             "typen_posten",
             "sso_typen_posten_tabel",
-            {"n": 0, "k": 0, "materialiteit": 2},
+            {"n": 0, "k": 0, "materialiteit": 2, "cv": 2},
         ),
         (
             "klanten_typen",
@@ -1044,6 +1111,27 @@ def on_sso_csv_upload():
         + "".join(f", {tekst}" for tekst in ingelezen)
         + ". Klik op \u2018evalueer alle klanten\u2019 om te rekenen.",
     )
+
+
+def on_sso_niveau3_upload():
+    """Lees het postenbestand van de hele SSO in (niveau 3)."""
+    bestand = st.session_state.get("sso_niveau3_upload")
+    if bestand is None:
+        st.session_state.sso_niveau3_posten = None
+        st.session_state.sso_niveau3_naam = None
+        st.session_state.sso_niveau3_fout = None
+        return
+    try:
+        gelezen = lees_postenbestand(bestand.getvalue(), meerdere_klanten=True)
+    except ValueError as exc:
+        st.session_state.sso_niveau3_fout = str(exc)
+        return  # Bij fout blijft een eerder geldig bestand bewaard.
+    st.session_state.sso_niveau3_posten = gelezen
+    st.session_state.sso_niveau3_naam = bestand.name
+    st.session_state.sso_niveau3_fout = None
+    st.session_state.sso_klanten_res = {}
+    st.session_state.sso_klanten_waarschuwingen = {}
+    st.session_state.sso_totaal_res = None
 
 
 def on_sso_postenbestand_upload():
@@ -2104,6 +2192,81 @@ with tab_sso:
                 "klantsteekproef. Er is geen terugval bij een zeer kleine "
                 "N_klant."
             )
+        sso_postgroottes = st.radio(
+            "informatie over postgroottes",
+            ["homogeen", "variabel", "postenbestand"],
+            format_func=lambda m: {
+                "homogeen": "niveau 1: alle posten even groot",
+                "variabel": "niveau 2: variatiecoëfficiënt (CV) van de postgroottes",
+                "postenbestand": "niveau 3: postenbestand van de hele SSO",
+            }[m],
+            key="sso_postgroottes",
+            help=(
+                "Bepaalt hoe de fout in euro\u2019s volgt uit het aantal foute "
+                "posten bij de klant. Zie tabblad \u2018theorie SSO\u2019."
+            ),
+        )
+        if sso_postgroottes == "variabel":
+            st.caption(
+                "Vul hieronder de CV in: bij \u00e9\u00e9n type post in stap 1, "
+                "bij meerdere typen posten in de kolom `cv` van de tabel "
+                "met typen posten. CV = standaardafwijking / gemiddelde van "
+                "de postbedragen; leeg of 0 betekent gelijke posten."
+            )
+        elif sso_postgroottes == "postenbestand":
+            st.file_uploader(
+                "Postenbestand van de hele SSO (CSV)",
+                type=["csv"],
+                key="sso_niveau3_upload",
+                on_change=on_sso_niveau3_upload,
+                help=(
+                    "Kolommen klant;post_id;type_post;bedrag, scheidingsteken "
+                    "';', meerdere klanten toegestaan (maximaal 50 MB of 1 "
+                    "miljoen posten). Bij onderscheid naar typen posten moet "
+                    "`type_post` overeenkomen met de namen in de tabel; "
+                    "anders worden alle posten samen gebruikt."
+                ),
+            )
+            st.download_button(
+                "Voorbeeld-postenbestand downloaden (CSV)",
+                data=postenbestand_csv(
+                    maak_voorbeeld_sso_postenbestand([
+                        (
+                            r["klant"],
+                            r["type_post"],
+                            int(_parse_nl(r["N_klant"])),
+                            _parse_nl(r["waarde_laag"]) / _parse_nl(r["N_klant"]),
+                        )
+                        for r in LEGE_SSO_KLANTEN_DF.to_dict("records")
+                    ])
+                ),
+                file_name="postenbestand_sso_voorbeeld.csv",
+                mime="text/csv",
+                key="sso_niveau3_voorbeeld_download",
+                help=(
+                    "Fictieve posten van de hele SSO (5.000 posten, twee "
+                    "klanten, typen Emolumenten en Inkoopfacturen), passend "
+                    "bij de voorbeeldinvoer. De bedragen zijn verzonnen."
+                ),
+            )
+            if st.session_state.sso_niveau3_fout:
+                st.error(
+                    "Postenbestand niet ingelezen: "
+                    + st.session_state.sso_niveau3_fout
+                )
+            if st.session_state.sso_niveau3_posten is not None:
+                st.success(
+                    f"Ingelezen: {st.session_state.sso_niveau3_naam} \u2014 "
+                    f"{len(st.session_state.sso_niveau3_posten):,} posten."
+                )
+            else:
+                st.info("Nog geen postenbestand ingelezen.")
+            if sso_kalibratiemethode != "exact":
+                st.caption(
+                    "Bij deze berekeningsmethode wordt alleen de CV per type "
+                    "post uit het bestand gebruikt; de volledige verdeling "
+                    "van de postgroottes alleen bij de exacte methode."
+                )
         sso_bereken = st.button(
             "evalueer alle klanten", type="primary", key="sso_bereken"
         )
@@ -2158,6 +2321,15 @@ with tab_sso:
         sso_totaal_materialiteit_text = c_mat.text_input(
             "materialiteit",
             key="sso_totaal_materialiteit_text",
+        )
+        sso_totaal_cv_text = st.text_input(
+            "cv postgroottes (alleen niveau 2, bij \u00e9\u00e9n type post)",
+            key="sso_totaal_cv_text",
+            help=(
+                "Variatiecoëfficiënt (standaardafwijking / gemiddelde) van "
+                "de postbedragen. Alleen gebruikt bij niveau 2 en als je "
+                "hieronder geen onderscheid maakt naar typen posten."
+            ),
         )
 
         st.subheader("2. Klanten")
@@ -2238,6 +2410,14 @@ with tab_sso:
                             "Materialiteit voor dit type post. Opgevat als "
                             "fractie als \u2264 1 (bijv. 0,01) anders als "
                             "bedrag in euro\u2019s."
+                        ),
+                    ),
+                    "cv": st.column_config.TextColumn(
+                        "cv",
+                        help=(
+                            "Variatiecoëfficiënt van de postbedragen van "
+                            "dit type post (alleen niveau 2; leeg of 0 = "
+                            "gelijke posten)."
                         ),
                     ),
                 },
@@ -2428,6 +2608,7 @@ with tab_sso:
                     "zekerheid": sso_zekerheid_text,
                     "berekeningsmethode": sso_kalibratiemethode,
                     "onderscheid": sso_onderscheid,
+                    "postgroottes": sso_postgroottes,
                 },
                 totaal={
                     "n": sso_totaal_n_text,
@@ -2438,6 +2619,7 @@ with tab_sso:
                     "ibr": sso_totaal_ibr,
                     "car": sso_totaal_car,
                     "materialiteit": sso_totaal_materialiteit_text,
+                    "cv": sso_totaal_cv_text,
                 },
                 klanten=st.session_state.sso_klanten_totaal_tabel,
                 typen_posten=st.session_state.sso_typen_posten_tabel,
@@ -2458,6 +2640,7 @@ with tab_sso:
                     "zekerheid": "0,95",
                     "berekeningsmethode": "momentmatching",
                     "onderscheid": "ja",
+                    "postgroottes": "homogeen",
                 },
                 totaal={
                     **SSO_TOTAAL_VOORBEELD,
@@ -2485,12 +2668,13 @@ with tab_sso:
                 "|---|---|---|---|\n"
                 "| `instelling` | leeg | leeg | `model` (binomiaal/poisson), "
                 "`zekerheid`, `berekeningsmethode` (momentmatching/naief/exact), "
-                "`onderscheid` (nee/ja) |\n"
+                "`onderscheid` (nee/ja), `postgroottes` "
+                "(homogeen/variabel/postenbestand) |\n"
                 "| `totaal` | leeg | leeg | `n`, `k`, `N_totaal`, `massa`, "
-                "`ihr`, `ibr`, `car`, `materialiteit` |\n"
+                "`ihr`, `ibr`, `car`, `materialiteit`, `cv` |\n"
                 "| `klant` | naam | leeg | `N_klant`, `waarde_laag` |\n"
                 "| `type_post` | leeg | naam | `n`, `k`, `ihr`, `ibr`, `car`, "
-                "`materialiteit` |\n"
+                "`materialiteit`, `cv` |\n"
                 "| `klant_type_post` | naam | naam | `N_klant`, "
                 "`waarde_laag` |\n\n"
                 "Regels voor het inlezen:\n"
@@ -2499,7 +2683,9 @@ with tab_sso:
                 "(`1.500.000,00`). `1234.56` wordt geweigerd, omdat het "
                 "dubbelzinnig is.\n"
                 "- `ihr`, `ibr`, `car` zijn `H`, `M` of `L`; `materialiteit` "
-                "mag leeg zijn (standaard 0,01).\n"
+                "mag leeg zijn (standaard 0,01); `cv` (niveau 2) mag leeg "
+                "zijn (= 0). Een postenbestand voor niveau 3 wordt apart "
+                "ingelezen en zit niet in dit bestand.\n"
                 "- Alle velden van een klant, type post of het totaal zijn "
                 "verplicht; dubbele regels worden geweigerd.\n"
                 "- Bij `onderscheid = ja` zijn zowel `type_post`- als "
@@ -2515,6 +2701,50 @@ with tab_sso:
         sso_zekerheid = _parse_nl(sso_zekerheid_text)
         klanten_fouten = []
         klanten_rijen_per_klant = {}
+
+        # Postgroottes: niveau 1 (cv = 0), niveau 2 (cv uit invoer) of
+        # niveau 3 (cv en, bij de exacte methode, de volledige verdeling uit
+        # het postenbestand van de hele SSO).
+        niveau3_waarden = {}
+        niveau3_cv = {}
+        if sso_postgroottes == "postenbestand":
+            niveau3_df = st.session_state.sso_niveau3_posten
+            if niveau3_df is None:
+                klanten_fouten.append(
+                    "Niveau 3: lees eerst een postenbestand van de hele SSO in."
+                )
+            else:
+                niveau3_waarden = postgroottes_per_type_post(niveau3_df)
+                niveau3_waarden[_ALLE_POSTEN] = niveau3_df["bedrag_cent"].to_numpy(
+                    dtype=float
+                ) / 100
+                niveau3_cv = {
+                    naam: variatiecoefficient(w) for naam, w in niveau3_waarden.items()
+                }
+        niveau3_exact = sso_kalibratiemethode == "exact"
+
+        def _postgroottes_velden(naam: str, cv_ruw, label=None) -> dict:
+            """cv (en evt. postwaarden) voor een type post, volgens het niveau.
+
+            `naam` is de sleutel in het postenbestand (`_ALLE_POSTEN` voor alle
+            posten samen, bij onderscheid = nee); `label` de naam in meldingen.
+            """
+            label = label or f"Type post '{naam}'"
+            if sso_postgroottes == "homogeen":
+                return {"cv": 0.0}
+            if sso_postgroottes == "variabel":
+                return {"cv": _lees_cv(cv_ruw, label, klanten_fouten)}
+            if naam not in niveau3_waarden:
+                if niveau3_waarden:
+                    klanten_fouten.append(
+                        f"{label}: komt niet voor als type_post in "
+                        "het postenbestand van de hele SSO."
+                    )
+                return {"cv": 0.0}
+            velden = {"cv": niveau3_cv[naam]}
+            if niveau3_exact:
+                velden["postwaarden"] = niveau3_waarden[naam]
+            return velden
 
         if sso_onderscheid == "nee":
             sso_totaal_n_val = _parse_nl(sso_totaal_n_text)
@@ -2539,6 +2769,9 @@ with tab_sso:
                     "SSO-totalen: veld 'materialiteit' "
                     f'("{sso_totaal_materialiteit_text}") is geen geldig getal.'
                 )
+            sso_totaal_postgroottes = _postgroottes_velden(
+                _ALLE_POSTEN, sso_totaal_cv_text, label="SSO-totalen"
+            )
 
             sso_klanten_totaal_rijen = [
                 r
@@ -2588,6 +2821,7 @@ with tab_sso:
                         ),
                         N_klant=N_klant_val,
                         waarde_laag=waarde_laag_val,
+                        **sso_totaal_postgroottes,
                     )
                 }
 
@@ -2641,6 +2875,7 @@ with tab_sso:
                         materialiteit=(
                             materialiteit_val if materialiteit_val is not None else 0.01
                         ),
+                        **_postgroottes_velden(naam, rij.get("cv")),
                     )
 
             if not sso_typen_posten_per_naam and not klanten_fouten:
@@ -2816,6 +3051,7 @@ with tab_sso:
                     "zekerheid": sso_zekerheid_text,
                     "berekeningsmethode": sso_kalibratiemethode,
                     "onderscheid": sso_onderscheid,
+                    "postgroottes": sso_postgroottes,
                 },
                 "totaal": {
                     "n": sso_totaal_n_text,
@@ -2826,9 +3062,21 @@ with tab_sso:
                     "ibr": sso_totaal_ibr,
                     "car": sso_totaal_car,
                     "materialiteit": sso_totaal_materialiteit_text,
+                    "cv": _cv_voor_rapport(
+                        _ALLE_POSTEN, sso_totaal_cv_text, sso_postgroottes, niveau3_cv
+                    ),
                 },
                 "klanten": st.session_state.sso_klanten_totaal_tabel.copy(),
-                "typen_posten": st.session_state.sso_typen_posten_tabel.copy(),
+                "typen_posten": st.session_state.sso_typen_posten_tabel.copy().assign(
+                    cv=lambda d: d["naam"].apply(
+                        lambda naam: _cv_voor_rapport(
+                            str(naam).strip(),
+                            d.loc[d["naam"] == naam, "cv"].iloc[0],
+                            sso_postgroottes,
+                            niveau3_cv,
+                        )
+                    )
+                ),
                 "klanten_typen": st.session_state.sso_klanten_tabel.copy(),
             }
 

@@ -5,8 +5,11 @@ from auditstat.sso.postenbestand import (
     POSTEN_KOLOMMEN,
     lees_postenbestand,
     maak_voorbeeld_postenbestand,
+    maak_voorbeeld_sso_postenbestand,
     postenbestand_csv,
+    postgroottes_per_type_post,
     totalen_per_type_post,
+    variatiecoefficient,
 )
 
 KOP = ";".join(POSTEN_KOLOMMEN) + "\n"
@@ -95,7 +98,7 @@ def test_te_groot_bestand_wordt_geweigerd(monkeypatch):
     import auditstat.sso.postenbestand as mod
 
     monkeypatch.setattr(mod, "MAX_BYTES", 10)
-    with pytest.raises(ValueError, match="20 MB"):
+    with pytest.raises(ValueError, match="MB groot"):
         _lees(KOP + _rij())
 
 
@@ -103,7 +106,7 @@ def test_te_veel_posten_wordt_geweigerd(monkeypatch):
     import auditstat.sso.postenbestand as mod
 
     monkeypatch.setattr(mod, "MAX_POSTEN", 1)
-    with pytest.raises(ValueError, match="100.000"):
+    with pytest.raises(ValueError, match="maximaal 1 posten"):
         _lees(KOP + _rij() + _rij(post_id="2"))
 
 
@@ -120,3 +123,55 @@ def test_totalen_per_type_post():
     assert t.loc["E", "waarde_laag"] == pytest.approx(10.15)
     assert t.loc["I", "N_klant"] == 1
     assert t["bedrag_cent"].sum() == 1715
+
+
+def test_meerdere_klanten_alleen_toegestaan_voor_sso_bestand():
+    tekst = KOP + _rij("1", "A") + _rij("2", "B")
+    with pytest.raises(ValueError, match="één klant"):
+        lees_postenbestand(tekst.encode())
+    df = lees_postenbestand(tekst.encode(), meerdere_klanten=True)
+    assert df["klant"].nunique() == 2
+
+
+def test_sso_bestand_heeft_ruimere_limieten(monkeypatch):
+    from auditstat.sso import postenbestand as mod
+
+    monkeypatch.setattr(mod, "MAX_POSTEN_SSO", 1)
+    tekst = KOP + _rij("1", "A") + _rij("2", "B")
+    with pytest.raises(ValueError, match="maximaal 1 posten"):
+        lees_postenbestand(tekst.encode(), meerdere_klanten=True)
+
+
+def test_postgroottes_per_type_post_en_variatiecoefficient():
+    tekst = KOP + _rij("1", "A", "X", "2,00") + _rij("2", "B", "X", "4,00")
+    tekst += _rij("3", "B", "Y", "10,00")
+    df = lees_postenbestand(tekst.encode(), meerdere_klanten=True)
+    waarden = postgroottes_per_type_post(df)
+    assert sorted(waarden["X"]) == [2.0, 4.0]
+    assert list(waarden["Y"]) == [10.0]
+    assert variatiecoefficient(waarden["X"]) == pytest.approx(1 / 3)
+    assert variatiecoefficient(waarden["Y"]) == 0.0
+
+
+def test_variatiecoefficient_weigert_lege_of_niet_positieve_rij():
+    with pytest.raises(ValueError):
+        variatiecoefficient([])
+    with pytest.raises(ValueError):
+        variatiecoefficient([1.0, 0.0])
+
+
+def test_voorbeeld_sso_postenbestand_is_geldig_en_reproduceerbaar():
+    regels = [("A", "E", 400, 500.0), ("B", "E", 300, 500.0), ("B", "I", 200, 800.0)]
+    a = maak_voorbeeld_sso_postenbestand(regels)
+    b = maak_voorbeeld_sso_postenbestand(regels)
+    pd.testing.assert_frame_equal(a, b)
+    gelezen = lees_postenbestand(postenbestand_csv(a), meerdere_klanten=True)
+    assert len(gelezen) == 900
+    assert gelezen["klant"].nunique() == 2
+    gem = gelezen[gelezen["type_post"] == "E"]["bedrag_cent"].mean() / 100
+    assert gem == pytest.approx(500, rel=0.2)
+
+
+def test_voorbeeld_sso_postenbestand_weigert_lege_invoer():
+    with pytest.raises(ValueError):
+        maak_voorbeeld_sso_postenbestand([])

@@ -68,7 +68,13 @@ _INSTELLING_LABELS = [
     ("zekerheid", "Zekerheid"),
     ("berekeningsmethode", "Berekeningsmethode"),
     ("onderscheid", "Onderscheid naar typen posten"),
+    ("postgroottes", "Informatie over postgroottes"),
 ]
+_POSTGROOTTES_LABELS = {
+    "homogeen": "Niveau 1: homogene posten",
+    "variabel": "Niveau 2: variabele postgroottes (CV)",
+    "postenbestand": "Niveau 3: postenbestand van de hele SSO",
+}
 _TOTAAL_LABELS = [
     ("n", "n (steekproefomvang)"),
     ("k", "k (fouten)"),
@@ -78,6 +84,7 @@ _TOTAAL_LABELS = [
     ("ibr", "ibr"),
     ("car", "car"),
     ("materialiteit", "Materialiteit"),
+    ("cv", "CV postgroottes"),
 ]
 
 
@@ -418,6 +425,34 @@ def _methode_onderdelen(
             "eerste trap: het overeenkomende aantal foutloze posten (HARo) "
             "is bij de SSO-n opgeteld vóór de kalibratie."
         )
+    postgroottes = instellingen.get("postgroottes", "homogeen")
+    if postgroottes == "variabel":
+        onderdelen += [
+            Paragraph("Postgroottes (niveau 2)", stijlen["kop2"]),
+            alinea(
+                "De postgroottes bij de klant zijn niet gelijk: ze hebben "
+                "per type post een variatiecoëfficiënt (CV, "
+                "standaardafwijking gedeeld door gemiddelde). De fout in "
+                "euro\u2019s is de som van de bedragen van de foute posten; "
+                "die bedragen worden gamma-verdeeld verondersteld met het "
+                "gemiddelde waarde/N_klant en de opgegeven CV. Alleen "
+                "gemiddelde en variantie komen uit de gegevens; de gammavorm "
+                "is een keuze. Er wordt getrokken met teruglegging "
+                "(licht conservatief)."
+            ),
+        ]
+    elif postgroottes == "postenbestand":
+        onderdelen += [
+            Paragraph("Postgroottes (niveau 3)", stijlen["kop2"]),
+            alinea(
+                "De postgroottes volgen uit het postenbestand van de hele "
+                "SSO. Bij de exacte methode is de empirische verdeling van "
+                "de bedragen per type post gebruikt (herschaald naar het "
+                "gemiddelde waarde/N_klant van de klant, getrokken met "
+                "teruglegging); bij de andere methoden is daaruit alleen de "
+                "variatiecoëfficiënt per type post afgeleid."
+            ),
+        ]
     onderdelen += [
         Paragraph("Combineren en uitkomst", stijlen["kop2"]),
         alinea(combineren),
@@ -532,6 +567,9 @@ def maak_sso_rapport_pdf(
         instellingen.get("berekeningsmethode", ""),
     )
     weergave["onderscheid"] = "ja" if onderscheid == "ja" else "nee"
+    weergave["postgroottes"] = _POSTGROOTTES_LABELS.get(
+        instellingen.get("postgroottes", "homogeen"), "Niveau 1: homogene posten"
+    )
     onderdelen.append(
         _tabel(
             ["Instelling", "Waarde"],
@@ -567,9 +605,10 @@ def maak_sso_rapport_pdf(
                     "ibr": "ibr",
                     "car": "car",
                     "materialiteit": "Materialiteit",
+                    "cv": "CV",
                 },
-                {"n", "k", "materialiteit"},
-                [0.26, 0.12, 0.08, 0.1, 0.1, 0.1, 0.24],
+                {"n", "k", "materialiteit", "cv"},
+                [0.22, 0.1, 0.08, 0.09, 0.09, 0.09, 0.19, 0.14],
             ),
             (
                 "Klanten per type post",
@@ -731,7 +770,13 @@ def maak_sso_rapport_pdf(
             Spacer(1, 6),
             _tabel(
                 (
-                    ["Type post", "Waarde (euro\u2019s)", "n (SSO)", "k (SSO)", "N klant"]
+                    [
+                        "Type post",
+                        "Waarde (euro\u2019s)",
+                        "n (SSO)",
+                        "k (SSO)",
+                        "N klant",
+                    ]
                     if exact
                     else [
                         "Type post",

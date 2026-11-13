@@ -59,6 +59,10 @@ def bouw_strata_SSO_klant(
         - ``waarde_laag`` (float): totale geldwaarde van dit type post bij
           de klant.
 
+        Optioneel: ``cv`` (variatiecoëfficiënt van de postgroottes van dit
+        type post, standaard 0; niveau 2/3 van de theorie, zie
+        ``naief_match_SSO`` en ``moment_match_SSO``).
+
         Optioneel (standaardwaarden conform ``eval_stratified`` als ze
         ontbreken): ``ihr``, ``ibr``, ``car``, ``waarde_hoog``,
         ``fout_hoog``, ``materialiteit``.
@@ -158,9 +162,12 @@ def bouw_strata_SSO_klant(
         except ValueError as e:
             raise ValueError(f"Type post '{naam}': {e}") from e
         n_sso = post["n"] + extra
+        cv = post.get("cv", 0.0)
+        if cv is None or not cv >= 0 or cv == float("inf"):
+            raise ValueError(f"Type post '{naam}': cv moet een eindig getal >= 0 zijn.")
 
         if kalibratiemethode == "naief":
-            n_eff, k_eff = naief_match_SSO(n_sso, post["k"], post["N_klant"])
+            n_eff, k_eff = naief_match_SSO(n_sso, post["k"], post["N_klant"], cv=cv)
         else:
             # moment_match_SSO vuurt bij klemming een RuntimeWarning af
             # zonder te weten bij welk type post (naam) dat hoort. Die
@@ -176,6 +183,7 @@ def bouw_strata_SSO_klant(
                         post["N_klant"],
                         verdeling=model,
                         zekerheid=zekerheid,
+                        cv=cv,
                     )
             except ValueError as e:
                 # Zie moment_match_SSO: bij een volledige blinde vlek

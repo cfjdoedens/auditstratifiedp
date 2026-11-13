@@ -1,0 +1,165 @@
+"""Samengestelde verdeling van de euro-fout bij een klant, met variabele postgroottes.
+
+Niveau 2 en 3 van de SSO-theorie (``theorie.qmd``): de fout in euro's bij een
+klant is ``E = Z_1 + ... + Z_K``, met ``K`` het aantal foute posten (Beta-
+Binomiaal resp. Negatief-Binomiaal, net als bij de exacte methode op niveau 1)
+en ``Z_i`` de waarde van een foute post:
+
+* niveau 2: ``Z`` is Gamma-verdeeld met gemiddelde ``mu = waarde / N_klant`` en
+  variatiecoëfficiënt ``cv`` (de Gamma-familie is een parametrische keuze;
+  alleen gemiddelde en variantie komen uit de data);
+* niveau 3: ``Z`` volgt de empirische verdeling van een lijst postwaarden,
+  herschaald naar gemiddelde ``mu`` (alleen de vorm van de verdeling telt).
+
+De verdeling van ``E`` volgt uit de kanskarakteristieke functie
+``phi_E(w) = som_K P(K) * phi_Z(w)**K`` op een euro-rooster (FFT). De
+trekkingen ``Z_i`` zijn onafhankelijk met teruglegging (een benadering van
+trekken zonder teruglegging; de spreiding is daardoor iets te groot, dus
+conservatief).
+
+Conventie: de kansmassa van het continue deel (``K >= 1``) wordt één roostercel
+omhoog geschoven (``E`` is dan nooit te laag in het rooster); ``K = 0`` staat
+exact op cel 0. Kansmassa boven ``waarde`` komt in de laatste cel.
+"""
+
+import math
+
+import numpy as np
+from scipy.special import betaln, gammainc, gammaln
+from scipy.stats import nbinom
+
+_STAARTMASSA = 1e-12
+# Grootste aantal waarden van K waarover wordt gesommeerd (elke waarde kost
+# één vermenigvuldiging van een rooster-lange vector).
+MAX_K_VENSTER = 300_000
+_MAX_FFT_LENGTE = 2**22
+
+
+def aantal_fouten_venster(model, n, k, N):
+    """Venster ``(k_laag, pmf)`` rond de kansmassa van het aantal foute posten.
+
+    ``pmf[i]`` is ``P(K = k_laag + i)``; het venster bevat de massa tussen
+    ``1e-12`` en ``1 - 1e-12`` en is genormaliseerd op som 1.
+    """
+    a, b = k + 1, n - k + 1
+    if model == "binomiaal":
+        j = np.arange(0, N + 1)
+        log_pmf = (
+            gammaln(N + 1)
+            - gammaln(j + 1)
+            - gammaln(N - j + 1)
+            + betaln(j + a, N - j + b)
+            - betaln(a, b)
+        )
+        pmf = np.exp(log_pmf)
+    else:
+        q = n / (n + N)
+        hoogste = int(nbinom.ppf(1 - _STAARTMASSA, k + 1, q)) + 1
+        pmf = nbinom.pmf(np.arange(0, hoogste + 1), k + 1, q)
+    cum = np.cumsum(pmf)
+    laag = int(np.searchsorted(cum, _STAARTMASSA))
+    hoog = min(int(np.searchsorted(cum, 1 - _STAARTMASSA)) + 1, len(pmf) - 1)
+    venster = pmf[laag : hoog + 1]
+    return laag, venster / venster.sum()
+
+
+def _karakteristieke_z(z, mu, dx, lengte):
+    """``phi_Z`` op de rfft-frequenties van een rooster met ``lengte`` cellen.
+
+    Geeft ``(phi, sigma_z)``; ``sigma_z`` is de standaardafwijking van ``Z``.
+    """
+    if isinstance(z, tuple) and z[0] == "gamma":
+        cv = float(z[1])
+        alfa = 1.0 / cv**2
+        theta = mu * cv**2
+        omega = 2 * np.pi * np.arange(lengte // 2 + 1) / (lengte * dx)
+        return (1 + 1j * omega * theta) ** (-alfa), cv * mu
+    waarden = np.asarray(z, dtype=float)
+    waarden = waarden * (mu / waarden.mean())
+    sigma = float(waarden.std())
+    pos = np.minimum(waarden / dx, lengte - 2.0)
+    i = np.floor(pos).astype(np.int64)
+    t = pos - i
+    g = np.bincount(i, weights=1 - t, minlength=lengte) + np.bincount(
+        i + 1, weights=t, minlength=lengte
+    )
+    g = g[:lengte] / len(waarden)
+    return np.fft.rfft(g), sigma
+
+
+def kansmassa_compound(model, n, k, N, waarde, z, dx):
+    """Kansmassa per roostercel van de euro-fout ``E`` van één type post.
+
+    Parameters
+    ----------
+    model : {"binomiaal", "poisson"}
+    n, k : float
+        SSO-steekproef (``n`` inclusief de HARo-foutloze posten).
+    N : int
+        Aantal posten van dit type bij de klant.
+    waarde : float
+        Totale geldwaarde van dit type post bij de klant.
+    z : tuple of array
+        ``("gamma", cv)`` voor niveau 2, of een rij postwaarden voor niveau 3.
+    dx : float
+        Celbreedte van het euro-rooster.
+
+    Returns
+    -------
+    numpy.ndarray
+        Lengte ``ceil(waarde / dx) + 1``; cel ``i`` hoort bij ``E = i * dx``.
+    """
+    ncellen = math.ceil(waarde / dx) + 1
+    mu = waarde / N
+    k0, pmf = aantal_fouten_venster(model, n, k, N)
+    if len(pmf) > MAX_K_VENSTER:
+        raise ValueError(
+            f"Het aantal mogelijke foute posten (spreiding {len(pmf):,}) is te "
+            "groot voor de exacte methode met postgroottes; gebruik een van "
+            "de andere methoden of een kleinere N_klant."
+        )
+    k_max = k0 + len(pmf) - 1
+    # Voor de lengte van het FFT-rooster: boven E_max mag geen kansmassa meer
+    # zitten, anders klapt die om naar de lage cellen.
+    sigma_schatting = mu * float(z[1]) if isinstance(z, tuple) else mu * 10.0
+    e_max = k_max * mu + 8 * sigma_schatting * math.sqrt(max(k_max, 1))
+    lengte = 1 << max(2 * ncellen - 1, math.ceil(1.1 * e_max / dx) + 2).bit_length()
+    if lengte > _MAX_FFT_LENGTE:
+        raise ValueError(
+            "De foutfractie kan bij deze steekproef zo hoog uitvallen dat het "
+            "euro-rooster te groot wordt voor de exacte methode met "
+            "postgroottes; gebruik een van de andere methoden."
+        )
+    phi, _ = _karakteristieke_z(z, mu, dx, lengte)
+
+    # K = 0 staat exact op cel 0. Bij een Gamma-verdeelde Z met grote cv is de
+    # dichtheid voor kleine K (aantal foute posten < cv^2) singulier in 0 en
+    # zou puntbemonstering in het frequentiedomein haar slecht weergeven: die
+    # K worden daarom exact uit de Gamma-cdf per cel gehaald (afgerond naar
+    # boven op de celgrens). Voor grotere K gaat de som via de FFT.
+    p0 = pmf[0] if k0 == 0 else 0.0
+    uit = np.zeros(ncellen)
+    uit[0] += p0
+    start = max(k0, 1)
+    if isinstance(z, tuple):
+        alfa = 1.0 / float(z[1]) ** 2
+        theta = mu * float(z[1]) ** 2
+        grens_k = min(math.ceil(10 * float(z[1]) ** 2), 400)
+        randen = np.arange(0, ncellen) * dx / theta
+        for kk in range(start, min(grens_k, k_max) + 1):
+            cdf = gammainc(kk * alfa, randen)
+            massa_k = np.diff(np.concatenate([[0.0], cdf]))
+            massa_k[-1] += 1.0 - cdf[-1]
+            uit += pmf[kk - k0] * massa_k
+        start = max(start, grens_k + 1)
+    if start <= k_max:
+        macht = phi**start
+        acc = np.zeros(len(phi), dtype=complex)
+        for i in range(start - k0, len(pmf)):
+            acc += pmf[i] * macht
+            macht = macht * phi
+        massa = np.clip(np.fft.irfft(acc, lengte), 0.0, None)
+        # Nearest-cel naar boven: schuif een cel op.
+        uit[1:ncellen] += massa[: ncellen - 1]
+        uit[ncellen - 1] += massa[ncellen - 1 :].sum()
+    return uit / uit.sum()

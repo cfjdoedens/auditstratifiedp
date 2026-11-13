@@ -6,6 +6,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import fftconvolve
 from scipy.special import betaln, gammaln, nbdtr
 
+from auditstat.sso.compound_postwaarden import kansmassa_compound
 from auditstat.stratified.utils import foutloze_posten_equivalent
 
 # Standaard aantal cellen van het euro-rooster waarop de strata worden
@@ -84,6 +85,27 @@ def _controleer_post(post):
         )
     if not (w > 0):
         raise ValueError(f"Type post '{naam}': waarde_laag moet groter dan 0 zijn.")
+    cv = post.get("cv", 0.0)
+    if cv is None or not cv >= 0 or cv == float("inf"):
+        raise ValueError(f"Type post '{naam}': cv moet een eindig getal >= 0 zijn.")
+    if post.get("postwaarden") is not None:
+        waarden = np.asarray(post["postwaarden"], dtype=float)
+        if waarden.ndim != 1 or len(waarden) == 0:
+            raise ValueError(
+                f"Type post '{naam}': postwaarden moet een niet-lege lijst zijn."
+            )
+        if not (np.all(np.isfinite(waarden)) and np.all(waarden > 0)):
+            raise ValueError(
+                f"Type post '{naam}': alle postwaarden moeten positief en eindig zijn."
+            )
+
+
+def _cv_van_post(post):
+    """De variatiecoëfficiënt waarmee voor deze post gerekend is (0 = gelijke posten)."""
+    if post.get("postwaarden") is not None:
+        waarden = np.asarray(post["postwaarden"], dtype=float)
+        return float(waarden.std() / waarden.mean())
+    return float(post.get("cv", 0.0))
 
 
 def _extra_foutloze_posten(post):
@@ -136,6 +158,13 @@ def evalueer_SSO_klant_exact(
     extra``; ``k`` blijft). De klantsteekproef zelf (``N_klant``) kent geen
     risicocorrectie.
 
+    Variabele postgroottes (niveau 2 en 3 van de theorie): een type post kan
+    een ``cv`` (variatiecoëfficiënt; ``Z`` Gamma-verdeeld, niveau 2) of
+    ``postwaarden`` (rij van postbedragen; empirische verdeling, herschaald
+    naar gemiddelde ``waarde_laag / N_klant``, niveau 3) meekrijgen. Dan is de
+    euro-fout de som van ``K`` postwaarden; zie ``compound_postwaarden``.
+    Zonder beide (of ``cv = 0``) is het het eerdere model met gelijke posten.
+
     Beperkingen: alleen het laagstratum (``waarde_hoog``/``fout_hoog`` moeten
     0 zijn). Het geheugengebruik schaalt met ``N_klant`` (maximaal
     ``MAX_N_KLANT``).
@@ -144,7 +173,8 @@ def evalueer_SSO_klant_exact(
     ----------
     post_typen : list[dict]
         Eén dict per type post, met ``naam``, ``n``, ``k``, ``N_klant`` (geheel)
-        en ``waarde_laag`` (totale geldwaarde van dit type post bij de klant).
+        en ``waarde_laag`` (totale geldwaarde van dit type post bij de klant);
+        optioneel ``cv`` of ``postwaarden`` (zie hierboven).
     model : {"binomiaal", "poisson"}
     zekerheid : float
         Tussen 0 en 1.
@@ -186,15 +216,24 @@ def evalueer_SSO_klant_exact(
     for post in post_typen:
         n, k, N, w = post["n"], post["k"], int(post["N_klant"]), post["waarde_laag"]
         n_calc = n + _extra_foutloze_posten(post)
-        cdf = _cdf_aantal_fouten(model, n_calc, k, N)
-        cellen = np.arange(0, math.ceil(w / dx) + 1)
-        # Cel c bevat de waarden met (j * w / N) in ((c-1)*dx, c*dx].
-        j = np.floor(cellen * dx * N / w + 1e-9)
-        if model == "binomiaal":
-            j = np.minimum(j, N)
-        kum = cdf(j)
-        massa = np.diff(np.concatenate([[0.0], kum]))
-        massa[-1] += 1.0 - kum[-1]
+        if post.get("postwaarden") is not None:
+            massa = kansmassa_compound(
+                model, n_calc, k, N, w, np.asarray(post["postwaarden"]), dx
+            )
+        elif post.get("cv", 0.0) > 0:
+            massa = kansmassa_compound(
+                model, n_calc, k, N, w, ("gamma", float(post["cv"])), dx
+            )
+        else:
+            cdf = _cdf_aantal_fouten(model, n_calc, k, N)
+            cellen = np.arange(0, math.ceil(w / dx) + 1)
+            # Cel c bevat de waarden met (j * w / N) in ((c-1)*dx, c*dx].
+            j = np.floor(cellen * dx * N / w + 1e-9)
+            if model == "binomiaal":
+                j = np.minimum(j, N)
+            kum = cdf(j)
+            massa = np.diff(np.concatenate([[0.0], kum]))
+            massa[-1] += 1.0 - kum[-1]
         kansmassa = fftconvolve(kansmassa, massa)
 
     kansmassa = np.clip(kansmassa, 0.0, None)
@@ -226,6 +265,7 @@ def evalueer_SSO_klant_exact(
         "n_laag": [p["n"] for p in post_typen],
         "k_laag": [p["k"] for p in post_typen],
         "N_klant": [int(p["N_klant"]) for p in post_typen],
+        "cv": [_cv_van_post(p) for p in post_typen],
         "extra_foutloze_posten": extra,
         "waarde_hoog": 0.0,
         "fout_hoog": 0.0,

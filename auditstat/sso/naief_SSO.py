@@ -1,4 +1,4 @@
-def naief_match_SSO(n, k, N_klant):
+def naief_match_SSO(n, k, N_klant, cv=0.0):
     """Naïeve pooling-benadering voor een effectieve (n_eff, k_eff) per klant.
 
     Dit is een eenvoudige eerste-orde-benadering (variantie-matching), een
@@ -42,6 +42,17 @@ def naief_match_SSO(n, k, N_klant):
     van de Beta-verdeling) en is niet gekalibreerd op de volledige
     samengestelde verdeling, zoals ``moment_match_SSO`` dat wel doet.
 
+    Niveau 2 (variabele postgroottes): met de variatiecoëfficiënt ``cv`` van
+    de postgroottes (standaardafwijking gedeeld door gemiddelde) wordt de
+    variantie bij de klant ``p(1-p)(1 + cv²)/N_klant`` (voor kleine ``p``;
+    zie ``theorie.qmd``) en wordt de formule
+
+        n_eff = n · N_klant / (N_klant + n · (1 + cv²))
+
+    Dat is gelijk aan de parallelformule met ``N_klant / (1 + cv²)`` als
+    effectieve populatieomvang. Bij ``cv = 0`` (alle posten even groot) is
+    dit de gewone formule.
+
     ``k_eff`` wordt proportioneel aan ``n_eff`` meegeschaald, zodat de
     geschatte foutfractie ``k/n`` behouden blijft:
 
@@ -56,6 +67,9 @@ def naief_match_SSO(n, k, N_klant):
         tussen 0 en ``n`` liggen.
     N_klant : float
         Aantal posten van dit type bij de klant. Moet positief zijn.
+    cv : float, standaard 0
+        Variatiecoëfficiënt van de postgroottes van dit type post (niet
+        negatief). ``0`` betekent dat alle posten even groot zijn.
 
     Returns
     -------
@@ -68,7 +82,9 @@ def naief_match_SSO(n, k, N_klant):
         raise ValueError("N_klant moet positief zijn.")
     if k < 0 or k > n:
         raise ValueError("k moet tussen 0 en n liggen.")
+    if not cv >= 0 or cv == float("inf"):
+        raise ValueError("cv moet een eindig getal >= 0 zijn.")
 
-    n_eff = n * N_klant / (n + N_klant)
+    n_eff = n * N_klant / (N_klant + n * (1 + cv**2))
     k_eff = k * n_eff / n
     return n_eff, k_eff

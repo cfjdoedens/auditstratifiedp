@@ -8,6 +8,7 @@ INSTELLINGEN = {
     "zekerheid": "0,95",
     "berekeningsmethode": "momentmatching",
     "onderscheid": "ja",
+    "postgroottes": "variabel",
 }
 TOTAAL = {
     "n": "200",
@@ -18,6 +19,7 @@ TOTAAL = {
     "ibr": "M",
     "car": "L",
     "materialiteit": "0,01",
+    "cv": "0,80",
 }
 
 
@@ -40,6 +42,7 @@ def typen_posten():
         "ibr": ["H", "M"],
         "car": ["H", "L"],
         "materialiteit": ["0,01", ""],
+        "cv": ["0,50", ""],
     })
 
 
@@ -231,4 +234,43 @@ def test_onderscheid_nee_zonder_detailtabellen_is_toegestaan(klanten):
 def test_klantnaam_hele_sso_is_gereserveerd(csv_tekst, naam):
     tekst = csv_tekst.replace("Klant A", naam)
     with pytest.raises(ValueError, match="gereserveerd"):
+        lees_sso_invoer_csv(tekst)
+
+
+def test_cv_en_postgroottes_zijn_optioneel_bij_inlezen():
+    tekst = (
+        "onderdeel;klant;type_post;veld;waarde\n"
+        "type_post;;E;n;10\n"
+        "type_post;;E;k;0\n"
+        "type_post;;E;ihr;H\n"
+        "type_post;;E;ibr;H\n"
+        "type_post;;E;car;H\n"
+    )
+    res = lees_sso_invoer_csv(tekst)
+    assert res["typen_posten"].loc[0, "cv"] == ""
+    assert "postgroottes" not in res["instellingen"]
+
+
+def test_export_zonder_postgroottes_valt_terug_op_homogeen(
+    klanten, typen_posten, klanten_typen
+):
+    instellingen = {k: v for k, v in INSTELLINGEN.items() if k != "postgroottes"}
+    tekst = maak_sso_invoer_csv(
+        instellingen, TOTAAL, klanten, typen_posten, klanten_typen
+    )
+    assert lees_sso_invoer_csv(tekst)["instellingen"]["postgroottes"] == "homogeen"
+
+
+@pytest.mark.parametrize("cv", ["1.5", "abc", "-1"])
+def test_ongeldige_cv_wordt_geweigerd(csv_tekst, cv):
+    tekst = _vervang(csv_tekst, "totaal;;;cv;0,80", f"totaal;;;cv;{cv}")
+    with pytest.raises(ValueError, match="cv"):
+        lees_sso_invoer_csv(tekst)
+
+
+def test_ongeldige_postgroottes_wordt_geweigerd(csv_tekst):
+    tekst = _vervang(
+        csv_tekst, "instelling;;;postgroottes;variabel", "instelling;;;postgroottes;x"
+    )
+    with pytest.raises(ValueError, match="postgroottes"):
         lees_sso_invoer_csv(tekst)
