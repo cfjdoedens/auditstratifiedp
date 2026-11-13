@@ -134,6 +134,17 @@ $$
 
 Voor kleine $p$ ($1-p \approx 1$) schaalt de variantie op klantniveau op met de variantie-inflatiefactor $(1 + CV^2)$.
 
+Wat de CV praktisch betekent voor de verdeling van de postgroottes, laat een Lorenz-curve zien. De posten staan van klein naar groot op de horizontale as; verticaal staat het deel van de totale waarde dat zij samen bevatten. Bij gelijke posten ($CV = 0$) is de curve de diagonaal. Hoe groter de CV, hoe verder de curve eronder zakt: een klein deel van de posten bevat dan een groot deel van de waarde. Voor het gammamodel van niveau 2 (vorm $a = 1/CV^2$) is de Lorenz-curve $L(p) = I(a+1,\, Q(p; a))$, met $I$ de regularized incomplete gammafunctie en $Q(p; a)$ het $p$-kwantiel van Gamma($a$); de Gini-coëfficiënt is $\Gamma(a+\tfrac12)/(\sqrt{\pi}\,\Gamma(a+1))$. Bij $CV = 1$ is dit de exponentiële verdeling (Gini 0,5).
+
+```{python}
+#| label: fig-lorenz-niveau2
+#| echo: false
+#| fig-cap: "Lorenz-curven van gammaverdeelde postbedragen bij CV 0,5, 1 en 2. De stippellijn is CV 0 (alle posten even groot). In de legenda staan de Gini-coëfficiënt en het aandeel van de totale waarde in de grootste 10% van de posten."
+from auditstat.sso.schema_figuren import teken_lorenz_niveau2  # pyrefly: ignore[missing-import]
+
+_ = teken_lorenz_niveau2()
+```
+
 ### 4.2 Gecorrigeerde eenvoudige poolingformule (niveau 2)
 
 Met de verhoogde variantie op laag 2 wordt de totale variantie:
@@ -173,6 +184,17 @@ Met de volledige dataset kennen we de exacte empirische verdeling van de stochas
 - **Euro-foutbedrag:** de werkelijke fout in euro's $E = \sum_{i=1}^K Z_i$ wordt berekend door de exacte empirische kansmassa van $Z$ discreet op een euro-rooster (standaard 20.000 cellen) via Fast Fourier Transforms (FFT) met zichzelf en over de strata te convolueren.
 
 Dit combineert de exacte onzekerheid van de steekproef met de exacte verdeling van het geldelijk belang per post.
+
+De empirische Lorenz-curve van het postenbestand laat zien in hoeverre het gammamodel van niveau 2 bij de werkelijke postgroottes past. In de app (tabblad "evaluatie SSO", uitklapper "Wat betekent de CV voor de postgroottes?") staat deze figuur voor het eigen bestand.
+
+```{python}
+#| label: fig-lorenz-niveau3
+#| echo: false
+#| fig-cap: "Lorenz-curve van een fictief postenbestand (rood, 5.000 posten met lognormale bedragen) naast het gammamodel met dezelfde CV (blauw). De bedragen zijn verzonnen; bij een echt bestand kan de overeenkomst beter of slechter zijn."
+from auditstat.sso.schema_figuren import teken_lorenz_niveau3  # pyrefly: ignore[missing-import]
+
+_ = teken_lorenz_niveau3()
+```
 
 ## 6. Vergelijkingstabel van de niveaus
 

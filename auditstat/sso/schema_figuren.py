@@ -282,7 +282,44 @@ def teken_sso_geldsteekproefschema():
     return teken_sso_schema(met_centen=True)
 
 
+def teken_lorenz_niveau2():
+    """Lorenz-curven van Gamma-verdeelde postbedragen bij CV 0,5 / 1 / 2."""
+    from auditstat.sso.plot_postgroottes import plot_lorenz_postgroottes
+
+    return plot_lorenz_postgroottes(cv=1.0, referentie_cvs=(0.5, 2.0))
+
+
+def teken_lorenz_niveau3():
+    """Lorenz-curve van een fictief postenbestand naast het Gamma-model met dezelfde CV."""
+    import numpy as np
+
+    from auditstat.sso.plot_postgroottes import plot_lorenz_postgroottes
+    from auditstat.sso.postenbestand import (
+        lees_postenbestand,
+        maak_voorbeeld_sso_postenbestand,
+        postenbestand_csv,
+        postgroottes_per_type_post,
+    )
+
+    df = lees_postenbestand(
+        postenbestand_csv(
+            maak_voorbeeld_sso_postenbestand([
+                ("Klant A", "Emolumenten", 3000, 500.0),
+                ("Klant B", "Inkoopfacturen", 2000, 500.0),
+            ])
+        ),
+        meerdere_klanten=True,
+    )
+    waarden = np.concatenate(list(postgroottes_per_type_post(df).values()))
+    cv = float(waarden.std() / waarden.mean())
+    return plot_lorenz_postgroottes(
+        cv=cv, postwaarden=waarden, referentie_cvs=(0.5, 1.0, 2.0)
+    )
+
+
 THEORIE_FIGUREN = {
     "fig-sso-steekproefschema": teken_sso_steekproefschema,
     "fig-sso-geldsteekproefschema": teken_sso_geldsteekproefschema,
+    "fig-lorenz-niveau2": teken_lorenz_niveau2,
+    "fig-lorenz-niveau3": teken_lorenz_niveau3,
 }
