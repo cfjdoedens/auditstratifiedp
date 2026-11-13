@@ -2157,7 +2157,7 @@ with tab_sso:
         "onderscheid wilt maken naar verschillende typen posten (bijv. "
         "emolumenten, inkoopfacturen), of dat de totalen volstaan (stap "
         "3). Alle klanten worden in één keer berekend. Zie tabblad "
-        "\u2018Theorie\u2019 voor de onderbouwing van de gebruikte methoden."
+        "\u2018theorie SSO\u2019 voor de onderbouwing van de gebruikte methoden."
     )
 
     # Geen st.form: alle data_editors gebruiken on_change om elke
@@ -2189,7 +2189,7 @@ with tab_sso:
             st.caption(
                 "De exacte methode rekent de klantverdeling per type post "
                 "zonder Beta/Gamma-benadering uit en voegt de typen posten "
-                "samen via FFT (zie tabblad \u2018Theorie\u2019). De "
+                "samen via FFT (zie tabblad \u2018theorie SSO\u2019). De "
                 "risicocorrectie (IHR, IBR, CAR en materialiteit) wordt "
                 "toegepast op de SSO-steekproef (eerste trap), niet op de "
                 "klantsteekproef. Er is geen terugval bij een zeer kleine "
@@ -2332,7 +2332,7 @@ with tab_sso:
                 "ene, gezamenlijke SSO-brede steekproef; `N totaal` is het "
                 "totaal aantal posten in de hele SSO-populatie en `totale "
                 "massa` de bijbehorende geldwaarde. Zie tabblad "
-                "\u2018Theorie\u2019, sectie 1 voor de achtergrond."
+                "\u2018theorie SSO\u2019, sectie 1 voor de achtergrond."
             )
         sso_voorbeeld_plek = {"totalen": st.empty()}
         c_n, c_k, c_N, c_massa = st.columns(4)
