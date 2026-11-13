@@ -37,6 +37,9 @@ for _poging in (1, 2):
             lees_sso_invoer_csv,
             maak_sso_invoer_csv,
         )
+        from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
+            plot_lorenz_postgroottes,
+        )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
             POSTEN_KOLOMMEN,
             lees_postenbestand,
@@ -2280,6 +2283,48 @@ with tab_sso:
         )
 
     with col_sso_hoofd:
+        with st.expander("Wat betekent de CV voor de postgroottes?"):
+            st.markdown(
+                "De CV (variatiecoëfficiënt) is de standaardafwijking van de "
+                "postbedragen gedeeld door hun gemiddelde. De Lorenz-curve "
+                "laat zien wat dat praktisch betekent: de posten worden van "
+                "klein naar groot gesorteerd (horizontaal) en uitgezet tegen "
+                "het deel van de totale waarde dat zij samen bevatten "
+                "(verticaal). Bij gelijke posten (CV = 0) volgt de curve de "
+                "stippellijn; hoe groter de CV, hoe verder de curve eronder "
+                "zakt, dus hoe meer van de waarde in een paar grote posten "
+                "zit."
+            )
+            _cv_standaard = _parse_nl(st.session_state.sso_totaal_cv_text)
+            _cv_lorenz = st.number_input(
+                "CV om te bekijken",
+                min_value=0.0,
+                max_value=10.0,
+                value=float(_cv_standaard) if _cv_standaard else 1.0,
+                step=0.1,
+                key="sso_lorenz_cv",
+                help="Standaard de CV uit stap 1 (als die is ingevuld).",
+            )
+            _lorenz_posten = None
+            _niveau3_df = st.session_state.sso_niveau3_posten
+            if _niveau3_df is not None:
+                _lorenz_posten = (_niveau3_df["bedrag_cent"] / 100).to_numpy()
+                _lorenz_posten = _lorenz_posten[_lorenz_posten > 0]
+                if _lorenz_posten.size == 0:
+                    _lorenz_posten = None
+            _fig_lorenz = plot_lorenz_postgroottes(
+                cv=_cv_lorenz if _cv_lorenz > 0 else None,
+                postwaarden=_lorenz_posten,
+            )
+            st.pyplot(_fig_lorenz)
+            plt.close(_fig_lorenz)
+            st.caption(
+                "Blauw: Gamma-model van niveau 2 bij de gekozen CV. Rood (als "
+                "een postenbestand is ingelezen, niveau 3): de werkelijke "
+                "verdeling van alle posten in het bestand. Grijs: "
+                "referentiecurven. Gini = 0 betekent gelijke posten, dicht "
+                "bij 1 betekent dat vrijwel alle waarde in enkele posten zit."
+            )
         st.subheader("1. Totalen voor de SSO als geheel")
         with st.expander("Hoe werkt dit?"):
             st.markdown(

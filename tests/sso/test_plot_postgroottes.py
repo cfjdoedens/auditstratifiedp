@@ -1,0 +1,64 @@
+import matplotlib
+import numpy as np
+import pytest
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+from auditstat.sso.plot_postgroottes import (  # noqa: E402
+    aandeel_grootste_gamma,
+    gini_gamma,
+    lorenz_empirisch,
+    lorenz_gamma,
+    plot_lorenz_postgroottes,
+)
+
+
+def test_cv_nul_is_de_diagonaal():
+    p = np.linspace(0, 1, 11)
+    assert np.allclose(lorenz_gamma(0, p), p)
+    assert gini_gamma(0) == 0.0
+
+
+def test_cv_een_is_exponentieel():
+    # Exponentieel (cv = 1): L(p) = p + (1-p) ln(1-p), Gini = 1/2.
+    p = np.array([0.1, 0.5, 0.9])
+    assert np.allclose(lorenz_gamma(1, p), p + (1 - p) * np.log(1 - p), atol=1e-9)
+    assert gini_gamma(1) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("cv", [0.3, 1.0, 2.5])
+def test_gamma_tegen_steekproef(cv):
+    rng = np.random.default_rng(4821)
+    a = 1 / cv**2
+    w = rng.gamma(a, 1 / a, size=400_000)
+    _, _, gini, top10 = lorenz_empirisch(w)
+    assert gini == pytest.approx(gini_gamma(cv), abs=0.01)
+    assert top10 == pytest.approx(aandeel_grootste_gamma(cv, 0.1), abs=0.01)
+
+
+def test_lorenz_stijgt_met_cv_naar_beneden():
+    p = np.linspace(0.05, 0.95, 10)
+    assert np.all(lorenz_gamma(2, p) < lorenz_gamma(1, p))
+    assert np.all(lorenz_gamma(1, p) < lorenz_gamma(0.5, p))
+
+
+def test_lorenz_empirisch_gelijke_posten():
+    _, L, gini, top10 = lorenz_empirisch([5.0] * 100)
+    assert gini == pytest.approx(0.0, abs=1e-12)
+    assert top10 == pytest.approx(0.1)
+
+
+def test_ongeldige_invoer():
+    with pytest.raises(ValueError):
+        lorenz_gamma(-1, [0.5])
+    with pytest.raises(ValueError):
+        lorenz_empirisch([])
+    with pytest.raises(ValueError):
+        plot_lorenz_postgroottes()
+
+
+def test_plot_wordt_getekend():
+    fig = plot_lorenz_postgroottes(cv=1.5, postwaarden=[1.0, 2.0, 10.0, 50.0])
+    assert fig.axes
+    plt.close(fig)
