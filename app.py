@@ -2196,7 +2196,7 @@ with tab_sso:
                 "N_klant."
             )
         sso_postgroottes = st.radio(
-            "informatie over postgroottes",
+            "verdeling postgroottes",
             ["homogeen", "variabel", "postenbestand"],
             format_func=lambda m: {
                 "homogeen": "niveau 1: alle posten even groot",

@@ -68,7 +68,7 @@ _INSTELLING_LABELS = [
     ("zekerheid", "Zekerheid"),
     ("berekeningsmethode", "Berekeningsmethode"),
     ("onderscheid", "Onderscheid naar typen posten"),
-    ("postgroottes", "Informatie over postgroottes"),
+    ("postgroottes", "Verdeling postgroottes"),
 ]
 _POSTGROOTTES_LABELS = {
     "homogeen": "Niveau 1: homogene posten",
