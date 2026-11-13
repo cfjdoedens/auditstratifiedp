@@ -139,7 +139,7 @@ Wat de CV praktisch betekent voor de verdeling van de postgroottes, laat een Lor
 ```{python}
 #| label: fig-lorenz-niveau2
 #| echo: false
-#| fig-cap: "Lorenz-curven van gammaverdeelde postbedragen bij CV 0,5, 1 en 2. De stippellijn is CV 0 (alle posten even groot). In de legenda staan de Gini-coëfficiënt en het aandeel van de totale waarde in de grootste 10% van de posten."
+#| fig-cap: "Lorenz-curven van gammaverdeelde postbedragen bij CV 0,5, 1 en 2. De stippellijn is CV 0 (alle posten even groot). In de legenda staan de Gini-coëfficiënt en het aandeel van de totale waarde in de grootste 10% van de posten. Voor de grens telt vooral de som van de bedragen van de foute posten: bij een CV tot ongeveer 1 hangt die nauwelijks af van de precieze vorm van de verdeling, bij een veel grotere CV wel (zie het bijschrift van de figuur bij niveau 3)."
 from auditstat.sso.schema_figuren import teken_lorenz_niveau2  # pyrefly: ignore[missing-import]
 
 _ = teken_lorenz_niveau2()
@@ -190,7 +190,7 @@ De empirische Lorenz-curve van het postenbestand laat zien in hoeverre het gamma
 ```{python}
 #| label: fig-lorenz-niveau3
 #| echo: false
-#| fig-cap: "Lorenz-curve van een fictief postenbestand (rood, 5.000 posten met lognormale bedragen) naast het gammamodel met dezelfde CV (blauw). De bedragen zijn verzonnen; bij een echt bestand kan de overeenkomst beter of slechter zijn."
+#| fig-cap: "Lorenz-curve van een fictief postenbestand (rood, 5.000 posten met lognormale bedragen) naast het gammamodel met dezelfde CV (blauw). De bedragen zijn verzonnen. Bij gelijke CV heeft dit bestand een iets lagere Gini dan het gammamodel, maar voor de grens maakt dat hier niets uit: in een doorgerekend voorbeeld (één klant, 3.000 posten, 1,5 miljoen euro) geeft de exacte methode bij CV 0,5 en 1,1 dezelfde grens met het gammamodel als met het bestand (verschil kleiner dan de roosterstap van 0,2%). Pas bij een veel scheefere verdeling loopt het uiteen: bij CV 3 is de grens met het gammamodel 1 tot 4% hoger, bij CV 6 ongeveer 11 tot 18% hoger. Het gammamodel is daar dus conservatiever dan de lognormale posten van dit voorbeeld; dat is één type verdeling en geen algemene uitspraak over echte postbestanden."
 from auditstat.sso.schema_figuren import teken_lorenz_niveau3  # pyrefly: ignore[missing-import]
 
 _ = teken_lorenz_niveau3()
