@@ -87,27 +87,10 @@ def _karakteristieke_z(z, mu, dx, lengte):
     return np.fft.rfft(g), sigma
 
 
-def kansmassa_compound(model, n, k, N, waarde, z, dx):
-    """Kansmassa per roostercel van de euro-fout ``E`` van één type post.
+def _rooster(model, n, k, N, waarde, z, dx):
+    """Roosterafmetingen van ``kansmassa_compound``, met de limietcontroles.
 
-    Parameters
-    ----------
-    model : {"binomiaal", "poisson"}
-    n, k : float
-        SSO-steekproef (``n`` inclusief de HARo-foutloze posten).
-    N : int
-        Aantal posten van dit type bij de klant.
-    waarde : float
-        Totale geldwaarde van dit type post bij de klant.
-    z : tuple of array
-        ``("gamma", cv)`` voor niveau 2, of een rij postwaarden voor niveau 3.
-    dx : float
-        Celbreedte van het euro-rooster.
-
-    Returns
-    -------
-    numpy.ndarray
-        Lengte ``ceil(waarde / dx) + 1``; cel ``i`` hoort bij ``E = i * dx``.
+    Geeft ``(ncellen, mu, k0, pmf, lengte)``.
     """
     ncellen = math.ceil(waarde / dx) + 1
     mu = waarde / N
@@ -130,6 +113,59 @@ def kansmassa_compound(model, n, k, N, waarde, z, dx):
             "euro-rooster te groot wordt voor de exacte methode met "
             "postgroottes; gebruik een van de andere methoden."
         )
+    return ncellen, mu, k0, pmf, lengte
+
+
+# Ruwe kalibratie van de rekentijd van de K-lus (seconden per
+# vensterlengte x halve FFT-lengte). Gemeten (N_klant 30.000 / 60.000 /
+# 100.000, 20.000 cellen, binomiaal): 12 / 16 / 30 x 1e-9 s per eenheid; de
+# tijd per eenheid stijgt met de arraylengte (geheugen). Alleen een
+# orde-van-grootte-indicatie, afhankelijk van de computer.
+_SECONDEN_PER_EENHEID = 2.0e-8
+
+
+def schat_rekentijd_compound(model, n, k, N, waarde, z, dx):
+    """Indicatie van de rekentijd (seconden) van ``kansmassa_compound``.
+
+    Gooit dezelfde ``ValueError`` als ``kansmassa_compound`` als de
+    limieten worden overschreden.
+    """
+    _, _, k0, pmf, lengte = _rooster(model, n, k, N, waarde, z, dx)
+    start = max(k0, 1)
+    if isinstance(z, tuple):
+        start = max(start, min(math.ceil(10 * float(z[1]) ** 2), 400) + 1)
+    k_max = k0 + len(pmf) - 1
+    aantal = max(k_max - start + 1, 0)
+    return aantal * (lengte // 2 + 1) * _SECONDEN_PER_EENHEID
+
+
+def kansmassa_compound(model, n, k, N, waarde, z, dx, voortgang=None):
+    """Kansmassa per roostercel van de euro-fout ``E`` van één type post.
+
+    Parameters
+    ----------
+    model : {"binomiaal", "poisson"}
+    n, k : float
+        SSO-steekproef (``n`` inclusief de HARo-foutloze posten).
+    N : int
+        Aantal posten van dit type bij de klant.
+    waarde : float
+        Totale geldwaarde van dit type post bij de klant.
+    z : tuple of array
+        ``("gamma", cv)`` voor niveau 2, of een rij postwaarden voor niveau 3.
+    dx : float
+        Celbreedte van het euro-rooster.
+    voortgang : callable, optional
+        ``voortgang(fractie)`` met een getal tussen 0 en 1, regelmatig
+        aangeroepen tijdens de rekenlus.
+
+    Returns
+    -------
+    numpy.ndarray
+        Lengte ``ceil(waarde / dx) + 1``; cel ``i`` hoort bij ``E = i * dx``.
+    """
+    ncellen, mu, k0, pmf, lengte = _rooster(model, n, k, N, waarde, z, dx)
+    k_max = k0 + len(pmf) - 1
     phi, _ = _karakteristieke_z(z, mu, dx, lengte)
 
     # K = 0 staat exact op cel 0. Bij een Gamma-verdeelde Z met grote cv is de
@@ -155,9 +191,13 @@ def kansmassa_compound(model, n, k, N, waarde, z, dx):
     if start <= k_max:
         macht = phi**start
         acc = np.zeros(len(phi), dtype=complex)
+        totaal_i = len(pmf) - (start - k0)
+        stap = max(totaal_i // 200, 1)
         for i in range(start - k0, len(pmf)):
             acc += pmf[i] * macht
             macht = macht * phi
+            if voortgang is not None and (i - (start - k0)) % stap == 0:
+                voortgang((i - (start - k0)) / totaal_i)
         massa = np.clip(np.fft.irfft(acc, lengte), 0.0, None)
         # Nearest-cel naar boven: schuif een cel op.
         uit[1:ncellen] += massa[: ncellen - 1]

@@ -30,6 +30,7 @@ for _poging in (1, 2):
         )
         from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
             evalueer_SSO_klant_exact,
+            schat_rekentijd_exact,
         )
         from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
             evalueer_SSO_klant_gestratificeerd,
@@ -1340,6 +1341,19 @@ def on_sso_postenbestand_upload(lokaal_bestand=None):
     st.session_state.sso_postenbestand = gelezen
     st.session_state.sso_postenbestand_naam = bestand.name
     st.session_state.sso_postenbestand_fout = None
+
+
+# Vanaf deze geschatte rekentijd (seconden) waarschuwt de SSO-tab vooraf.
+SSO_LANG_REKENEN_SECONDEN = 10.0
+
+
+def _nl_tijd(seconden):
+    """Een tijdsduur in gewone woorden, op ruwe schaal."""
+    if seconden < 90:
+        return f"{int(round(seconden))} seconden"
+    if seconden < 5400:
+        return f"{int(round(seconden / 60))} minuten"
+    return f"{seconden / 3600:.1f}".replace(".", ",") + " uur"
 
 
 def _meld_csv_fout(tekst):
@@ -3299,8 +3313,48 @@ with tab_sso:
             sso_klanten_res = {}
             sso_klanten_waarschuwingen = {}
             berekenings_fouten = []
-            for klant, type_post_dict in klanten_rijen_per_klant.items():
+            # Bij de exacte methode met postgroottes kan de berekening lang
+            # duren (vooral bij een grote N_klant): waarschuw vooraf en toon
+            # een voortgangsbalk.
+            _sso_schattingen = {}
+            if sso_kalibratiemethode == "exact":
+                for _k, _tp in klanten_rijen_per_klant.items():
+                    _sso_schattingen[_k] = schat_rekentijd_exact(
+                        list(_tp.values()), model=sso_model
+                    )
+            _sso_schat_totaal = sum(v for v in _sso_schattingen.values() if v)
+            _sso_waarschuwing = st.empty()
+            _sso_balk = None
+            if _sso_schat_totaal >= SSO_LANG_REKENEN_SECONDEN:
+                _lang = sorted(
+                    ((k_, v) for k_, v in _sso_schattingen.items() if v),
+                    key=lambda kv: -kv[1],
+                )[:5]
+                _sso_waarschuwing.warning(
+                    "De exacte methode met postgroottes kan hier lang duren: "
+                    f"naar schatting ongeveer {_nl_tijd(_sso_schat_totaal)} "
+                    "(een grove schatting; de werkelijke tijd hangt af van uw "
+                    "computer). De rekentijd groeit sterk met het aantal "
+                    "posten per klant (`N_klant`). Duurste klanten: "
+                    + ", ".join(f"{k_} ({_nl_tijd(v)})" for k_, v in _lang)
+                    + ". Wilt u sneller rekenen, kies dan een andere "
+                    "berekeningsmethode of verdeling van de postgroottes."
+                )
+                _sso_balk = st.progress(0.0, text="Berekening gestart\u2026")
+            _sso_aantal_klanten = max(len(klanten_rijen_per_klant), 1)
+            for _sso_index, (klant, type_post_dict) in enumerate(
+                klanten_rijen_per_klant.items()
+            ):
                 post_typen = list(type_post_dict.values())
+
+                def _sso_voortgang(f, _i=_sso_index, _klant=klant):
+                    if _sso_balk is not None:
+                        _sso_balk.progress(
+                            min((_i + f) / _sso_aantal_klanten, 1.0),
+                            text=f"Klant {_i + 1} van {_sso_aantal_klanten}: "
+                            f"{_klant} ({int(f * 100)}%)",
+                        )
+
                 try:
                     with warnings.catch_warnings(record=True) as gevangen:
                         warnings.simplefilter("always", RuntimeWarning)
@@ -3309,6 +3363,7 @@ with tab_sso:
                                 post_typen,
                                 model=sso_model,
                                 zekerheid=sso_zekerheid,
+                                voortgang=_sso_voortgang,
                             )
                         else:
                             resultaat = evalueer_SSO_klant_gestratificeerd(
@@ -3327,6 +3382,9 @@ with tab_sso:
                         sso_klanten_waarschuwingen[klant] = klant_waarschuwingen
                 except ValueError as e:
                     berekenings_fouten.append(f"Klant '{klant}': {e}")
+            _sso_waarschuwing.empty()
+            if _sso_balk is not None:
+                _sso_balk.empty()
 
             # Evaluatie van de hele SSO: de SSO-brede steekproef direct op
             # de totale massa, zonder klantkalibratie.

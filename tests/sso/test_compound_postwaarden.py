@@ -154,3 +154,44 @@ def test_strata_geeft_cv_door():
     assert met["n_laag"].iloc[0] < zonder["n_laag"].iloc[0]
     with pytest.raises(ValueError, match="cv"):
         bouw_strata_SSO_klant([{**basis, "cv": -1}])
+
+
+def test_voortgang_loopt_van_0_naar_bijna_1_en_verandert_uitkomst_niet():
+    import numpy as np
+
+    from auditstat.sso.compound_postwaarden import kansmassa_compound
+
+    w = np.linspace(100, 900, 500)
+    meldingen = []
+    met = kansmassa_compound(
+        "binomiaal", 100, 1, 2000, 1_000_000.0, w, 50.0, voortgang=meldingen.append
+    )
+    zonder = kansmassa_compound("binomiaal", 100, 1, 2000, 1_000_000.0, w, 50.0)
+    assert np.array_equal(met, zonder)
+    assert meldingen and meldingen[0] == 0.0
+    assert all(0.0 <= m < 1.0 for m in meldingen)
+    assert meldingen == sorted(meldingen)
+
+
+def test_schatting_rekentijd_groeit_met_n_klant_en_geeft_none_bij_fout():
+    import numpy as np
+
+    from auditstat.sso.evalueer_SSO_klant_exact import schat_rekentijd_exact
+
+    w = np.linspace(100, 900, 500)
+
+    def post(N, **extra):
+        return {
+            "naam": "t",
+            "n": 100,
+            "k": 1,
+            "N_klant": N,
+            "waarde_laag": N * 500.0,
+            **extra,
+        }
+
+    klein = schat_rekentijd_exact([post(2000, postwaarden=w)])
+    groot = schat_rekentijd_exact([post(40000, postwaarden=w)])
+    assert 0 <= klein < groot
+    assert schat_rekentijd_exact([post(2000)]) == 0.0
+    assert schat_rekentijd_exact([post(5_000_000, postwaarden=w)]) is None

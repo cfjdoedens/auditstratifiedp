@@ -6,7 +6,10 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import fftconvolve
 from scipy.special import betaln, gammaln, nbdtr
 
-from auditstat.sso.compound_postwaarden import kansmassa_compound
+from auditstat.sso.compound_postwaarden import (
+    kansmassa_compound,
+    schat_rekentijd_compound,
+)
 from auditstat.stratified.utils import foutloze_posten_equivalent
 
 # Standaard aantal cellen van het euro-rooster waarop de strata worden
@@ -124,6 +127,7 @@ def evalueer_SSO_klant_exact(
     model="binomiaal",
     zekerheid=0.95,
     granulariteit=STANDAARD_GRANULARITEIT,
+    voortgang=None,
 ):
     """
     Evalueert een klant gestratificeerd (één stratum per type post) op basis
@@ -180,6 +184,9 @@ def evalueer_SSO_klant_exact(
         Tussen 0 en 1.
     granulariteit : int
         Aantal cellen van het euro-rooster.
+    voortgang : callable, optional
+        ``voortgang(fractie)`` (0 tot 1), regelmatig aangeroepen tijdens de
+        berekening, voor een voortgangsbalk.
 
     Returns
     -------
@@ -213,16 +220,35 @@ def evalueer_SSO_klant_exact(
     dx = totaal / granulariteit
 
     kansmassa = np.array([1.0])
-    for post in post_typen:
+    for index, post in enumerate(post_typen):
+
+        def _deel(f, index=index):
+            if voortgang is not None:
+                voortgang((index + f) / len(post_typen))
+
         n, k, N, w = post["n"], post["k"], int(post["N_klant"]), post["waarde_laag"]
         n_calc = n + _extra_foutloze_posten(post)
         if post.get("postwaarden") is not None:
             massa = kansmassa_compound(
-                model, n_calc, k, N, w, np.asarray(post["postwaarden"]), dx
+                model,
+                n_calc,
+                k,
+                N,
+                w,
+                np.asarray(post["postwaarden"]),
+                dx,
+                voortgang=_deel,
             )
         elif post.get("cv", 0.0) > 0:
             massa = kansmassa_compound(
-                model, n_calc, k, N, w, ("gamma", float(post["cv"])), dx
+                model,
+                n_calc,
+                k,
+                N,
+                w,
+                ("gamma", float(post["cv"])),
+                dx,
+                voortgang=_deel,
             )
         else:
             cdf = _cdf_aantal_fouten(model, n_calc, k, N)
@@ -235,6 +261,7 @@ def evalueer_SSO_klant_exact(
             massa = np.diff(np.concatenate([[0.0], kum]))
             massa[-1] += 1.0 - kum[-1]
         kansmassa = fftconvolve(kansmassa, massa)
+        _deel(1.0)
 
     kansmassa = np.clip(kansmassa, 0.0, None)
     kansmassa /= kansmassa.sum()
@@ -298,3 +325,39 @@ def evalueer_SSO_klant_exact(
             "vergelijk": False,
         },
     }
+
+
+def schat_rekentijd_exact(
+    post_typen, model="binomiaal", granulariteit=STANDAARD_GRANULARITEIT
+):
+    """Indicatie (seconden) van de rekentijd van ``evalueer_SSO_klant_exact``.
+
+    Alleen typen posten met ``postwaarden`` of ``cv > 0`` kosten merkbaar
+    tijd. Een orde-van-grootte-schatting; geeft ``None`` als de berekening
+    om een andere reden niet kan (de berekening zelf geeft dan de
+    foutmelding).
+    """
+    try:
+        totaal = float(sum(p["waarde_laag"] for p in post_typen))
+        dx = totaal / granulariteit
+        seconden = 0.0
+        for post in post_typen:
+            n_calc = post["n"] + _extra_foutloze_posten(post)
+            if post.get("postwaarden") is not None:
+                z = np.asarray(post["postwaarden"])
+            elif post.get("cv", 0.0) > 0:
+                z = ("gamma", float(post["cv"]))
+            else:
+                continue
+            seconden += schat_rekentijd_compound(
+                model,
+                n_calc,
+                post["k"],
+                int(post["N_klant"]),
+                post["waarde_laag"],
+                z,
+                dx,
+            )
+        return seconden
+    except (ValueError, KeyError, TypeError):
+        return None
