@@ -100,4 +100,3 @@ Daarmee zijn twee verschillende vragen afzonderlijk beantwoord:
    Omdat de implementatie wordt getoetst aan exacte analytische oplossingen, alternatieve convolutiealgoritmen en numerieke convergentietests.
 
 Daarmee vormt convolutie via `FFT samen` een transparante, reproduceerbare en rechtstreeks controleerbare statistische basis voor de gezamenlijke evaluatie van gestratificeerde auditsteekproeven.
-

@@ -414,9 +414,3 @@ waarover de FFT rekent opgevuld tot de volgende macht van 2
 Strata met een gezamenlijke `waarde_laag` kleiner dan $0{,}01$ worden direct
 analytisch behandeld en niet geconvolueerd. Dit voorkomt numerieke problemen
 bij een nagenoeg lege verdeling.
-
-
-
-
-
-
