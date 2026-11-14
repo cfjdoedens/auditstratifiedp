@@ -33,6 +33,8 @@ _STAARTMASSA = 1e-12
 # één vermenigvuldiging van een rooster-lange vector).
 MAX_K_VENSTER = 300_000
 _MAX_FFT_LENGTE = 2**22
+# Aantal frequenties per blok in de K-lus (past in de L1/L2-cache).
+_FREQUENTIEBLOK = 2048
 
 
 def aantal_fouten_venster(model, n, k, N):
@@ -56,9 +58,15 @@ def aantal_fouten_venster(model, n, k, N):
         q = n / (n + N)
         hoogste = int(nbinom.ppf(1 - _STAARTMASSA, k + 1, q)) + 1
         pmf = nbinom.pmf(np.arange(0, hoogste + 1), k + 1, q)
+    # Normaliseren vóór de cumulatieve som: de log-gamma-berekening telt door
+    # afrondingsfouten op tot ca. 1 - 1e-10, waardoor ``cum`` nooit 1 - 1e-12
+    # haalde en het venster onterecht tot K = N doorliep. De bovenstaart
+    # komt uit een omgekeerde som (nauwkeurig voor kleine massa's).
+    pmf = pmf / pmf.sum()
     cum = np.cumsum(pmf)
+    staart = np.cumsum(pmf[::-1])[::-1]  # staart[j] = P(K >= j)
     laag = int(np.searchsorted(cum, _STAARTMASSA))
-    hoog = min(int(np.searchsorted(cum, 1 - _STAARTMASSA)) + 1, len(pmf) - 1)
+    hoog = int(np.max(np.nonzero(staart > _STAARTMASSA)[0]))
     venster = pmf[laag : hoog + 1]
     return laag, venster / venster.sum()
 
@@ -117,11 +125,11 @@ def _rooster(model, n, k, N, waarde, z, dx):
 
 
 # Ruwe kalibratie van de rekentijd van de K-lus (seconden per
-# vensterlengte x halve FFT-lengte). Gemeten (N_klant 30.000 / 60.000 /
-# 100.000, 20.000 cellen, binomiaal): 12 / 16 / 30 x 1e-9 s per eenheid; de
-# tijd per eenheid stijgt met de arraylengte (geheugen). Alleen een
+# vensterlengte x halve FFT-lengte). Gemeten na de Horner-/blokaanpak
+# (N_klant 30.000 / 100.000 / 300.000, 20.000 cellen, binomiaal en poisson):
+# 1,1e-9 s per eenheid, vrijwel constant; 1,5e-9 laat enige marge. Alleen een
 # orde-van-grootte-indicatie, afhankelijk van de computer.
-_SECONDEN_PER_EENHEID = 2.0e-8
+_SECONDEN_PER_EENHEID = 1.5e-9
 
 
 def schat_rekentijd_compound(model, n, k, N, waarde, z, dx):
@@ -189,15 +197,22 @@ def kansmassa_compound(model, n, k, N, waarde, z, dx, voortgang=None):
             uit += pmf[kk - k0] * massa_k
         start = max(start, grens_k + 1)
     if start <= k_max:
-        macht = phi**start
-        acc = np.zeros(len(phi), dtype=complex)
-        totaal_i = len(pmf) - (start - k0)
-        stap = max(totaal_i // 200, 1)
-        for i in range(start - k0, len(pmf)):
-            acc += pmf[i] * macht
-            macht = macht * phi
-            if voortgang is not None and (i - (start - k0)) % stap == 0:
-                voortgang((i - (start - k0)) / totaal_i)
+        # Som_K pmf[K] * phi**K in de Horner-vorm (hoogste K eerst): één
+        # vermenigvuldiging en één optelling per K. De frequenties worden in
+        # blokken verwerkt die in de cache passen; dat is ca. 5 keer sneller
+        # dan telkens de hele vector doorlopen (de lus is geheugengebonden).
+        acc = np.empty(len(phi), dtype=complex)
+        gewichten = pmf[start - k0 :]
+        blokken = range(0, len(phi), _FREQUENTIEBLOK)
+        for nr, begin in enumerate(blokken):
+            if voortgang is not None:
+                voortgang(nr / len(blokken))
+            phi_b = phi[begin : begin + _FREQUENTIEBLOK]
+            h = np.full(len(phi_b), gewichten[-1], dtype=complex)
+            for w in gewichten[-2::-1]:
+                h *= phi_b
+                h += w
+            acc[begin : begin + len(phi_b)] = h * phi_b**start
         massa = np.clip(np.fft.irfft(acc, lengte), 0.0, None)
         # Nearest-cel naar boven: schuif een cel op.
         uit[1:ncellen] += massa[: ncellen - 1]

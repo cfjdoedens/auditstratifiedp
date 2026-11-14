@@ -195,3 +195,17 @@ def test_schatting_rekentijd_groeit_met_n_klant_en_geeft_none_bij_fout():
     assert 0 <= klein < groot
     assert schat_rekentijd_exact([post(2000)]) == 0.0
     assert schat_rekentijd_exact([post(5_000_000, postwaarden=w)]) is None
+
+
+def test_venster_aantal_fouten_loopt_niet_door_tot_n():
+    import numpy as np
+
+    from auditstat.sso.compound_postwaarden import aantal_fouten_venster
+
+    # Regressie: door afrondingsfouten in de pmf haalde de cumulatieve som nooit
+    # 1 - 1e-12 en liep het venster door tot K = N (100.001 i.p.v. ~15.700).
+    laag, venster = aantal_fouten_venster("binomiaal", 200, 2, 100_000)
+    assert len(venster) < 20_000
+    assert abs(venster.sum() - 1.0) < 1e-12
+    assert laag + len(venster) - 1 >= 15_000
+    assert np.all(venster >= 0)
