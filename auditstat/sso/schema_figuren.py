@@ -1,9 +1,9 @@
 """Schematische figuren voor de Theorie-tab en het Quarto-document.
 
 De figuren worden getekend met matplotlib en zijn zowel door de Streamlit-app
-(``theorie.qmd`` wordt daar ingelezen) als door Quarto zelf (``quarto render
-theorie.qmd``) te gebruiken. ``THEORIE_FIGUREN`` koppelt het label van een
-figuur in ``theorie.qmd`` aan de tekenfunctie.
+(``theorie_SSO.qmd`` wordt daar ingelezen) als door Quarto zelf (``quarto render
+theorie_SSO.qmd``) te gebruiken. ``THEORIE_FIGUREN`` koppelt het label van een
+figuur in ``theorie_SSO.qmd`` aan de tekenfunctie.
 """
 
 import math

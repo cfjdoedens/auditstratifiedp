@@ -3840,11 +3840,11 @@ with tab_sso:
 # gewone wiskundige afleiding/redenering, nog geen formeel Lean-bewijs (dat
 # is een apart, toekomstig traject — zie AGENTS.md).
 with tab_theorie:
-    # De theorietekst staat in theorie.qmd (zie auditstat/sso/theorie_qmd.py).
+    # De theorietekst staat in theorie_SSO.qmd (zie auditstat/sso/theorie_qmd.py).
     try:
-        _theorie = lees_theorie_qmd(Path(__file__).parent / "theorie.qmd")
+        _theorie = lees_theorie_qmd(Path(__file__).parent / "theorie_SSO.qmd")
     except (OSError, ValueError) as _fout:
-        st.error(f"theorie.qmd kon niet worden gelezen: {_fout}")
+        st.error(f"theorie_SSO.qmd kon niet worden gelezen: {_fout}")
     else:
         st.subheader(_theorie.titel or "Theoretische achtergrond")
         if _theorie.inleiding:
@@ -3859,4 +3859,4 @@ with tab_theorie:
                         if _blok.bijschrift:
                             st.caption(_blok.bijschrift)
                     else:
-                        st.error(f"Onbekende figuur in theorie.qmd: {_blok.label}")
+                        st.error(f"Onbekende figuur in theorie_SSO.qmd: {_blok.label}")

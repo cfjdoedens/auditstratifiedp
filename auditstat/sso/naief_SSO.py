@@ -45,7 +45,7 @@ def naief_match_SSO(n, k, N_klant, cv=0.0):
     Niveau 2 (variabele postgroottes): met de variatiecoëfficiënt ``cv`` van
     de postgroottes (standaardafwijking gedeeld door gemiddelde) wordt de
     variantie bij de klant ``p(1-p)(1 + cv²)/N_klant`` (voor kleine ``p``;
-    zie ``theorie.qmd``) en wordt de formule
+    zie ``theorie_SSO.qmd``) en wordt de formule
 
         n_eff = n · N_klant / (N_klant + n · (1 + cv²))
 

@@ -1,6 +1,6 @@
 """Samengestelde verdeling van de euro-fout bij een klant, met variabele postgroottes.
 
-Niveau 2 en 3 van de SSO-theorie (``theorie.qmd``): de fout in euro's bij een
+Niveau 2 en 3 van de SSO-theorie (``theorie_SSO.qmd``): de fout in euro's bij een
 klant is ``E = Z_1 + ... + Z_K``, met ``K`` het aantal foute posten (Beta-
 Binomiaal resp. Negatief-Binomiaal, net als bij de exacte methode op niveau 1)
 en ``Z_i`` de waarde van een foute post:

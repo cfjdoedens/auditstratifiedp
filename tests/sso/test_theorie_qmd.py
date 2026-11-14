@@ -5,7 +5,7 @@ import pytest
 from auditstat.sso.schema_figuren import THEORIE_FIGUREN
 from auditstat.sso.theorie_qmd import Figuur, lees_theorie_qmd, parseer_theorie_qmd
 
-QMD = Path(__file__).resolve().parents[2] / "theorie.qmd"
+QMD = Path(__file__).resolve().parents[2] / "theorie_SSO.qmd"
 
 VOORBEELD = """---
 title: "Titel"

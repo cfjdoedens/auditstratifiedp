@@ -1,4 +1,4 @@
-"""Inlezen van ``theorie.qmd`` voor de Theorie-tab van de Streamlit-app.
+"""Inlezen van ``theorie_SSO.qmd`` voor de Theorie-tab van de Streamlit-app.
 
 Het Quarto-document is de enige bron van de theorietekst. De app gebruikt
 een kleine, bewust beperkte lezer (geen Quarto nodig op de server):
@@ -47,7 +47,7 @@ def _ontquote(waarde: str) -> str:
 
 
 def parseer_theorie_qmd(tekst: str) -> Theorie:
-    """Zet de inhoud van een theorie.qmd om in titel, inleiding en secties."""
+    """Zet de inhoud van een theorie_SSO.qmd om in titel, inleiding en secties."""
     tekst = re.sub(r"<!--.*?-->", "", tekst, flags=re.DOTALL)
     regels = tekst.replace("\r\n", "\n").split("\n")
 
