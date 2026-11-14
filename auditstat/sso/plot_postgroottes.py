@@ -24,6 +24,8 @@ from scipy.stats import gamma as gamma_verdeling
 from auditstat._formatting import nl_getal, nl_getal_variabel, nl_tick_formatter
 
 _PUNTEN = 400
+# log-assen tonen hooguit 9 decaden onder het grootste bedrag
+_MIN_VERHOUDING = 1e-9
 
 
 def _controleer_cv(cv: float) -> float:
@@ -298,10 +300,14 @@ def _controleer_waarden(waarden) -> np.ndarray:
 def _zet_logbereik(ax, groepen) -> None:
     """Begrens de log-as tot het 0,2%-kwantiel (onder) en het maximum (boven),
     zodat enkele extreem kleine posten de as niet ruim over nullen uitrekken."""
-    laag = min(
-        float(np.quantile(np.asarray(w, dtype=float), 0.002)) for w in groepen.values()
-    )
     hoog = max(float(np.max(w)) for w in groepen.values())
+    laag = max(
+        min(
+            float(np.quantile(np.asarray(w, dtype=float), 0.002))
+            for w in groepen.values()
+        ),
+        hoog * _MIN_VERHOUDING,
+    )
     if hoog > laag > 0:
         ax.set_xlim(laag / 1.5, hoog * 1.3)
 
@@ -454,8 +460,9 @@ def simuleer_gamma_posten(
     rng = np.random.default_rng(seed)
     waarden = rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
     # bij zeer grote cv geeft de gammatrekking soms exact 0 (underflow);
-    # een post van 0 euro bestaat in dit voorbeeld niet
-    return np.maximum(waarden, gemiddelde * 1e-12)
+    # een post van 0 euro bestaat in dit voorbeeld niet (alleen het kleinste
+    # positieve getal als ondergrens, zodat er geen kunstmatige opeenhoping ontstaat)
+    return np.maximum(waarden, np.finfo(float).tiny)
 
 
 def _groepen_dict(waarden) -> dict:
@@ -517,15 +524,15 @@ def plot_histogram_postgroottes(
     if not groepen:
         raise ValueError("Geef minstens één groep postbedragen.")
     alle = [_controleer_waarden(w) for w in groepen.values()]
-    laag = min(float(np.quantile(w, 0.002)) for w in alle)
     hoog = max(float(w.max()) for w in alle)
+    laag = max(min(float(np.quantile(w, 0.002)) for w in alle), hoog * _MIN_VERHOUDING)
     if not hoog > laag:
         laag, hoog = laag / 2, hoog * 2
     randen = np.logspace(np.log10(laag), np.log10(hoog), klassen + 1)
     fig, ax = plt.subplots(figsize=_afmeting(compact))
     for i, (naam, w) in enumerate(zip(groepen, alle, strict=True)):
         kleur = plt.get_cmap("tab10")(i % 10)
-        aantallen, _ = np.histogram(np.clip(w, laag, hoog), bins=randen)
+        aantallen, _ = np.histogram(w, bins=randen)
         aandeel = aantallen / w.size
         if len(groepen) == 1:
             ax.stairs(aandeel, randen, fill=True, color=kleur, alpha=0.7)

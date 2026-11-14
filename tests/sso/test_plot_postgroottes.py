@@ -173,3 +173,17 @@ def test_simuleer_gamma_posten_blijft_positief_bij_zeer_grote_cv():
     w = simuleer_gamma_posten(10.0, 500.0, 5000)
     assert np.all(w > 0)
     plot_pareto_postgroottes(w, compact=True)
+
+
+def test_histogram_heeft_geen_uitschieter_links_bij_cv_3():
+    from auditstat.sso.plot_postgroottes import (
+        plot_histogram_postgroottes,
+        simuleer_gamma_posten,
+    )
+
+    w = simuleer_gamma_posten(3.0, 500.0, 20000)
+    fig = plot_histogram_postgroottes(w)
+    hoogtes = fig.axes[0].patches[0].get_path().vertices[:, 1]
+    hoogtes = hoogtes[hoogtes > 0]
+    assert hoogtes[0] <= 1.5 * hoogtes.max() and hoogtes.max() < 0.12
+    assert hoogtes[:3].max() < 0.5 * hoogtes.max()
