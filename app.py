@@ -16,6 +16,14 @@ import streamlit as st
 # nog niet, dan volgt een duidelijke herstartmelding.
 for _poging in (1, 2):
     try:
+        from auditstat.lokaal_bestanden import (  # pyrefly: ignore[missing-import]
+            dialoog_beschikbaar,
+            is_lokaal_verzoek,
+            kies_bestand_dialoog,
+            kies_opslaan_dialoog,
+            lees_lokaal_bestand,
+            schrijf_lokaal_bestand,
+        )
         from auditstat.single.eval_distribution import (  # pyrefly: ignore[missing-import]
             eval_distribution,
             plot_eval_distribution,
@@ -294,8 +302,7 @@ def _lees_cv(ruw, label: str, fouten: list) -> float:
     waarde = _parse_nl(tekst)
     if waarde is None or waarde < 0:
         fouten.append(
-            f"{label}: veld 'cv' (\"{tekst}\") is geen geldig getal van "
-            "minstens 0."
+            f"{label}: veld 'cv' (\"{tekst}\") is geen geldig getal van minstens 0."
         )
         return 0.0
     return waarde
@@ -1064,7 +1071,135 @@ def _sso_voorbeeld_tekst(status, voorbeeldzin, uitleg=""):
     return " ".join(t for t in (voorbeeld, uitleg) if t)
 
 
-def on_sso_csv_upload():
+class _LokaalBestand:
+    """Een lokaal gelezen bestand met dezelfde interface als een upload."""
+
+    def __init__(self, name, inhoud):
+        self.name = name
+        self._inhoud = inhoud
+
+    def getvalue(self):
+        return self._inhoud
+
+
+def _is_lokaal():
+    """Draait de app lokaal en komt dit verzoek van de eigen computer?"""
+    try:
+        return is_lokaal_verzoek(st.context.ip_address, st.context.headers.get("Host"))
+    except Exception:  # noqa: BLE001 - bij twijfel: niet lokaal
+        return False
+
+
+def _lees_lokaal_pad(pad_sleutel, verwerk, meld_fout, bladeren):
+    """Lees een lokaal bestand (via het pad in het tekstveld of via een
+    bestandsvenster) en geef het aan `verwerk`; fouten gaan naar `meld_fout`."""
+    if bladeren:
+        try:
+            pad = kies_bestand_dialoog()
+        except RuntimeError as fout:
+            meld_fout(str(fout))
+            return
+        if pad is None:
+            return
+        st.session_state[pad_sleutel] = pad
+    else:
+        pad = st.session_state.get(pad_sleutel, "")
+    try:
+        naam, inhoud = lees_lokaal_bestand(pad)
+    except ValueError as fout:
+        meld_fout(str(fout))
+        return
+    verwerk(_LokaalBestand(naam, inhoud))
+
+
+def _toon_lokaal_inlezen(sleutel, verwerk, meld_fout):
+    """Toon (alleen lokaal) de keuze van een bestand op deze computer."""
+    if not _is_lokaal():
+        return
+    pad_sleutel = f"{sleutel}_pad"
+    st.text_input(
+        "Of lees een bestand van deze computer in (pad)",
+        key=pad_sleutel,
+        help=(
+            "Alleen beschikbaar als de app lokaal draait. Plak een pad of "
+            "kies met Bladeren\u2026 een bestand."
+        ),
+    )
+    kolommen = st.columns(2)
+    kolommen[0].button(
+        "Inlezen",
+        key=f"{sleutel}_inlezen",
+        on_click=_lees_lokaal_pad,
+        args=(pad_sleutel, verwerk, meld_fout, False),
+    )
+    if dialoog_beschikbaar():
+        kolommen[1].button(
+            "Bladeren\u2026",
+            key=f"{sleutel}_bladeren",
+            on_click=_lees_lokaal_pad,
+            args=(pad_sleutel, verwerk, meld_fout, True),
+        )
+
+
+def _opslaan_lokaal(sleutel, data, standaardnaam, bladeren):
+    pad_sleutel = f"{sleutel}_pad"
+    try:
+        if bladeren:
+            pad = kies_opslaan_dialoog(standaardnaam=standaardnaam)
+            if pad is None:
+                return
+            st.session_state[pad_sleutel] = pad
+            # Het systeemvenster heeft al om bevestiging gevraagd.
+            bestand = schrijf_lokaal_bestand(pad, data, overschrijven=True)
+        else:
+            bestand = schrijf_lokaal_bestand(
+                st.session_state.get(pad_sleutel, ""), data
+            )
+    except (RuntimeError, ValueError) as fout:
+        st.session_state[f"{sleutel}_melding"] = ("error", str(fout))
+        return
+    st.session_state[f"{sleutel}_melding"] = ("success", f"Opgeslagen: {bestand}")
+
+
+def _toon_lokaal_opslaan(sleutel, data, standaardnaam):
+    """Toon (alleen lokaal) het opslaan van `data` op deze computer."""
+    if not _is_lokaal():
+        return
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    pad_sleutel = f"{sleutel}_pad"
+    if pad_sleutel not in st.session_state:
+        st.session_state[pad_sleutel] = str(Path.home() / standaardnaam)
+    with st.expander("Opslaan op deze computer"):
+        st.text_input(
+            "Pad",
+            key=pad_sleutel,
+            help=(
+                "Alleen beschikbaar als de app lokaal draait. Een bestaand "
+                "bestand wordt niet overschreven; kies dan een andere naam "
+                "of gebruik Bladeren\u2026."
+            ),
+        )
+        kolommen = st.columns(2)
+        kolommen[0].button(
+            "Opslaan",
+            key=f"{sleutel}_opslaan",
+            on_click=_opslaan_lokaal,
+            args=(sleutel, data, standaardnaam, False),
+        )
+        if dialoog_beschikbaar():
+            kolommen[1].button(
+                "Bladeren\u2026",
+                key=f"{sleutel}_bladeren",
+                on_click=_opslaan_lokaal,
+                args=(sleutel, data, standaardnaam, True),
+            )
+    melding = st.session_state.pop(f"{sleutel}_melding", None)
+    if melding is not None:
+        (st.success if melding[0] == "success" else st.error)(melding[1])
+
+
+def on_sso_csv_upload(lokaal_bestand=None):
     """Lees een geüploade SSO-invoer-CSV in en zet de invoer van de SSO-tab.
 
     Draait als `on_change`-callback, dus vóór de rerun: widget-sleutels
@@ -1072,9 +1207,11 @@ def on_sso_csv_upload():
     blijft de huidige invoer volledig ongewijzigd en krijgt de gebruiker de
     foutmeldingen te zien. De uploader krijgt een nieuwe sleutel, zodat
     hetzelfde bestand na een wijziging opnieuw kan worden geüpload.
+    `lokaal_bestand` is een bestand van het lokale bestandssysteem
+    (alleen bij lokaal draaien) in plaats van een upload.
     """
     sleutel = f"sso_csv_upload_{st.session_state.sso_csv_upload_key}"
-    bestand = st.session_state.get(sleutel)
+    bestand = lokaal_bestand or st.session_state.get(sleutel)
     st.session_state.sso_csv_upload_key += 1
     if bestand is None:
         return
@@ -1151,9 +1288,9 @@ def on_sso_csv_upload():
     )
 
 
-def on_sso_niveau3_upload():
+def on_sso_niveau3_upload(lokaal_bestand=None):
     """Lees het postenbestand van de hele SSO in (niveau 3)."""
-    bestand = st.session_state.get("sso_niveau3_upload")
+    bestand = lokaal_bestand or st.session_state.get("sso_niveau3_upload")
     if bestand is None:
         st.session_state.sso_niveau3_posten = None
         st.session_state.sso_niveau3_naam = None
@@ -1172,8 +1309,8 @@ def on_sso_niveau3_upload():
     st.session_state.sso_totaal_res = None
 
 
-def on_sso_postenbestand_upload():
-    bestand = st.session_state.get("sso_posten_upload")
+def on_sso_postenbestand_upload(lokaal_bestand=None):
+    bestand = lokaal_bestand or st.session_state.get("sso_posten_upload")
     if bestand is None:
         st.session_state.sso_postenbestand = None
         st.session_state.sso_postenbestand_naam = None
@@ -1187,6 +1324,21 @@ def on_sso_postenbestand_upload():
     st.session_state.sso_postenbestand = gelezen
     st.session_state.sso_postenbestand_naam = bestand.name
     st.session_state.sso_postenbestand_fout = None
+
+
+def _meld_csv_fout(tekst):
+    st.session_state.sso_csv_melding = (
+        "error",
+        f"CSV niet ingelezen; de huidige invoer is ongewijzigd.\n\n{tekst}",
+    )
+
+
+def _meld_niveau3_fout(tekst):
+    st.session_state.sso_niveau3_fout = tekst
+
+
+def _meld_postenbestand_fout(tekst):
+    st.session_state.sso_postenbestand_fout = tekst
 
 
 # Bouw de hoofdnavigatie van de applicatie op met vier functionele tabbladen.
@@ -2255,8 +2407,7 @@ with tab_sso:
         if sso_postgroottes == "variabel":
             if "sso_totaal_cv_text" not in st.session_state:
                 st.session_state.sso_totaal_cv_text = (
-                    st.session_state.get("sso_cv_bewaard")
-                    or SSO_TOTAAL_VOORBEELD["cv"]
+                    st.session_state.get("sso_cv_bewaard") or SSO_TOTAAL_VOORBEELD["cv"]
                 )
             sso_totaal_cv_text = st.text_input(
                 "CV van de postbedragen",
@@ -2293,9 +2444,7 @@ with tab_sso:
                     f"€ {_nl(_kenm['drempel_top10'], 2)} bij de grootste 10%."
                 )
             _toon_postgroottes_weergaven(
-                simuleer_gamma_posten(
-                    _cv_getoond, _sso_gemiddelde or 1.0, 5000
-                ),
+                simuleer_gamma_posten(_cv_getoond, _sso_gemiddelde or 1.0, 5000),
                 gesimuleerd=True,
             )
             st.caption(_tekst)
@@ -2314,8 +2463,7 @@ with tab_sso:
         else:
             sso_totaal_cv_text = st.session_state.get(
                 "sso_totaal_cv_text",
-                st.session_state.get("sso_cv_bewaard")
-                or SSO_TOTAAL_VOORBEELD["cv"],
+                st.session_state.get("sso_cv_bewaard") or SSO_TOTAAL_VOORBEELD["cv"],
             )
             st.session_state.sso_cv_bewaard = sso_totaal_cv_text
             st.file_uploader(
@@ -2332,19 +2480,23 @@ with tab_sso:
                 ),
             )
             st.caption("Maximaal 50 MB en 1.000.000 posten per bestand.")
+            _toon_lokaal_inlezen(
+                "lok_niveau3", on_sso_niveau3_upload, _meld_niveau3_fout
+            )
+            _niveau3_voorbeeld_csv = postenbestand_csv(
+                maak_voorbeeld_sso_postenbestand([
+                    (
+                        r["klant"],
+                        r["type_post"],
+                        int(_parse_nl(r["N_klant"])),
+                        _parse_nl(r["waarde_laag"]) / _parse_nl(r["N_klant"]),
+                    )
+                    for r in LEGE_SSO_KLANTEN_DF.to_dict("records")
+                ])
+            )
             st.download_button(
                 "Voorbeeld-postenbestand downloaden (CSV)",
-                data=postenbestand_csv(
-                    maak_voorbeeld_sso_postenbestand([
-                        (
-                            r["klant"],
-                            r["type_post"],
-                            int(_parse_nl(r["N_klant"])),
-                            _parse_nl(r["waarde_laag"]) / _parse_nl(r["N_klant"]),
-                        )
-                        for r in LEGE_SSO_KLANTEN_DF.to_dict("records")
-                    ])
-                ),
+                data=_niveau3_voorbeeld_csv,
                 file_name="postenbestand_sso_voorbeeld.csv",
                 mime="text/csv",
                 key="sso_niveau3_voorbeeld_download",
@@ -2354,10 +2506,14 @@ with tab_sso:
                     "bij de voorbeeldinvoer. De bedragen zijn verzonnen."
                 ),
             )
+            _toon_lokaal_opslaan(
+                "lok_dl_niveau3_voorbeeld",
+                _niveau3_voorbeeld_csv,
+                "postenbestand_sso_voorbeeld.csv",
+            )
             if st.session_state.sso_niveau3_fout:
                 st.error(
-                    "Postenbestand niet ingelezen: "
-                    + st.session_state.sso_niveau3_fout
+                    "Postenbestand niet ingelezen: " + st.session_state.sso_niveau3_fout
                 )
             _niveau3_df = st.session_state.sso_niveau3_posten
             if _niveau3_df is None:
@@ -2548,9 +2704,7 @@ with tab_sso:
                     )
                 if _cvs_per_type:
                     _gem_type = {}
-                    for _r in st.session_state.sso_klanten_tabel.to_dict(
-                        "records"
-                    ):
+                    for _r in st.session_state.sso_klanten_tabel.to_dict("records"):
                         _t = str(_r.get("type_post") or "").strip()
                         _w = _parse_nl(_r.get("waarde_laag"))
                         _nn = _parse_nl(_r.get("N_klant"))
@@ -2765,31 +2919,33 @@ with tab_sso:
                 "een fout blijft de invoer ongewijzigd."
             ),
         )
+        _toon_lokaal_inlezen("lok_sso_csv", on_sso_csv_upload, _meld_csv_fout)
+        _sso_invoer_csv = maak_sso_invoer_csv(
+            instellingen={
+                "model": sso_model,
+                "zekerheid": sso_zekerheid_text,
+                "berekeningsmethode": sso_kalibratiemethode,
+                "onderscheid": sso_onderscheid,
+                "postgroottes": sso_postgroottes,
+            },
+            totaal={
+                "n": sso_totaal_n_text,
+                "k": sso_totaal_k_text,
+                "N_totaal": sso_totaal_N_text,
+                "massa": sso_totaal_massa_text,
+                "ihr": sso_totaal_ihr,
+                "ibr": sso_totaal_ibr,
+                "car": sso_totaal_car,
+                "materialiteit": sso_totaal_materialiteit_text,
+                "cv": sso_totaal_cv_text,
+            },
+            klanten=st.session_state.sso_klanten_totaal_tabel,
+            typen_posten=st.session_state.sso_typen_posten_tabel,
+            klanten_typen=st.session_state.sso_klanten_tabel,
+        ).encode("utf-8-sig")
         st.download_button(
             "SSO-invoer downloaden (CSV)",
-            data=maak_sso_invoer_csv(
-                instellingen={
-                    "model": sso_model,
-                    "zekerheid": sso_zekerheid_text,
-                    "berekeningsmethode": sso_kalibratiemethode,
-                    "onderscheid": sso_onderscheid,
-                    "postgroottes": sso_postgroottes,
-                },
-                totaal={
-                    "n": sso_totaal_n_text,
-                    "k": sso_totaal_k_text,
-                    "N_totaal": sso_totaal_N_text,
-                    "massa": sso_totaal_massa_text,
-                    "ihr": sso_totaal_ihr,
-                    "ibr": sso_totaal_ibr,
-                    "car": sso_totaal_car,
-                    "materialiteit": sso_totaal_materialiteit_text,
-                    "cv": sso_totaal_cv_text,
-                },
-                klanten=st.session_state.sso_klanten_totaal_tabel,
-                typen_posten=st.session_state.sso_typen_posten_tabel,
-                klanten_typen=st.session_state.sso_klanten_tabel,
-            ).encode("utf-8-sig"),
+            data=_sso_invoer_csv,
             file_name="sso_invoer.csv",
             mime="text/csv",
             help=(
@@ -2797,32 +2953,37 @@ with tab_sso:
                 "ook als onderscheid op \u2018nee\u2019 staat."
             ),
         )
+        _toon_lokaal_opslaan("lok_dl_sso_invoer", _sso_invoer_csv, "sso_invoer.csv")
+        _sso_voorbeeld_csv = maak_sso_invoer_csv(
+            instellingen={
+                "model": "binomiaal",
+                "zekerheid": "0,95",
+                "berekeningsmethode": "momentmatching",
+                "onderscheid": "ja",
+                "postgroottes": "homogeen",
+            },
+            totaal={
+                **SSO_TOTAAL_VOORBEELD,
+                "ihr": "H",
+                "ibr": "H",
+                "car": "H",
+            },
+            klanten=LEGE_SSO_KLANTEN_TOTAAL_DF,
+            typen_posten=LEGE_SSO_TYPEN_POSTEN_DF,
+            klanten_typen=LEGE_SSO_KLANTEN_DF,
+        ).encode("utf-8-sig")
         st.download_button(
             "Voorbeeldbestand downloaden (CSV)",
-            data=maak_sso_invoer_csv(
-                instellingen={
-                    "model": "binomiaal",
-                    "zekerheid": "0,95",
-                    "berekeningsmethode": "momentmatching",
-                    "onderscheid": "ja",
-                    "postgroottes": "homogeen",
-                },
-                totaal={
-                    **SSO_TOTAAL_VOORBEELD,
-                    "ihr": "H",
-                    "ibr": "H",
-                    "car": "H",
-                },
-                klanten=LEGE_SSO_KLANTEN_TOTAAL_DF,
-                typen_posten=LEGE_SSO_TYPEN_POSTEN_DF,
-                klanten_typen=LEGE_SSO_KLANTEN_DF,
-            ).encode("utf-8-sig"),
+            data=_sso_voorbeeld_csv,
             file_name="sso_invoer_voorbeeld.csv",
             mime="text/csv",
             help=(
                 "Een ingevuld voorbeeld in het juiste formaat, om te openen "
                 "in Excel en als uitgangspunt voor een eigen bestand."
             ),
+        )
+        _toon_lokaal_opslaan(
+            "lok_dl_sso_voorbeeld", _sso_voorbeeld_csv, "sso_invoer_voorbeeld.csv"
         )
         with st.expander("Uitleg van het CSV-formaat"):
             st.markdown(
@@ -2880,9 +3041,9 @@ with tab_sso:
                 )
             else:
                 niveau3_waarden = postgroottes_per_type_post(niveau3_df)
-                niveau3_waarden[_ALLE_POSTEN] = niveau3_df["bedrag_cent"].to_numpy(
-                    dtype=float
-                ) / 100
+                niveau3_waarden[_ALLE_POSTEN] = (
+                    niveau3_df["bedrag_cent"].to_numpy(dtype=float) / 100
+                )
                 niveau3_cv = {
                     naam: variatiecoefficient(w) for naam, w in niveau3_waarden.items()
                 }
@@ -3358,12 +3519,16 @@ with tab_sso:
                 f"{_nl(float(_bedragen.std(ddof=0) / _bedragen.mean()), 2)} "
                 "(wijkt bij weinig posten af van de ingestelde CV)."
             )
+            _posten_voorbeeld_csv = postenbestand_csv(voorbeeld_df)
             st.download_button(
                 "Download voorbeeld-postenbestand (CSV)",
-                data=postenbestand_csv(voorbeeld_df),
+                data=_posten_voorbeeld_csv,
                 file_name="postenbestand.csv",
                 mime="text/csv",
                 key="sso_posten_download",
+            )
+            _toon_lokaal_opslaan(
+                "lok_dl_posten_voorbeeld", _posten_voorbeeld_csv, "postenbestand.csv"
             )
         else:
             st.warning(
@@ -3376,6 +3541,9 @@ with tab_sso:
             on_change=on_sso_postenbestand_upload,
         )
         st.caption("Maximaal 20 MB en 100.000 posten per bestand.")
+        _toon_lokaal_inlezen(
+            "lok_posten", on_sso_postenbestand_upload, _meld_postenbestand_fout
+        )
         if st.session_state.sso_postenbestand_fout:
             st.error(
                 "Postenbestand niet ingelezen: "
@@ -3509,6 +3677,9 @@ with tab_sso:
                         "Bevat de invoer waarmee is gerekend, de resultaten "
                         "per klant en de kanskrommen."
                     ),
+                )
+                _toon_lokaal_opslaan(
+                    "lok_dl_pdf", st.session_state.sso_rapport_pdf, "sso_rapport.pdf"
                 )
 
         sso_totaal_res = st.session_state.sso_totaal_res
