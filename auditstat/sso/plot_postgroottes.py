@@ -290,22 +290,27 @@ def _bedrag_formatter():
 
 def _controleer_waarden(waarden) -> np.ndarray:
     w = np.asarray(waarden, dtype=float)
-    if w.size == 0 or not np.all(np.isfinite(w)) or not np.all(w > 0):
+    if w.size == 0 or not np.all(np.isfinite(w)) or np.any(w < 0) or not np.any(w > 0):
         raise ValueError(
-            "Postbedragen moeten een niet-lege rij positieve getallen zijn."
+            "Postbedragen moeten een niet-lege rij getallen van minstens 0 zijn, "
+            "waarvan minstens één positief."
         )
     return w
+
+
+def _positief(w) -> np.ndarray:
+    """Alleen de posten boven 0 (een log-as kan geen 0 tonen)."""
+    w = np.asarray(w, dtype=float)
+    return w[w > 0]
 
 
 def _zet_logbereik(ax, groepen) -> None:
     """Begrens de log-as tot het 0,2%-kwantiel (onder) en het maximum (boven),
     zodat enkele extreem kleine posten de as niet ruim over nullen uitrekken."""
-    hoog = max(float(np.max(w)) for w in groepen.values())
+    positief = [_positief(w) for w in groepen.values()]
+    hoog = max(float(np.max(w)) for w in positief)
     laag = max(
-        min(
-            float(np.quantile(np.asarray(w, dtype=float), 0.002))
-            for w in groepen.values()
-        ),
+        min(float(np.quantile(w, 0.002)) for w in positief),
         hoog * _MIN_VERHOUDING,
     )
     if hoog > laag > 0:
@@ -376,9 +381,10 @@ def plot_ecdf_postgroottes(groepen: dict, compact: bool = False) -> Figure:
     for i, (naam, waarden) in enumerate(groepen.items()):
         w = np.sort(_controleer_waarden(waarden))
         y = np.arange(1, w.size + 1) / w.size
+        pos = w > 0  # posten van 0 tellen mee in y, maar staan niet op de log-as
         ax.step(
-            w,
-            y,
+            w[pos],
+            y[pos],
             where="post",
             color=plt.get_cmap("tab10")(i % 10),
             linewidth=1.8,
@@ -417,7 +423,10 @@ def plot_strip_postgroottes(
     fig, ax = plt.subplots(figsize=(breed, max(hoog, 1.4 + 0.8 * len(groepen))))
     for i, waarden in enumerate(groepen.values()):
         w = _controleer_waarden(waarden)
-        punten = w if w.size <= max_punten else rng.choice(w, max_punten, replace=False)
+        wp = _positief(w)
+        punten = (
+            wp if wp.size <= max_punten else rng.choice(wp, max_punten, replace=False)
+        )
         y = i + rng.uniform(-0.3, 0.3, punten.size)
         ax.scatter(
             punten,
@@ -427,7 +436,8 @@ def plot_strip_postgroottes(
             color=plt.get_cmap("tab10")(i % 10),
             linewidths=0,
         )
-        ax.plot([np.median(w)] * 2, [i - 0.4, i + 0.4], color="green", linewidth=2)
+        if np.median(w) > 0:  # bij een mediaan van 0 past de lijn niet op de log-as
+            ax.plot([np.median(w)] * 2, [i - 0.4, i + 0.4], color="green", linewidth=2)
         ax.plot([w.mean()] * 2, [i - 0.4, i + 0.4], color="red", linewidth=2)
     ax.plot([], [], color="green", linewidth=2, label="mediaan")
     ax.plot([], [], color="red", linewidth=2, label="gemiddelde")
@@ -452,11 +462,10 @@ def simuleer_gamma_posten(
 ) -> np.ndarray:
     """Gesimuleerde Gamma-verdeelde postbedragen (voorbeeld bij niveau 2).
 
-    De bedragen zijn afgerond op hele centen, met 1 cent als kleinste post (een
-    post van 0 euro bestaat niet). Bij een grote cv geeft dat een zichtbare
-    opeenhoping op 1 cent: zoveel posten zijn dan kleiner dan een halve cent.
-    Bij ``cv = 0`` zijn alle posten gelijk aan ``gemiddelde`` (op centen
-    afgerond).
+    De bedragen zijn afgerond op hele centen: onder een halve cent wordt het
+    0 (een post van 0 euro kan bestaan). Bij een grote cv is dat een groot
+    deel van de posten. Bij ``cv = 0`` zijn alle posten gelijk aan
+    ``gemiddelde`` (op centen afgerond).
     """
     cv = _controleer_cv(cv)
     if cv == 0:
@@ -464,7 +473,7 @@ def simuleer_gamma_posten(
     else:
         rng = np.random.default_rng(seed)
         waarden = rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
-    return np.maximum(np.round(waarden, 2), 0.01)
+    return np.round(waarden, 2)
 
 
 def _groepen_dict(waarden) -> dict:
@@ -526,8 +535,9 @@ def plot_histogram_postgroottes(
     if not groepen:
         raise ValueError("Geef minstens één groep postbedragen.")
     alle = [_controleer_waarden(w) for w in groepen.values()]
-    hoog = max(float(w.max()) for w in alle)
-    laag = max(min(float(np.quantile(w, 0.002)) for w in alle), hoog * _MIN_VERHOUDING)
+    pos = [_positief(w) for w in alle]
+    hoog = max(float(w.max()) for w in pos)
+    laag = max(min(float(np.quantile(w, 0.002)) for w in pos), hoog * _MIN_VERHOUDING)
     if not hoog > laag:
         laag, hoog = laag / 2, hoog * 2
     randen = np.logspace(np.log10(laag), np.log10(hoog), klassen + 1)
@@ -542,7 +552,7 @@ def plot_histogram_postgroottes(
             ax.stairs(aandeel, randen, color=kleur, linewidth=1.8, label=naam)
     ax.set_xscale("log")
     ax.xaxis.set_major_formatter(_bedrag_formatter())
-    ax.yaxis.set_major_formatter(nl_tick_formatter(2))
+    ax.yaxis.set_major_formatter(nl_tick_formatter(3))
     ax.set_xlabel(
         "bedrag van de post (euro, log-schaal)", fontsize=8 if compact else None
     )
@@ -572,9 +582,10 @@ def plot_overschrijdingscurve_postgroottes(waarden, compact: bool = False) -> Fi
         w = np.sort(_controleer_waarden(w))
         # P(X >= w_(i)) = (n - i) / n, i = 0..n-1: de kleinste post heeft 1
         y = (w.size - np.arange(w.size)) / w.size
+        pos = w > 0  # posten van 0 tellen mee in y, maar staan niet op de log-as
         ax.step(
-            w,
-            y,
+            w[pos],
+            y[pos],
             where="post",
             color=plt.get_cmap("tab10")(i % 10),
             linewidth=1.8,

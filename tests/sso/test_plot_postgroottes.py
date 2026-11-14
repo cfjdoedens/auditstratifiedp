@@ -116,7 +116,7 @@ def test_pareto_ecdf_strip_figuren():
     plot_pareto_postgroottes([1.0, 2.0, 3.0])
     assert np.all(simuleer_gamma_posten(0.0, 7.0, 10) == 7.0)
     with pytest.raises(ValueError):
-        plot_ecdf_postgroottes({"a": [0.0, 1.0]})
+        plot_ecdf_postgroottes({"a": [-1.0, 1.0]})
     with pytest.raises(ValueError):
         plot_strip_postgroottes({})
 
@@ -164,24 +164,31 @@ def test_omgekeerde_lorenz_histogram_overschrijding():
             f({})
 
 
-def test_simuleer_gamma_posten_blijft_positief_bij_zeer_grote_cv():
+def test_gesimuleerde_posten_zijn_hele_centen_en_nul_mag():
     from auditstat.sso.plot_postgroottes import (
+        plot_ecdf_postgroottes,
+        plot_histogram_postgroottes,
+        plot_overschrijdingscurve_postgroottes,
         plot_pareto_postgroottes,
+        plot_strip_postgroottes,
         simuleer_gamma_posten,
     )
 
-    w = simuleer_gamma_posten(10.0, 500.0, 5000)
-    assert np.all(w > 0)
-    plot_pareto_postgroottes(w, compact=True)
-
-
-def test_gesimuleerde_posten_zijn_hele_centen():
-    from auditstat.sso.plot_postgroottes import simuleer_gamma_posten
-
     for cv in (0.0, 0.5, 3.0, 10.0):
         w = simuleer_gamma_posten(cv, 500.0, 5000)
-        assert np.all(w >= 0.01)
+        assert w.size == 5000
+        assert np.all(w >= 0)
         assert np.allclose(w * 100, np.round(w * 100))
+    w = simuleer_gamma_posten(10.0, 500.0, 5000)
+    assert (w == 0).mean() > 0.5  # onder een halve cent wordt 0
     assert simuleer_gamma_posten(0.0, 12.34, 3).tolist() == [12.34] * 3
-    assert simuleer_gamma_posten(10.0, 500.0, 5000).size == 5000
-    assert simuleer_gamma_posten(0.0, 0.001, 5).tolist() == [0.01] * 5
+    for f in (
+        plot_pareto_postgroottes,
+        plot_histogram_postgroottes,
+        plot_ecdf_postgroottes,
+        plot_overschrijdingscurve_postgroottes,
+        plot_strip_postgroottes,
+    ):
+        f(w if f is plot_pareto_postgroottes else {"a": w}, compact=True)
+    with pytest.raises(ValueError):
+        plot_pareto_postgroottes([0.0, 0.0])

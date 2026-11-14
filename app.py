@@ -336,10 +336,17 @@ def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
             plt.close(fig)
     bron = (
         "gesimuleerde posten (5.000 trekkingen uit het Gamma-model, vaste "
-        "seed, afgerond op centen, kleinste post 1 cent)"
+        "seed, afgerond op centen; onder een halve cent wordt het 0)"
         if gesimuleerd
         else "alle posten in het bestand"
     )
+    nullen = sum(1 for x in waarden if x == 0) / len(waarden) if gesimuleerd else 0.0
+    if nullen > 0:
+        st.caption(
+            f"{_nl(100 * nullen, 1)}% van de gesimuleerde posten is 0 cent. "
+            "Die tellen mee in de aandelen, maar staan niet op de "
+            "log-assen (histogram, ECDF, strip plot, overschrijdingscurve)."
+        )
     st.caption(
         f"Getoond op basis van {bron}. Pareto: de posten van groot naar "
         "klein in 20 gelijke groepen, met per groep het aandeel van de "
