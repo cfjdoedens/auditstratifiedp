@@ -1,9 +1,9 @@
 """
 Planningsfuncties van auditstratified.
-Hoofdfunctie is plan_stratified().
+Hoofdfunctie is plan_geldsteek_gestratificeerd().
 """
 
-__all__ = ["plan_stratified", "plan_stratified_basis", "vind_beste_strata_groep"]
+__all__ = ["plan_geldsteek_gestratificeerd", "plan_geldsteek_gestratificeerd_basis", "vind_beste_strata_groep"]
 
 import math
 import warnings
@@ -12,11 +12,11 @@ import numpy as np
 import pandas as pd
 
 # Importeer de benodigde wiskundige rekenmotoren uit de andere pakketbestanden.
-from .eval_stratified import eval_stratified
+from .evalueer_geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
 from .utils import drawsneeded, haro_nog_nodige_zekerheid
 
 
-def plan_stratified(
+def plan_geldsteek_gestratificeerd(
     steekproeven: pd.DataFrame,
     model: str = "binomiaal",
     zekerheid: float = 0.95,
@@ -387,10 +387,10 @@ def plan_stratified(
                 )
 
     # Bereken de initiële basissteekproefomvang op basis van de invoerdata.
-    strata = plan_stratified_basis(steekproeven, model=model)
+    strata = plan_geldsteek_gestratificeerd_basis(steekproeven, model=model)
 
     # Bereken de initiële algehele convolutiefout van de startpositie.
-    huidige_fout = eval_stratified(
+    huidige_fout = evalueer_geldsteek_gestratificeerd(
         strata,
         model=model,
         zekerheid=zekerheid,
@@ -423,7 +423,7 @@ def plan_stratified(
             )
 
         # Evalueer de nieuwe algehele fout na de parallelle ophoogstap.
-        huidige_fout = eval_stratified(
+        huidige_fout = evalueer_geldsteek_gestratificeerd(
             strata,
             model=model,
             zekerheid=zekerheid,
@@ -437,7 +437,7 @@ def plan_stratified(
     return strata
 
 
-def plan_stratified_basis(
+def plan_geldsteek_gestratificeerd_basis(
     steekproeven: pd.DataFrame, model: str = "binomiaal"
 ) -> pd.DataFrame:
     """
@@ -513,7 +513,7 @@ def vind_beste_strata_groep(
 
     # Definieer de interne functie voor de gelijktijdige FFT convolutie-evaluatie.
     def calc_max_fout_klim(s_data):
-        res = eval_stratified(
+        res = evalueer_geldsteek_gestratificeerd(
             steekproeven=s_data,
             model=model,
             zekerheid=totale_zekerheid,

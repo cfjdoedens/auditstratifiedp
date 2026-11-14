@@ -1,7 +1,9 @@
 import pandas as pd
 import pytest
 
-from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (
+    evalueer_geldsteek_gestratificeerd,
+)
 from auditstat.sso.evalueer_SSO_totaal import evalueer_SSO_totaal
 
 
@@ -9,9 +11,9 @@ def _post(naam="totaal", n=200, k=4, waarde=2_500_000.0):
     return dict(naam=naam, n=n, k=k, waarde_laag=waarde)
 
 
-def test_een_stratum_gelijk_aan_eval_stratified_op_ruwe_steekproef():
+def test_een_stratum_gelijk_aan_evalueer_geldsteek_gestratificeerd_op_ruwe_steekproef():
     res = evalueer_SSO_totaal([_post()])
-    direct = eval_stratified(
+    direct = evalueer_geldsteek_gestratificeerd(
         pd.DataFrame(
             [dict(naam="totaal", waarde_laag=2_500_000.0, n_laag=200, k_laag=4)]
         )

@@ -4,9 +4,9 @@ import math
 
 import pandas as pd
 
-from .eval_stratified import eval_stratified
-from .plan_stratified import (
-    plan_stratified_basis,
+from .evalueer_geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
+from .plan_geldsteek_gestratificeerd import (
+    plan_geldsteek_gestratificeerd_basis,
     vind_beste_strata_groep,
 )
 
@@ -43,7 +43,7 @@ def analyseer_klimheuristiek(
     data = steekproeven.copy()
 
     # Bepaal eerst de minimale basissteekproefomvang per stratum (Stap 1).
-    strata_basis = plan_stratified_basis(data, model=model)
+    strata_basis = plan_geldsteek_gestratificeerd_basis(data, model=model)
     n_strata = len(strata_basis)
 
     # Initialiseer de trackingvariabelen voor de analyse.
@@ -82,7 +82,7 @@ def analyseer_klimheuristiek(
         # of als we aan het einde van onze rit (N_add) zijn beland.
         if per_stap or toegevoegd == N_add:
             # Evalueer de actuele fout van het greedy pad tot nu toe.
-            res_greedy = eval_stratified(
+            res_greedy = evalueer_geldsteek_gestratificeerd(
                 strata_greedy,
                 model=model,
                 zekerheid=zekerheid,
@@ -113,7 +113,7 @@ def analyseer_klimheuristiek(
                     )
 
                 # Evalueer de resulterende fout voor deze specifieke verdeling.
-                fout_test = eval_stratified(
+                fout_test = evalueer_geldsteek_gestratificeerd(
                     test_strata,
                     model=model,
                     zekerheid=zekerheid,
@@ -215,7 +215,7 @@ def analyseer_exchange_convexiteit(
                     * test_strata.at[rij_label, "verwachte_foutfractie"]
                 )
 
-            fout_per_verdeling[verdeling] = eval_stratified(
+            fout_per_verdeling[verdeling] = evalueer_geldsteek_gestratificeerd(
                 test_strata,
                 model=model,
                 zekerheid=zekerheid,

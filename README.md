@@ -12,11 +12,11 @@ van meerdere steekproeven noemen we een **gestratificeerde steekproef**.
 
 Het pakket bevat drie hoofdfuncties:
 
-- `plan_stratified()` — plannen van steekproeven, dit is bepalen hoeveel
-  steken per massa nodig zijn;
-- `eval_stratified()` — gezamenlijke evaluatie van meerdere
-  steekproeven, dit is schatten van de foutfractie per massa en schatten
-  van de totale foutfractie;
+- `plan_geldsteek_gestratificeerd()` — plannen van steekproeven, dit is
+  bepalen hoeveel steken per massa nodig zijn;
+- `evalueer_geldsteek_gestratificeerd()` — gezamenlijke evaluatie van
+  meerdere steekproeven, dit is schatten van de foutfractie per massa en
+  schatten van de totale foutfractie;
 - `plot_kanskromme()` — visualisatie van de resulterende kansverdeling.
 
 Bij planning en evaluatie van de steekproeven wordt gebruik gemaakt van
@@ -27,9 +27,10 @@ Rijksoverheid). Het HARo beschrijft ook hoe de risico-inschattingen
 worden vertaald naar statistische onzekerheid.
 
 Hoewel in de auditpraktijk doorgaans eerst wordt gepland en daarna
-geëvalueerd, bespreken we hieronder eerst `eval_stratified()`. De
-werking van `plan_stratified()` wordt namelijk het duidelijkst begrepen
-vanuit de evaluatiemethode.
+geëvalueerd, bespreken we hieronder eerst
+`evalueer_geldsteek_gestratificeerd()`. De werking van
+`plan_geldsteek_gestratificeerd()` wordt namelijk het duidelijkst
+begrepen vanuit de evaluatiemethode.
 
 # Kenmerken
 
@@ -126,10 +127,10 @@ kansverdelingen worden gecombineerd. Uit de resulterende gecombineerde
 kansverdeling kunnen vervolgens onder andere de minimale en maximale
 fout bij een gekozen zekerheidsniveau worden afgeleid.
 
-`eval_stratified` gebruikt convolutie omdat daarmee de statistische
-onzekerheid van de afzonderlijke strata gezamenlijk kan worden
-gemodelleerd, in plaats van bijvoorbeeld de maximale fouten van de
-afzonderlijke strata simpelweg bij elkaar op te tellen.
+`evalueer_geldsteek_gestratificeerd` gebruikt convolutie omdat daarmee
+de statistische onzekerheid van de afzonderlijke strata gezamenlijk kan
+worden gemodelleerd, in plaats van bijvoorbeeld de maximale fouten van
+de afzonderlijke strata simpelweg bij elkaar op te tellen.
 
 # Vier rekenmethoden voor convolutie
 
@@ -175,15 +176,16 @@ algoritmen:
 Monte Carlo-methode introduceert statistische ruis doordat
 toevalsgetallen worden gebruikt.
 
-Bij `eval_stratified()` kan worden gekozen tussen alle vier methoden.
-Bij `plan_stratified()` wordt altijd gebruikgemaakt van **FFT samen**.
+Bij `evalueer_geldsteek_gestratificeerd()` kan worden gekozen tussen
+alle vier methoden. Bij `plan_geldsteek_gestratificeerd()` wordt altijd
+gebruikgemaakt van **FFT samen**.
 
 ------------------------------------------------------------------------
 
-# `eval_stratified()`: Evaluatie van meerdere steekproeven
+# `evalueer_geldsteek_gestratificeerd()`: Evaluatie van meerdere steekproeven
 
-`eval_stratified()` combineert meerdere afzonderlijke steekproeven tot
-één gezamenlijke evaluatie.
+`evalueer_geldsteek_gestratificeerd()` combineert meerdere afzonderlijke
+steekproeven tot één gezamenlijke evaluatie.
 
 Dit is nuttig wanneer een totale populatie bestaat uit verschillende
 deelpopulaties, bijvoorbeeld:
@@ -195,7 +197,7 @@ deelpopulaties, bijvoorbeeld:
 Wanneer resultaten simpelweg zouden worden opgeteld, wordt de
 statistische onzekerheid onjuist behandeld.
 
-`eval_stratified()` lost dit op door:
+`evalueer_geldsteek_gestratificeerd()` lost dit op door:
 
 1.  voor ieder stratum een kansverdeling op te bouwen;
 2.  deze kansverdelingen via convolutie samen te voegen;
@@ -234,7 +236,8 @@ toegevoegd aan de kanskromme van het geld uit de laagstrata.
 ## Speciale gevallen
 
 De volgende speciale gevallen zijn op zich mogelijk interessant, en
-geven ook meer inzicht in hoe `eval_stratified()` werkt.
+geven ook meer inzicht in hoe `evalueer_geldsteek_gestratificeerd()`
+werkt.
 
 ### Scenario 1: Geen fouten in het hoogstratum; het verdunningseffect
 
@@ -271,8 +274,8 @@ gecontroleerd en bevat € 12.500 aan fouten.
 Er is geen statistische onzekerheid meer voor dit bestand. Geef voor het
 laagstratum een omvang van € 0 op; het bestand kan worden behandeld als
 één volledig gecontroleerd hoogstratum, met daarin € 12.500 aan fout
-geld. Het lege laagstratum wordt door `eval_stratified()` niet
-meegenomen in de convolutie.
+geld. Het lege laagstratum wordt door
+`evalueer_geldsteek_gestratificeerd()` niet meegenomen in de convolutie.
 
 ## Risicofactoren en materialiteit
 
@@ -355,9 +358,9 @@ virtuele posten past het package de convolutie toe. Hierdoor weegt de
 vooraf verkregen zekerheid per bestand mee in de berekende maximale fout
 voor de gehele populatie.
 
-## Invoerdata eval_stratified
+## Invoerdata evalueer_geldsteek_gestratificeerd
 
-`eval_stratified()` verwacht 7 argumenten.
+`evalueer_geldsteek_gestratificeerd()` verwacht 7 argumenten.
 
 1.  een `pandas.DataFrame` waarin iedere rij één steekproef
     vertegenwoordigt.
@@ -387,11 +390,11 @@ voor de gehele populatie.
 | `fout_hoog`     | Geconstateerde fout in euro’s                  | Hoogstratum |
 | `materialiteit` | Materialiteit als fractie van het hele stratum | Risico      |
 
-# `plan_stratified()`: Plannen van meerdere steekproeven
+# `plan_geldsteek_gestratificeerd()`: Plannen van meerdere steekproeven
 
-`plan_stratified()` zoekt met een iteratief algoritme naar een
-kostenefficiënte verdeling van de steekproefomvang over de strata,
-zodanig dat de gezamenlijke maximale fout onder de algehele
+`plan_geldsteek_gestratificeerd()` zoekt met een iteratief algoritme
+naar een kostenefficiënte verdeling van de steekproefomvang over de
+strata, zodanig dat de gezamenlijke maximale fout onder de algehele
 materialiteit blijft.
 
 ## Algoritme
@@ -399,9 +402,10 @@ materialiteit blijft.
 Het planningsalgoritme is gebaseerd op het evaluatie-algoritme. We
 gebruiken een **heuvelklimalgoritme** dat stap voor stap
 steekproefposten toevoegt aan de strata, waarbij steeds koers wordt
-gehouden door `eval_stratified()` aan te roepen. In pseudocode:
+gehouden door `evalueer_geldsteek_gestratificeerd()` aan te roepen. In
+pseudocode:
 
-    while eval_stratified(strata) > totale_materialiteit:
+    while evalueer_geldsteek_gestratificeerd(strata) > totale_materialiteit:
        bepaal voor welk stratum de maximale fout het meest afneemt
        per kosteneenheid als n voor dat stratum met 1 wordt opgehoogd;
        hoog n voor dat stratum op
@@ -409,9 +413,9 @@ gehouden door `eval_stratified()` aan te roepen. In pseudocode:
 Bij een gelijkstand (twee of meer strata leveren dezelfde foutreductie
 per kosteneenheid) worden alle ex-aequo strata tegelijk opgehoogd.
 
-## Invoerdata plan_stratified
+## Invoerdata plan_geldsteek_gestratificeerd
 
-`plan_stratified()` verwacht 5 argumenten.
+`plan_geldsteek_gestratificeerd()` verwacht 5 argumenten.
 
 1.  een `pandas.DataFrame` waarin iedere rij één steekproef
     vertegenwoordigt.
@@ -420,9 +424,10 @@ per kosteneenheid) worden alle ex-aequo strata tegelijk opgehoogd.
 4.  de gewenste zekerheid; bij verstek 0,95, dus 95%.
 5.  granulariteit; verstekwaarde is 10.000.
 
-De parameter `methode`, die wordt gebruikt bij `eval_stratified()`, is
-niet nodig. `plan_stratified()` gebruikt als methode altijd “FFT samen”.
-Daarom is de parameter `start` voor de startwaarde van de
+De parameter `methode`, die wordt gebruikt bij
+`evalueer_geldsteek_gestratificeerd()`, is niet nodig.
+`plan_geldsteek_gestratificeerd()` gebruikt als methode altijd “FFT
+samen”. Daarom is de parameter `start` voor de startwaarde van de
 toevalsgenerator ook niet nodig, want die wordt alleen gebruikt bij de
 methode “Monte Carlo”.
 
@@ -454,10 +459,10 @@ visualiseren. De grafiek toont onder andere:
 
 ## 1. Plannen
 
-`plan_stratified()` berekent een kostenefficiënte steekproefverdeling,
-waarbij stapsgewijs de steek wordt toegevoegd die op dat moment de
-grootste foutreductie per kosteneenheid oplevert om zo uiteindelijk
-onder de gestelde algehele materialiteit te komen.
+`plan_geldsteek_gestratificeerd()` berekent een kostenefficiënte
+steekproefverdeling, waarbij stapsgewijs de steek wordt toegevoegd die
+op dat moment de grootste foutreductie per kosteneenheid oplevert om zo
+uiteindelijk onder de gestelde algehele materialiteit te komen.
 
 Als auditstat nog niet lokaal is geïnstalleerd, dan doen we dat nu door
 het volgende uit te voeren in een terminal met een shell, zoals bash.
@@ -472,7 +477,7 @@ bijvoorbeeld in een Jupyter-notebook of in een Python-script.
 ``` python
 import time
 import pandas as pd
-from auditstat.geldsteek_gestratificeerd.plan_stratified import plan_stratified # type: ignore
+from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import plan_geldsteek_gestratificeerd # type: ignore
 
 # Definieer de strata en de HARo-risico's
 data = pd.DataFrame({
@@ -494,14 +499,14 @@ data = pd.DataFrame({
 # Bereken het optimale plan
 # Het algoritme weegt foutreductie af tegen kosten per steek.
 t0 = time.time()
-plan = plan_stratified(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
+plan = plan_geldsteek_gestratificeerd(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
 t1 = time.time()
 print(f"   Klaar met plannen in {t1 - t0:.1f} seconden.", flush=True)
 print(plan[["naam", "kosten", "n_basis", "n_laag"]])
 print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}\n")
 ```
 
-       Klaar met plannen in 0.0 seconden.
+       Klaar met plannen in 0.1 seconden.
             naam  kosten  n_basis  n_laag
     0  Subsidies     5.0       56      56
     1     Inkoop     1.0        1       1
@@ -512,14 +517,14 @@ print(f"Verwachte eindfout: {plan.attrs['geplande_max_fout_totaal']:.4f}\n")
 Na de uitvoering van de controle kun je de gevonden fouten evalueren.
 
 ``` python
-from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified # type: ignore
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd # type: ignore
 
 # Voeg de testresultaten toe aan je dataset
 data["n_laag"] = [60, 30]
 data["k_laag"] = [1, 0]
 
 # Voer de evaluatie uit met FFT-convolutie
-resultaat = eval_stratified(steekproeven=data, zekerheid=0.95, methode="FFT samen")
+resultaat = evalueer_geldsteek_gestratificeerd(steekproeven=data, zekerheid=0.95, methode="FFT samen")
 
 # Rapporteer de resultaten
 print(f"Maximale fout (convolutie): {resultaat['max_fout_convolutie']:.4f}")
@@ -572,7 +577,8 @@ print(virtuele_posten)
 
     78
 
-Deze functies worden automatisch gebruikt binnen `eval_stratified()`.
+Deze functies worden automatisch gebruikt binnen
+`evalueer_geldsteek_gestratificeerd()`.
 
 # SSO-invoer opslaan en hergebruiken via CSV
 
@@ -642,8 +648,9 @@ $(n, k)$ is direct een steekproef uit de populatie waarover geoordeeld
 wordt. Elk type post wordt één stratum met $n_\text{laag} = n$,
 $k_\text{laag} = k$ en als waarde de totale massa van dat type post (de
 som over alle klanten); zonder onderscheid naar typen posten is het één
-stratum met de SSO-totalen. Daarna combineert `eval_stratified` de
-strata tot één kanskromme en maximale fout.
+stratum met de SSO-totalen. Daarna combineert
+`evalueer_geldsteek_gestratificeerd` de strata tot één kanskromme en
+maximale fout.
 
 De uitkomst is niet de optelsom van de klantuitkomsten, want die komen
 uit dezelfde steekproef en zijn niet onafhankelijk. `n` moet een geheel

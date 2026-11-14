@@ -1,11 +1,11 @@
-"""Tests voor plan_stratified."""
+"""Tests voor plan_geldsteek_gestratificeerd."""
 
 import pandas as pd
 import pytest
 
-from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
-    plan_stratified,
-    plan_stratified_basis,
+from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    plan_geldsteek_gestratificeerd,
+    plan_geldsteek_gestratificeerd_basis,
 )
 
 
@@ -26,13 +26,13 @@ def test_happy_flow_succesvolle_planning():
     })
 
     # Voer de planning uit met standaardwaarden[cite: 12].
-    resultaat = plan_stratified(
+    resultaat = plan_geldsteek_gestratificeerd(
         steekproeven=test_succes, materialiteit=0.05, zekerheid=0.95
     )
 
     # Verifieer de structuur en integriteit van het resultaat[cite: 12].
     assert isinstance(resultaat, pd.DataFrame), (
-        "Het resultaat van plan_stratified moet een pandas DataFrame zijn[cite: 12]."
+        "Het resultaat van plan_geldsteek_gestratificeerd moet een pandas DataFrame zijn[cite: 12]."
     )
     assert "n_laag" in resultaat.columns, (
         "De kolom 'n_laag' ontbreekt in het planningsresultaat[cite: 12]."
@@ -63,7 +63,7 @@ def test_foutmelding_verwachte_foutfractie_te_hoog():
 
     # Controleer of de juiste foutmelding wordt opgeworpen[cite: 12].
     with pytest.raises(ValueError, match="Totale verwachte fout in de laagstrata"):
-        plan_stratified(test_fout_verwacht, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(test_fout_verwacht, materialiteit=0.05)
 
 
 def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
@@ -88,7 +88,7 @@ def test_foutmelding_bekende_fout_hoogstratum_nekt_materialiteit():
 
     # Verifieer dat de algehele materialiteitsgrens bewaakt wordt[cite: 12].
     with pytest.raises(ValueError, match="Bekende fout in de hoogstrata"):
-        plan_stratified(test_fout_hoog, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(test_fout_hoog, materialiteit=0.05)
 
 
 def test_foutmelding_inconsistentie_op_stratum_niveau():
@@ -111,7 +111,7 @@ def test_foutmelding_inconsistentie_op_stratum_niveau():
     with pytest.raises(
         ValueError, match="Verwachte foutfractie >= de omgerekende materialiteit"
     ):
-        plan_stratified(test_inconsistent, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(test_inconsistent, materialiteit=0.05)
 
 
 def test_attribuutverificatie_geretourneerde_dataset():
@@ -131,7 +131,7 @@ def test_attribuutverificatie_geretourneerde_dataset():
     })
 
     # Voer de planning uit en controleer de attributen[cite: 12].
-    resultaat = plan_stratified(test_data, materialiteit=0.05)
+    resultaat = plan_geldsteek_gestratificeerd(test_data, materialiteit=0.05)
     assert isinstance(resultaat, pd.DataFrame), (
         "Het geretourneerde object moet een DataFrame zijn[cite: 12]."
     )
@@ -158,7 +158,7 @@ def test_foutmelding_dubbele_stratumnamen():
 
     # Verifieer dat dubbele namen worden geweigerd[cite: 12].
     with pytest.raises(ValueError, match="stratumnamen komen vaker dan"):
-        plan_stratified(test_dubbel, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(test_dubbel, materialiteit=0.05)
 
 
 # Lever een minimale, geldige invoer voor de parametertests.
@@ -183,7 +183,7 @@ def test_plan_ongeldig_model(basis_plan_invoer):
     """Foutmelding: Ongeldig model opgegeven[cite: 12]."""
     # Test of een ongeldig model direct wordt afgewezen[cite: 12].
     with pytest.raises(ValueError, match="Model moet"):
-        plan_stratified(basis_plan_invoer, model="frequentist", materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(basis_plan_invoer, model="frequentist", materialiteit=0.05)
 
 
 # Test alle foutieve invoer voor de parameter materialiteit in één keer.
@@ -202,7 +202,7 @@ def test_plan_materialiteit_invoer(
     """Invoercontrole op de parameter materialiteit[cite: 12]."""
     # Voer de test uit met de schone dataset uit de fixture en de foute parameter[cite: 12].
     with pytest.raises(exc_type, match=match_tekst):
-        plan_stratified(basis_plan_invoer, materialiteit=foute_waarde)
+        plan_geldsteek_gestratificeerd(basis_plan_invoer, materialiteit=foute_waarde)
 
 
 # Test alle foutieve invoer voor de parameter zekerheid in één keer.
@@ -219,7 +219,7 @@ def test_plan_zekerheid_invoer(basis_plan_invoer, foute_waarde, exc_type, match_
     """Invoercontrole op de parameter zekerheid[cite: 12]."""
     # Weer wordt de functie geïnjecteerd met de dataset[cite: 12].
     with pytest.raises(exc_type, match=match_tekst):
-        plan_stratified(basis_plan_invoer, materialiteit=0.05, zekerheid=foute_waarde)
+        plan_geldsteek_gestratificeerd(basis_plan_invoer, materialiteit=0.05, zekerheid=foute_waarde)
 
 
 # Test alle foutieve invoer voor de parameter granulariteit in één keer.
@@ -237,7 +237,7 @@ def test_plan_granulariteit_invoer(
     """Invoercontrole op de parameter granulariteit[cite: 12]."""
     # Voer de test uit met een schone dataset en foutieve granulariteit[cite: 12].
     with pytest.raises(exc_type, match=match_tekst):
-        plan_stratified(
+        plan_geldsteek_gestratificeerd(
             basis_plan_invoer, materialiteit=0.05, granulariteit=foute_waarde
         )
 
@@ -261,7 +261,7 @@ def test_plan_verwachte_fout_laagstrata_alleen_te_groot():
     })
     # Valideer dat de algehele check faalt[cite: 12].
     with pytest.raises(ValueError, match="laagstrata alleen al"):
-        plan_stratified(data, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(data, materialiteit=0.05)
 
 
 # Genereer een representatieve dataset met twee strata voor de simulatietesten.
@@ -282,10 +282,10 @@ def basis_steekproeven():
     })
 
 
-def test_plan_stratified_binomiaal_sluitend(basis_steekproeven):
-    """Verifieer of plan_stratified een exact sluitend steekproefplan genereert voor binomiaal[cite: 12]."""
+def test_plan_geldsteek_gestratificeerd_binomiaal_sluitend(basis_steekproeven):
+    """Verifieer of plan_geldsteek_gestratificeerd een exact sluitend steekproefplan genereert voor binomiaal[cite: 12]."""
     # Gebruik de fixture dataset direct voor de calculatie[cite: 12].
-    resultaat = plan_stratified(
+    resultaat = plan_geldsteek_gestratificeerd(
         steekproeven=basis_steekproeven,
         materialiteit=0.03,
         zekerheid=0.95,
@@ -304,14 +304,14 @@ def test_plan_stratified_binomiaal_sluitend(basis_steekproeven):
     )
 
 
-def test_plan_stratified_poisson_strakke_marges(basis_steekproeven):
-    """Verifieer of plan_stratified correct werkt met de poisson verdeling en strakke marges[cite: 12]."""
+def test_plan_geldsteek_gestratificeerd_poisson_strakke_marges(basis_steekproeven):
+    """Verifieer of plan_geldsteek_gestratificeerd correct werkt met de poisson verdeling en strakke marges[cite: 12]."""
     # Maak expliciet een kopie van de fixture dataset om mutatie side-effects te voorkomen[cite: 12].
     test_data = basis_steekproeven.copy()
     test_data["verwachte_foutfractie"] = [0.02, 0.01]
 
     # Voer de planning uit voor poisson[cite: 12].
-    resultaat = plan_stratified(
+    resultaat = plan_geldsteek_gestratificeerd(
         steekproeven=test_data,
         materialiteit=0.05,
         zekerheid=0.95,
@@ -351,10 +351,10 @@ def test_materialiteit_kolom_stuurt_laagstratum_n_basis():
     )
 
     # Bereken de basisomvang voor strakke en ruime materialiteit[cite: 12].
-    strak = plan_stratified_basis(
+    strak = plan_geldsteek_gestratificeerd_basis(
         pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.03]})
     )
-    ruim = plan_stratified_basis(
+    ruim = plan_geldsteek_gestratificeerd_basis(
         pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.10]})
     )
 
@@ -388,7 +388,7 @@ def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum():
 
     # Test verschillende materialiteitswaarden[cite: 12].
     for mat_kolom in [0.04, 0.10]:
-        resultaat = plan_stratified(
+        resultaat = plan_geldsteek_gestratificeerd(
             pd.DataFrame({**basis, "materialiteit": [mat_kolom]}),
             materialiteit=0.05,
             zekerheid=0.95,
@@ -422,7 +422,7 @@ def test_kolominhoud_nan_in_numerieke_kolom_wordt_geweigerd(geldige_invoer):
     """NaN (float) in een numerieke kolom wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "waarde_laag"] = float("nan")
     with pytest.raises(ValueError, match="lege waarden"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 @pytest.mark.parametrize("kolom", ["naam", "ihr", "ibr", "car"])
@@ -430,35 +430,35 @@ def test_kolominhoud_none_in_tekstkolom_wordt_geweigerd(geldige_invoer, kolom):
     """None in een tekstkolom wordt als lege waarde herkend en geweigerd[cite: 12]."""
     geldige_invoer.loc[0, kolom] = None
     with pytest.raises(ValueError, match="lege waarden"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_lege_string_naam_wordt_geweigerd(geldige_invoer):
     """Een lege string in kolom 'naam' wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "naam"] = ""
     with pytest.raises(ValueError, match="lege strings"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_whitespace_naam_wordt_geweigerd(geldige_invoer):
     """Een naam die alleen spaties bevat wordt als leeg beschouwd en geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "naam"] = "   "
     with pytest.raises(ValueError, match="lege strings"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_niet_numeriek_wordt_geweigerd(geldige_invoer):
     """Een niet-numerieke waarde in een numerieke kolom wordt geweigerd[cite: 12]."""
     geldige_invoer["waarde_laag"] = geldige_invoer["waarde_laag"].astype(str)
     with pytest.raises(ValueError, match="numerieke waarden"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_negatieve_waarde_laag_wordt_geweigerd(geldige_invoer):
     """Negatieve waarde_laag wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "waarde_laag"] = -1.0
     with pytest.raises(ValueError, match="waarde_laag"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 @pytest.mark.parametrize("waarde", [-0.01, 1.0, 1.5])
@@ -466,7 +466,7 @@ def test_kolominhoud_verwachte_foutfractie_buiten_bereik(geldige_invoer, waarde)
     """verwachte_foutfractie buiten [0, 1) wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "verwachte_foutfractie"] = waarde
     with pytest.raises(ValueError, match="verwachte_foutfractie"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 @pytest.mark.parametrize("waarde", [0.0, -1.0])
@@ -474,21 +474,21 @@ def test_kolominhoud_kosten_niet_positief_wordt_geweigerd(geldige_invoer, waarde
     """Kosten <= 0 wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "kosten"] = waarde
     with pytest.raises(ValueError, match="kosten"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_negatieve_waarde_hoog_wordt_geweigerd(geldige_invoer):
     """Negatieve waarde_hoog wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "waarde_hoog"] = -100.0
     with pytest.raises(ValueError, match="waarde_hoog"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_negatieve_fout_hoog_wordt_geweigerd(geldige_invoer):
     """Negatieve fout_hoog wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "fout_hoog"] = -1.0
     with pytest.raises(ValueError, match="fout_hoog"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd(geldige_invoer):
@@ -496,7 +496,7 @@ def test_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd(geldige_in
     geldige_invoer.loc[0, "waarde_hoog"] = 1000.0
     geldige_invoer.loc[0, "fout_hoog"] = 2000.0
     with pytest.raises(ValueError, match="fout_hoog"):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 @pytest.mark.parametrize("waarde", [0.0, 1.0, -0.01, 1.5])
@@ -504,7 +504,7 @@ def test_kolominhoud_materialiteit_kolom_buiten_bereik(geldige_invoer, waarde):
     """Materialiteit-kolom buiten (0, 1) wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, "materialiteit"] = waarde
     with pytest.raises(ValueError, match="materialiteit"):
-        plan_stratified(geldige_invoer, materialiteit=0.5)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.5)
 
 
 @pytest.mark.parametrize("kolom", ["ihr", "ibr", "car"])
@@ -512,7 +512,7 @@ def test_kolominhoud_ongeldig_risico_wordt_geweigerd(geldige_invoer, kolom):
     """Een ongeldige risicowaarde in ihr, ibr of car wordt geweigerd[cite: 12]."""
     geldige_invoer.loc[0, kolom] = "X"
     with pytest.raises(ValueError, match=kolom):
-        plan_stratified(geldige_invoer, materialiteit=0.05)
+        plan_geldsteek_gestratificeerd(geldige_invoer, materialiteit=0.05)
 
 
 def test_verwachte_foutfractie_wordt_aangevuld_als_ontbrekend():
@@ -521,7 +521,7 @@ def test_verwachte_foutfractie_wordt_aangevuld_als_ontbrekend():
         "naam": ["Stratum_A"],
         "waarde_laag": [100000.0],
     })
-    resultaat = plan_stratified(zonder_verwachte_fout, materialiteit=0.05)
+    resultaat = plan_geldsteek_gestratificeerd(zonder_verwachte_fout, materialiteit=0.05)
     assert (resultaat["verwachte_foutfractie"] == 0.001).all()
 
 
@@ -531,7 +531,7 @@ def test_kosten_worden_aangevuld_als_ontbrekend():
         "naam": ["Stratum_A"],
         "waarde_laag": [100000.0],
     })
-    resultaat = plan_stratified(zonder_kosten, materialiteit=0.05)
+    resultaat = plan_geldsteek_gestratificeerd(zonder_kosten, materialiteit=0.05)
     assert (resultaat["kosten"] == 1.0).all()
 
 
@@ -546,7 +546,7 @@ def test_ihr_ibr_car_worden_aangevuld_als_ontbrekend():
         "waarde_hoog": [0.0],
         "kosten": [1.0],
     })
-    resultaat = plan_stratified(zonder_risicokolommen, materialiteit=0.05)
+    resultaat = plan_geldsteek_gestratificeerd(zonder_risicokolommen, materialiteit=0.05)
     assert (resultaat["ihr"] == "H").all()
     assert (resultaat["ibr"] == "H").all()
     assert (resultaat["car"] == "H").all()
@@ -568,7 +568,7 @@ def test_kosten_invloed_op_allocatie():
         "kosten": [100.0, 1.0],
     })
 
-    resultaat = plan_stratified(
+    resultaat = plan_geldsteek_gestratificeerd(
         steekproeven=test_kosten, materialiteit=0.03, granulariteit=10000
     )
 

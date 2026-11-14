@@ -10,7 +10,7 @@ from auditstat.sso.compound_postwaarden import kansmassa_compound
 # vervangende (n_eff, k_eff)-paar wordt gekalibreerd op de exacte
 # Beta-Binomiale/Negatief-Binomiale grens — "exact" voor het conservatieve
 # model dat elke post ofwel volledig goed, ofwel volledig fout is, zie
-# _max_fout_exact. Een aanroeper die de zekerheid van eval_stratified kent
+# _max_fout_exact. Een aanroeper die de zekerheid van evalueer_geldsteek_gestratificeerd kent
 # hoort die via de parameter ``zekerheid`` van moment_match_SSO door te
 # geven, zodat de kalibratie exact aansluit op het gekozen niveau; deze
 # waarde is alleen de standaard.
@@ -76,7 +76,7 @@ def _kalibreer_n_eff_gelijk_k_eff_op_exacte_grens(doel_max_fout, zekerheid):
     omgekeerde klemgeval (een zeer hoge SSO-foutfractie, waarbij het
     benodigde n_eff kleiner dan k_eff zou zijn). Bepaalt ``n_eff = k_eff``
     (de kleinst mogelijke ``beta``-parameter, ``n_eff - k_eff + 1 = 1``,
-    binnen eval_stratified's vereiste ``n_laag >= k_laag``) zodanig dat de
+    binnen evalueer_geldsteek_gestratificeerd's vereiste ``n_laag >= k_laag``) zodanig dat de
     Beta(n_eff + 1, 1)-kwantiel bij ``zekerheid`` exact gelijk is aan
     ``doel_max_fout``.
 
@@ -152,7 +152,7 @@ def moment_match_SSO(
     n_eff)-verdeling dezelfde eerste twee momenten heeft als de
     werkelijke samengestelde verdeling van de foutfractie bij de klant.
     Dit is bedoeld om als (n_laag, k_laag)-paar te dienen voor
-    ``eval_stratified``, dat zelf intern een Beta- resp.
+    ``evalueer_geldsteek_gestratificeerd``, dat zelf intern een Beta- resp.
     Gamma-verdeling per stratum opbouwt uit (n_laag, k_laag) — zo
     draagt de gestratificeerde evaluatie zowel het juiste gemiddelde als
     (voor zover binnen de Beta/Gamma-familie mogelijk) de juiste
@@ -191,7 +191,7 @@ def moment_match_SSO(
     dicht bij n) in combinatie met een kleine N_klant, waarbij het
     benodigde n_eff kleiner dan k_eff zou zijn — krijgt analoog dezelfde
     behandeling, maar gespiegeld: ``n_eff`` wordt op ``k_eff`` gezet (de
-    kleinst mogelijke ``beta``-parameter binnen de door ``eval_stratified``
+    kleinst mogelijke ``beta``-parameter binnen de door ``evalueer_geldsteek_gestratificeerd``
     vereiste ``n_laag >= k_laag``) en samen opgehoogd zodat de Beta(n_eff +
     1, 1)-kwantiel bij ``zekerheid`` exact gelijk is aan de werkelijke
     grens (``_kalibreer_n_eff_gelijk_k_eff_op_exacte_grens``). Dit geval
@@ -240,13 +240,13 @@ def moment_match_SSO(
         Aantal posten bij de klant.
     verdeling : {"binomiaal", "poisson"}, standaard "binomiaal"
         Moet overeenkomen met het ``model``-argument waarmee het
-        resulterende (n_eff, k_eff)-paar straks aan ``eval_stratified``
+        resulterende (n_eff, k_eff)-paar straks aan ``evalueer_geldsteek_gestratificeerd``
         wordt doorgegeven.
     zekerheid : float, standaard 0,95
         Zekerheidsniveau (tussen 0 en 1) waarop, uitsluitend bij klemming
         of bij een volledige blinde vlek, op de exacte grens wordt
         gekalibreerd. Geef hier de zekerheid door die ook aan
-        ``eval_stratified`` wordt meegegeven: de kalibratie is exact op
+        ``evalueer_geldsteek_gestratificeerd`` wordt meegegeven: de kalibratie is exact op
         dat niveau, en bij een ander niveau conservatief of niet
         sluitend. Bij momentmatching zonder klemming heeft de waarde geen
         invloed. Een hogere zekerheid maakt een volledige blinde vlek

@@ -33,8 +33,8 @@ jobs:
       - name: Test package import
         run: |
           python -c "
-          from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
-          from auditstat.geldsteek_gestratificeerd.plan_stratified import plan_stratified
+          from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
+          from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import plan_geldsteek_gestratificeerd
           from auditstat.geldsteek_gestratificeerd.plot_kanskromme import plot_kanskromme
           from auditstat.geldsteek_gestratificeerd.utils import haro_nog_nodige_zekerheid, foutloze_posten_equivalent
           print('Alle imports geslaagd.')

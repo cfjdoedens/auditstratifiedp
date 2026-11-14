@@ -1,6 +1,6 @@
 """Evaluatie van één steekproef met de binomiale, hypergeometrische, Poisson- of normale verdeling.
 
-Python-omzetting van de SAS-macro ``%eval_distribution`` (Crist-Jan Doedens,
+Python-omzetting van de SAS-macro ``%evalueer_postensteek`` (Crist-Jan Doedens,
 2010-2020). Uit een aselecte steekproef van ``n`` posten met ``k`` foute posten
 wordt de kansdichtheid van het foutpercentage ``p`` berekend (vlakke prior),
 met daarbij het minimum, het maximum (bij een eenzijdige zekerheid) en de meest
@@ -14,7 +14,7 @@ Verschillen met de SAS-macro:
   maximale dichtheid (relatieve tolerantie 1e-12) in plaats van exacte
   gelijkheid, zodat afrondingsruis geen invloed heeft.
 - Resultaten komen terug als dict plus ``pandas.DataFrame``; de plot is een
-  matplotlib-figuur (zie ``plot_eval_distribution``).
+  matplotlib-figuur (zie ``plot_evalueer_postensteek``).
 """
 
 import math
@@ -74,7 +74,7 @@ def _signifdig(waarde: float, cijfers: int) -> float:
     return round(waarde, decimalen)
 
 
-def eval_distribution(
+def evalueer_postensteek(
     n: int,
     k: int,
     verdeling: str = "hypergeometrisch",
@@ -249,7 +249,7 @@ def _procent(x: float, cijfers: int = 4) -> str:
     return nl_getal_variabel(_signifdig(x * 100, cijfers))
 
 
-def plot_eval_distribution(
+def plot_evalueer_postensteek(
     res: dict,
     titel: str = "",
     titel2: str = "",
@@ -268,12 +268,12 @@ def plot_eval_distribution(
     clip_bij: float = 0.01,
     figsize: tuple[float, float] = (8.27, 11.69),
 ) -> plt.Figure:
-    """Teken de kanskromme van ``eval_distribution`` (zoals het SAS-rapport).
+    """Teken de kanskromme van ``evalueer_postensteek`` (zoals het SAS-rapport).
 
     Parameters
     ----------
     res:
-        Uitvoer van ``eval_distribution``.
+        Uitvoer van ``evalueer_postensteek``.
     geklemd_deel:
         Donkerblauw gekleurd deel onder de kromme (de rest is lichtblauw; standaard tussen minimale en maximale fout): een van ``"geen"``,
         ``"onder_pmax"``, ``"boven_pmin"``, ``"tussen_pmin_pmax"``, ``"band"``,

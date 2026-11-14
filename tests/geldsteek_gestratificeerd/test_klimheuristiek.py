@@ -7,8 +7,8 @@ from auditstat.geldsteek_gestratificeerd.analyseer_klimheuristiek import (  # py
     analyseer_exchange_convexiteit,
     analyseer_klimheuristiek,
 )
-from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
-    plan_stratified_basis,
+from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    plan_geldsteek_gestratificeerd_basis,
     vind_beste_strata_groep,
 )
 
@@ -100,7 +100,7 @@ def test_klimheuristiek_lage_zekerheid_zonder_exchange():
 
 def test_exchange_convexiteit_direct_symmetrisch():
     """Test de nieuwe analysefunctie rechtstreeks op twee identieke strata."""
-    basis = plan_stratified_basis(_identieke_data(), model="binomiaal")
+    basis = plan_geldsteek_gestratificeerd_basis(_identieke_data(), model="binomiaal")
 
     rapport = analyseer_exchange_convexiteit(
         strata_basis=basis,
@@ -130,7 +130,7 @@ def test_exchange_convexiteit_direct_symmetrisch():
 
 def test_exchange_rapport_consistentie_drie_strata():
     """Controleer dat totalen in het exchange-rapport optellen uit de per-N regels."""
-    basis = plan_stratified_basis(_demo_data(), model="binomiaal")
+    basis = plan_geldsteek_gestratificeerd_basis(_demo_data(), model="binomiaal")
     rapport = analyseer_exchange_convexiteit(
         strata_basis=basis,
         N_add=5,
@@ -152,7 +152,7 @@ def test_exchange_rapport_consistentie_drie_strata():
 
 def test_exchange_N_add_kleiner_dan_twee_geeft_leeg_rapport():
     """Voor N=0 of N=1 bestaan nog geen centrale 1-op-1 exchange-toetsen."""
-    basis = plan_stratified_basis(_identieke_data(), model="binomiaal")
+    basis = plan_geldsteek_gestratificeerd_basis(_identieke_data(), model="binomiaal")
 
     for N_add in [0, 1]:
         rapport = analyseer_exchange_convexiteit(
@@ -178,7 +178,7 @@ def test_exchange_N_add_kleiner_dan_twee_geeft_leeg_rapport():
 )
 def test_exchange_valideert_argumenten(kwargs, match):
     """Negatieve grensparameters moeten expliciet worden geweigerd."""
-    basis = plan_stratified_basis(_identieke_data(), model="binomiaal")
+    basis = plan_geldsteek_gestratificeerd_basis(_identieke_data(), model="binomiaal")
 
     with pytest.raises(ValueError, match=match):
         analyseer_exchange_convexiteit(strata_basis=basis, **kwargs)

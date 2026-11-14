@@ -1,12 +1,12 @@
 import pandas as pd
 import pytest
 
-from auditstat.geldsteek_gestratificeerd.eval_stratified import (  # pyrefly: ignore[missing-import]
-    eval_stratified,
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    evalueer_geldsteek_gestratificeerd,
 )
 
 
-def test_eval_stratified_basis():
+def test_evalueer_geldsteek_gestratificeerd_basis():
     """Test de succesvolle uitvoering van de convolutiemotor met standaardwaarden."""
     # Creëer een simpele test-dataset met twee zuivere strata zonder fouten in de steekproef.
     data = pd.DataFrame({
@@ -23,7 +23,7 @@ def test_eval_stratified_basis():
     })
 
     # Draai de evaluatie met de FFT-methode op het binomiale model.
-    resultaat = eval_stratified(
+    resultaat = evalueer_geldsteek_gestratificeerd(
         data, model="binomiaal", zekerheid=0.95, methode="FFT samen", granulariteit=1000
     )
 
@@ -40,17 +40,17 @@ def test_eval_stratified_basis():
     assert resultaat["populatie_totaal"] == 150000.0
 
 
-def test_eval_stratified_foutieve_invoer():
+def test_evalueer_geldsteek_gestratificeerd_foutieve_invoer():
     """Test of de motor netjes weigert bij incomplete of foutieve invoerdata."""
     # Maak een DataFrame met ontbrekende verplichte kolommen, zoals de naam en risico's.
     foute_data = pd.DataFrame({"waarde_laag": [100000.0], "n_laag": [60]})
 
     # Controleer of de functie een ValueError opwerpt zodra er kolommen missen.
     with pytest.raises(ValueError):
-        eval_stratified(foute_data)
+        evalueer_geldsteek_gestratificeerd(foute_data)
 
 
-def test_eval_stratified_dubbele_namen():
+def test_evalueer_geldsteek_gestratificeerd_dubbele_namen():
     """Test of de motor weigert om strata met exact dezelfde naam te verwerken."""
     # Creëer een test-dataset waarin twee strata abusievelijk dezelfde naam hebben gekregen.
     data_dubbel = pd.DataFrame({
@@ -68,7 +68,7 @@ def test_eval_stratified_dubbele_namen():
 
     # Controleer of de functie dit direct afstraft met een ValueError ter bescherming van de aggregatie.
     with pytest.raises(ValueError):
-        eval_stratified(data_dubbel)
+        evalueer_geldsteek_gestratificeerd(data_dubbel)
 
 
 def test_vergelijk_convolutie_methoden():
@@ -88,21 +88,21 @@ def test_vergelijk_convolutie_methoden():
     })
 
     # Bereken de referentiewaarde via de gelijktijdige FFT methode.
-    ref_res = eval_stratified(
+    ref_res = evalueer_geldsteek_gestratificeerd(
         data_vergelijk, methode="FFT samen", zekerheid=0.95, granulariteit=10000
     )
     ref_fout = ref_res["max_fout_convolutie"]
 
     # Bereken de resultaten voor de paarsgewijze FFT methode en de directe methode.
-    paarsgewijs_res = eval_stratified(
+    paarsgewijs_res = evalueer_geldsteek_gestratificeerd(
         data_vergelijk, methode="FFT paarsgewijs", zekerheid=0.95, granulariteit=10000
     )
-    direct_res = eval_stratified(
+    direct_res = evalueer_geldsteek_gestratificeerd(
         data_vergelijk, methode="direct", zekerheid=0.95, granulariteit=10000
     )
 
     # Bereken het resultaat via Monte Carlo simulatie met een vaste seed voor reproduceerbaarheid.
-    mc_res = eval_stratified(
+    mc_res = evalueer_geldsteek_gestratificeerd(
         data_vergelijk,
         methode="Monte Carlo",
         zekerheid=0.95,
@@ -140,7 +140,7 @@ def test_voorbeeld_paul_van_batenburg():
         "waarde_hoog": [0.0, 0.0],
         "fout_hoog": [0.0, 0.0],
     })
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         vb_paul, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.0310, abs=1e-3), (
@@ -162,7 +162,7 @@ def test_uitleg_samennemen_beschrijving():
         "waarde_hoog": [0.0, 0.0],
         "fout_hoog": [0.0, 0.0],
     })
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         example, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.0184, abs=1e-3), (
@@ -186,7 +186,7 @@ def test_voorbeelden_niels_van_leeuwen():
     })
 
     # Test 95%
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.0136, abs=1e-3), (
@@ -195,21 +195,21 @@ def test_voorbeelden_niels_van_leeuwen():
     assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0156, abs=1e-3)
 
     # Test 90%
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.90, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.0108, abs=1e-3)
     assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0120, abs=1e-3)
 
     # Test 55%
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.55, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.004510, abs=1e-4)
     assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.00418, abs=1e-4)
 
     # Test 10% (Hier is convolutie voor het eerst groter dan los)
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.10, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.00118, abs=1e-4)
@@ -230,7 +230,7 @@ def test_drie_dezelfde_steekproeven():
         "waarde_hoog": [0.0] * 3,
         "fout_hoog": [0.0] * 3,
     })
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         dezelfde_drie, zekerheid=0.60, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.088, abs=1e-3)
@@ -253,14 +253,14 @@ def test_tweeendertig_dezelfde_steekproeven():
     })
 
     # 51% Zekerheid
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         dezelfde_32, zekerheid=0.51, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.0830, abs=1e-3)
     assert r["vergelijk_met"]["max_fout_los"] == pytest.approx(0.0628, abs=1e-3)
 
     # 95% Zekerheid
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         dezelfde_32, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
     assert r["max_fout_convolutie"] == pytest.approx(0.106, abs=1e-3)
@@ -282,7 +282,7 @@ def test_lnv_2023_wim_slot():
         "fout_hoog": [0.0, 0.0, 0.0],
     })
 
-    r = eval_stratified(
+    r = evalueer_geldsteek_gestratificeerd(
         lnv_2023, zekerheid=0.95, methode="FFT samen", granulariteit=100000
     )
 
@@ -312,7 +312,7 @@ def test_evaluatie_met_hoogstratum():
         "fout_hoog": [10000.0],
     })
 
-    r_fft = eval_stratified(test_top, zekerheid=0.95, methode="FFT paarsgewijs")
+    r_fft = evalueer_geldsteek_gestratificeerd(test_top, zekerheid=0.95, methode="FFT paarsgewijs")
     assert r_fft["mw_fout_convolutie_geld"] == pytest.approx(15000, abs=10.0)
 
 
@@ -331,10 +331,10 @@ def test_fft_vs_monte_carlo():
         "fout_hoog": [0.0, 0.0],
     })
 
-    r_mc = eval_stratified(
+    r_mc = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.95, methode="Monte Carlo", granulariteit=100000, start=1
     )
-    r_fft = eval_stratified(
+    r_fft = evalueer_geldsteek_gestratificeerd(
         sniels, zekerheid=0.95, methode="FFT paarsgewijs", granulariteit=10000
     )
 
@@ -371,8 +371,8 @@ def test_effect_hoogstratum_toevoeging():
     b = a.copy()
     b.loc[0, "fout_hoog"] = 1000.0
 
-    ra = eval_stratified(a, methode="FFT samen", vergelijk=False)
-    rb = eval_stratified(b, methode="FFT samen", vergelijk=False)
+    ra = evalueer_geldsteek_gestratificeerd(a, methode="FFT samen", vergelijk=False)
+    rb = evalueer_geldsteek_gestratificeerd(b, methode="FFT samen", vergelijk=False)
 
     assert ra["max_fout_convolutie"] < rb["max_fout_convolutie"]
 
@@ -400,52 +400,52 @@ def get_geldige_steekproef():
 
 def test_invoercontrole_geen_dataframe():
     with pytest.raises(TypeError, match="DataFrame"):
-        eval_stratified("geen dataframe")
+        evalueer_geldsteek_gestratificeerd("geen dataframe")
 
 
 def test_invoercontrole_ongeldig_model():
     with pytest.raises(ValueError, match="Model moet"):
-        eval_stratified(get_geldige_steekproef(), model="frequentist")
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), model="frequentist")
 
 
 def test_invoercontrole_zekerheid_bool():
     with pytest.raises(TypeError, match="boolean"):
-        eval_stratified(get_geldige_steekproef(), zekerheid=True)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), zekerheid=True)
 
 
 def test_invoercontrole_zekerheid_geen_getal():
     with pytest.raises(TypeError, match="getal"):
-        eval_stratified(get_geldige_steekproef(), zekerheid="0.95")
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), zekerheid="0.95")
 
 
 def test_invoercontrole_zekerheid_negatief():
     with pytest.raises(ValueError, match="segment"):
-        eval_stratified(get_geldige_steekproef(), zekerheid=-0.1)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), zekerheid=-0.1)
 
 
 def test_invoercontrole_zekerheid_te_groot():
     with pytest.raises(ValueError, match="segment"):
-        eval_stratified(get_geldige_steekproef(), zekerheid=1.5)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), zekerheid=1.5)
 
 
 def test_invoercontrole_ongeldige_methode():
     with pytest.raises(ValueError, match="Ongeldige methode"):
-        eval_stratified(get_geldige_steekproef(), methode="onbekende_methode")
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), methode="onbekende_methode")
 
 
 def test_invoercontrole_granulariteit_bool():
     with pytest.raises(TypeError, match="bool"):
-        eval_stratified(get_geldige_steekproef(), granulariteit=True)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), granulariteit=True)
 
 
 def test_invoercontrole_granulariteit_geen_int():
     with pytest.raises(TypeError, match="geheel getal"):
-        eval_stratified(get_geldige_steekproef(), granulariteit=100.5)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), granulariteit=100.5)
 
 
 def test_invoercontrole_granulariteit_te_klein():
     with pytest.raises(ValueError, match=">= 1"):
-        eval_stratified(get_geldige_steekproef(), granulariteit=0)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), granulariteit=0)
 
 
 def _steekproef_met_extreem_gewichtsverschil():
@@ -473,14 +473,14 @@ def test_granulariteit_te_laag_voor_extreem_gewichtsverschil_fft():
     data = _steekproef_met_extreem_gewichtsverschil()
     for methode in ["FFT samen", "FFT paarsgewijs", "direct"]:
         with pytest.raises(ValueError, match="te laag"):
-            eval_stratified(data, methode=methode, granulariteit=100)
+            evalueer_geldsteek_gestratificeerd(data, methode=methode, granulariteit=100)
 
 
 def test_granulariteit_te_laag_voor_extreem_gewichtsverschil_monte_carlo_vrijgesteld():
     """Monte Carlo gebruikt geen vast rooster en is vrijgesteld van de granulariteitscheck."""
     data = _steekproef_met_extreem_gewichtsverschil()
     # Mag niet gooien, ongeacht hoe laag de granulariteit is.
-    result = eval_stratified(
+    result = evalueer_geldsteek_gestratificeerd(
         data, methode="Monte Carlo", granulariteit=100, vergelijk=False
     )
     assert "max_fout_convolutie" in result
@@ -490,7 +490,7 @@ def test_granulariteit_voldoende_voor_extreem_gewichtsverschil():
     """Bij een hoge genoeg granulariteit slaagt de evaluatie gewoon."""
     data = _steekproef_met_extreem_gewichtsverschil()
     # min_benodigde_gran = ceil(1.001.000 / 1.000 * 10) = 10.010 → 20.000 is ruim voldoende.
-    result = eval_stratified(
+    result = evalueer_geldsteek_gestratificeerd(
         data, methode="FFT samen", granulariteit=20_000, vergelijk=False
     )
     assert "max_fout_convolutie" in result
@@ -498,23 +498,23 @@ def test_granulariteit_voldoende_voor_extreem_gewichtsverschil():
 
 def test_invoercontrole_start_bool():
     with pytest.raises(TypeError, match="bool"):
-        eval_stratified(get_geldige_steekproef(), start=True)
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), start=True)
 
 
 def test_invoercontrole_start_geen_getal():
     with pytest.raises(TypeError, match="int of een float"):
-        eval_stratified(get_geldige_steekproef(), start="1")
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), start="1")
 
 
 def test_invoercontrole_vergelijk_geen_bool():
     with pytest.raises(TypeError, match="boolean"):
-        eval_stratified(get_geldige_steekproef(), vergelijk="ja")
+        evalueer_geldsteek_gestratificeerd(get_geldige_steekproef(), vergelijk="ja")
 
 
 def test_invoercontrole_ontbrekende_kolom():
     slecht = get_geldige_steekproef().drop(columns=["k_laag"])
     with pytest.raises(ValueError, match="Ontbrekende kolommen"):
-        eval_stratified(slecht)
+        evalueer_geldsteek_gestratificeerd(slecht)
 
 
 def test_optionele_kolommen_worden_aangevuld_als_ontbrekend():
@@ -528,7 +528,7 @@ def test_optionele_kolommen_worden_aangevuld_als_ontbrekend():
         "n_laag": [50],
         "k_laag": [0],
     })
-    resultaat = eval_stratified(minimaal, vergelijk=False)
+    resultaat = evalueer_geldsteek_gestratificeerd(minimaal, vergelijk=False)
     steekproeven_uit = resultaat["steekproeven"]
     assert (steekproeven_uit["ihr"] == "H").all()
     assert (steekproeven_uit["ibr"] == "H").all()
@@ -541,13 +541,13 @@ def test_optionele_kolommen_worden_aangevuld_als_ontbrekend():
 def test_invoercontrole_dubbele_stratumnamen():
     dubbel = pd.concat([get_geldige_steekproef(), get_geldige_steekproef()])
     with pytest.raises(ValueError, match="stratumnamen"):
-        eval_stratified(dubbel)
+        evalueer_geldsteek_gestratificeerd(dubbel)
 
 
 def test_invoercontrole_lege_dataframe():
     leeg = get_geldige_steekproef().iloc[0:0]
     with pytest.raises(ValueError, match="is leeg"):
-        eval_stratified(leeg)
+        evalueer_geldsteek_gestratificeerd(leeg)
 
 
 def test_materialiteit_kolom_stuurt_extra_foutloze_posten():
@@ -570,11 +570,11 @@ def test_materialiteit_kolom_stuurt_extra_foutloze_posten():
         fout_hoog=[0.0],
     )
 
-    strak = eval_stratified(
+    strak = evalueer_geldsteek_gestratificeerd(
         pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.02]}),
         vergelijk=False,
     )
-    ruim = eval_stratified(
+    ruim = evalueer_geldsteek_gestratificeerd(
         pd.DataFrame({**gemeenschappelijk, "materialiteit": [0.10]}),
         vergelijk=False,
     )
@@ -597,7 +597,7 @@ def test_eval_kolominhoud_nan_in_numerieke_kolom_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "waarde_laag"] = float("nan")
     with pytest.raises(ValueError, match="lege waarden"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 @pytest.mark.parametrize("kolom", ["naam", "ihr", "ibr", "car"])
@@ -606,7 +606,7 @@ def test_eval_kolominhoud_none_in_tekstkolom_wordt_geweigerd(kolom):
     data = get_geldige_steekproef()
     data.loc[0, kolom] = None
     with pytest.raises(ValueError, match="lege waarden"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_lege_string_naam_wordt_geweigerd():
@@ -614,7 +614,7 @@ def test_eval_kolominhoud_lege_string_naam_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "naam"] = ""
     with pytest.raises(ValueError, match="lege strings"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_whitespace_naam_wordt_geweigerd():
@@ -622,7 +622,7 @@ def test_eval_kolominhoud_whitespace_naam_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "naam"] = "   "
     with pytest.raises(ValueError, match="lege strings"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_niet_numeriek_wordt_geweigerd():
@@ -630,7 +630,7 @@ def test_eval_kolominhoud_niet_numeriek_wordt_geweigerd():
     data = get_geldige_steekproef()
     data["n_laag"] = data["n_laag"].astype(str)
     with pytest.raises(ValueError, match="numerieke waarden"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_negatieve_waarde_laag_wordt_geweigerd():
@@ -638,7 +638,7 @@ def test_eval_kolominhoud_negatieve_waarde_laag_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "waarde_laag"] = -1.0
     with pytest.raises(ValueError, match="waarde_laag"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_negatieve_n_laag_wordt_geweigerd():
@@ -646,7 +646,7 @@ def test_eval_kolominhoud_negatieve_n_laag_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "n_laag"] = -1
     with pytest.raises(ValueError, match="n_laag"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_gebroken_n_laag_wordt_geaccepteerd():
@@ -654,7 +654,7 @@ def test_eval_gebroken_n_laag_wordt_geaccepteerd():
     data = get_geldige_steekproef()
     data["n_laag"] = data["n_laag"].astype(float)
     data.loc[0, "n_laag"] = 30.5
-    res = eval_stratified(data)
+    res = evalueer_geldsteek_gestratificeerd(data)
     assert 0 < res["max_fout_convolutie"] < 1
 
 
@@ -663,7 +663,7 @@ def test_eval_kolominhoud_negatieve_k_laag_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "k_laag"] = -0.5
     with pytest.raises(ValueError, match="k_laag"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_k_laag_groter_dan_n_laag_wordt_geweigerd():
@@ -672,7 +672,7 @@ def test_eval_kolominhoud_k_laag_groter_dan_n_laag_wordt_geweigerd():
     data.loc[0, "n_laag"] = 10
     data.loc[0, "k_laag"] = 11.0
     with pytest.raises(ValueError, match="k_laag"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_negatieve_waarde_hoog_wordt_geweigerd():
@@ -680,7 +680,7 @@ def test_eval_kolominhoud_negatieve_waarde_hoog_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "waarde_hoog"] = -100.0
     with pytest.raises(ValueError, match="waarde_hoog"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_negatieve_fout_hoog_wordt_geweigerd():
@@ -688,7 +688,7 @@ def test_eval_kolominhoud_negatieve_fout_hoog_wordt_geweigerd():
     data = get_geldige_steekproef()
     data.loc[0, "fout_hoog"] = -1.0
     with pytest.raises(ValueError, match="fout_hoog"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd():
@@ -697,7 +697,7 @@ def test_eval_kolominhoud_fout_hoog_groter_dan_waarde_hoog_wordt_geweigerd():
     data.loc[0, "waarde_hoog"] = 500.0
     data.loc[0, "fout_hoog"] = 600.0
     with pytest.raises(ValueError, match="fout_hoog"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 @pytest.mark.parametrize("waarde", [0.0, 1.0, -0.01, 1.5])
@@ -706,7 +706,7 @@ def test_eval_kolominhoud_materialiteit_kolom_buiten_bereik(waarde):
     data = get_geldige_steekproef()
     data.loc[0, "materialiteit"] = waarde
     with pytest.raises(ValueError, match="materialiteit"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_cross_constraint_materialiteit_te_laag_voor_fout_hoog():
@@ -720,7 +720,7 @@ def test_eval_cross_constraint_materialiteit_te_laag_voor_fout_hoog():
     data.loc[0, "fout_hoog"] = 100.0
     data.loc[0, "materialiteit"] = 0.05
     with pytest.raises(ValueError, match="geen foutmarge"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_cross_constraint_materialiteit_strikt_kleiner_dan_fout_hoog_gedeeld_door_populatie():
@@ -736,7 +736,7 @@ def test_eval_cross_constraint_materialiteit_strikt_kleiner_dan_fout_hoog_gedeel
     data.loc[0, "fout_hoog"] = 100.0
     data.loc[0, "materialiteit"] = 0.05  # < 100/1000 = 0.10
     with pytest.raises(ValueError, match="geen foutmarge"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_eval_cross_constraint_materialiteit_laag_groter_dan_1():
@@ -751,7 +751,7 @@ def test_eval_cross_constraint_materialiteit_laag_groter_dan_1():
     data.loc[0, "fout_hoog"] = 0.0
     data.loc[0, "materialiteit"] = 0.9
     with pytest.raises(ValueError, match="laagstratum"):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 @pytest.mark.parametrize("kolom", ["ihr", "ibr", "car"])
@@ -760,7 +760,7 @@ def test_eval_kolominhoud_ongeldig_risico_wordt_geweigerd(kolom):
     data = get_geldige_steekproef()
     data.loc[0, kolom] = "X"
     with pytest.raises(ValueError, match=kolom):
-        eval_stratified(data)
+        evalueer_geldsteek_gestratificeerd(data)
 
 
 def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
@@ -786,7 +786,7 @@ def test_materialiteit_kolom_heeft_geen_invloed_op_hoogstratum_eval():
     )
 
     for mat_kolom in [0.05, 0.10]:
-        resultaat = eval_stratified(
+        resultaat = evalueer_geldsteek_gestratificeerd(
             pd.DataFrame({**basis, "materialiteit": [mat_kolom]}),
             vergelijk=False,
         )
@@ -817,7 +817,7 @@ def test_edge_case_extreme_fout_kleine_steekproef():
     })
 
     # Controleer of de motor niet breekt over deze extreme statistische input
-    resultaat = eval_stratified(
+    resultaat = evalueer_geldsteek_gestratificeerd(
         data_extreem,
         model="binomiaal",
         zekerheid=0.95,

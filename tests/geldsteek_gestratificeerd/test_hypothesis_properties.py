@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from hypothesis import given, settings
 
-from auditstat.geldsteek_gestratificeerd import eval_stratified
+from auditstat.geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
 
 
 @st.composite
@@ -83,7 +83,7 @@ class TestPropertyBasedConvolutie:
         granulariteit = 50_000
 
         # Bereken de baseline met de oorspronkelijke volgorde.
-        res_orig = eval_stratified(
+        res_orig = evalueer_geldsteek_gestratificeerd(
             steekproeven=df,
             model="poisson",
             zekerheid=zekerheid,
@@ -96,7 +96,7 @@ class TestPropertyBasedConvolutie:
         df_shuffled = df.sample(frac=1.0).reset_index(drop=True)
 
         # Bereken het resultaat van de gehusselde dataset.
-        res_shuffled = eval_stratified(
+        res_shuffled = evalueer_geldsteek_gestratificeerd(
             steekproeven=df_shuffled,
             model="poisson",
             zekerheid=zekerheid,
@@ -124,7 +124,7 @@ class TestPropertyBasedConvolutie:
         granulariteit = 50_000
 
         # Evalueer het model op een zekerheid van 95 procent.
-        res_95 = eval_stratified(
+        res_95 = evalueer_geldsteek_gestratificeerd(
             steekproeven=df,
             model="poisson",
             zekerheid=0.95,
@@ -134,7 +134,7 @@ class TestPropertyBasedConvolutie:
         )
 
         # Evalueer het model op een zekerheid van 99 procent.
-        res_99 = eval_stratified(
+        res_99 = evalueer_geldsteek_gestratificeerd(
             steekproeven=df,
             model="poisson",
             zekerheid=0.99,

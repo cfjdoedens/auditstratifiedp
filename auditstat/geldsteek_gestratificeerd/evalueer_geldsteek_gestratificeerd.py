@@ -1,9 +1,9 @@
 """
 Evaluatiefuncties van auditstratified.
-Hoofdfunctie is eval_stratified().
+Hoofdfunctie is evalueer_geldsteek_gestratificeerd().
 """
 
-__all__ = ["eval_stratified"]
+__all__ = ["evalueer_geldsteek_gestratificeerd"]
 
 import math
 
@@ -17,7 +17,7 @@ from scipy.stats import beta, gamma, gaussian_kde
 from .utils import foutloze_posten_equivalent
 
 
-def eval_stratified(
+def evalueer_geldsteek_gestratificeerd(
     steekproeven: pd.DataFrame,
     model: str = "binomiaal",
     zekerheid: float = 0.95,

@@ -1,6 +1,8 @@
 import pandas as pd
 
-from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (
+    evalueer_geldsteek_gestratificeerd,
+)
 
 # Naam waaronder de evaluatie van de hele SSO in samenvattingen en rapporten
 # verschijnt; daarom niet toegestaan als naam van een klant.
@@ -84,7 +86,7 @@ def evalueer_SSO_totaal(
     ``(n, k)`` is direct een steekproef uit de populatie waarover
     geoordeeld wordt. Elk type post wordt daarom één stratum met
     ``n_laag = n`` en ``k_laag = k`` over de totale geldwaarde van dat type
-    post bij de hele SSO; ``eval_stratified`` combineert de strata.
+    post bij de hele SSO; ``evalueer_geldsteek_gestratificeerd`` combineert de strata.
 
     Parameters
     ----------
@@ -96,12 +98,12 @@ def evalueer_SSO_totaal(
         Zonder onderscheid naar typen posten is dit één dict met de
         SSO-brede totalen.
     model, zekerheid, methode, granulariteit
-        Zie ``eval_stratified``.
+        Zie ``evalueer_geldsteek_gestratificeerd``.
 
     Returns
     -------
     dict
-        Het resultaat van ``eval_stratified`` (bruikbaar met
+        Het resultaat van ``evalueer_geldsteek_gestratificeerd`` (bruikbaar met
         ``plot_kanskromme``), met de stratatabel onder ``"steekproeven"``.
     """
     if not post_typen:
@@ -128,7 +130,7 @@ def evalueer_SSO_totaal(
                 rij[optioneel] = post[optioneel]
         rijen.append(rij)
 
-    return eval_stratified(
+    return evalueer_geldsteek_gestratificeerd(
         steekproeven=pd.DataFrame(rijen),
         model=model,
         zekerheid=zekerheid,

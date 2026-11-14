@@ -1,8 +1,8 @@
 """
 auditstat.postensteek: evaluatie van één enkele steekproef (binomiaal of
-hypergeometrisch), een omzetting van de SAS-macro ``%eval_distribution``.
+hypergeometrisch), een omzetting van de SAS-macro ``%evalueer_postensteek``.
 """
 
-from .eval_distribution import eval_distribution, plot_eval_distribution
+from .evalueer_postensteek import evalueer_postensteek, plot_evalueer_postensteek
 
-__all__ = ["eval_distribution", "plot_eval_distribution"]
+__all__ = ["evalueer_postensteek", "plot_evalueer_postensteek"]

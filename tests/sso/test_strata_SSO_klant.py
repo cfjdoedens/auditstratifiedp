@@ -65,7 +65,7 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
         self.assertAlmostEqual(df["n_laag"].iloc[0], n_eff)
         self.assertAlmostEqual(df["k_laag"].iloc[0], k_eff)
         self.assertAlmostEqual(df["extra_foutloze_posten_sso"].iloc[0], extra)
-        # Niet doorgegeven, anders past eval_stratified het nogmaals toe.
+        # Niet doorgegeven, anders past evalueer_geldsteek_gestratificeerd het nogmaals toe.
         for kolom in ("ihr", "ibr", "car", "materialiteit"):
             self.assertNotIn(kolom, df.columns)
 

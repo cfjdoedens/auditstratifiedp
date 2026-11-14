@@ -191,7 +191,7 @@ def evalueer_SSO_klant_exact(
     Returns
     -------
     dict
-        Zelfde sleutels als ``eval_stratified`` voor wat ``plot_kanskromme``
+        Zelfde sleutels als ``evalueer_geldsteek_gestratificeerd`` voor wat ``plot_kanskromme``
         en de samenvattingen gebruiken (``kanskromme``, ``populatie_totaal``,
         ``max_fout_convolutie`` en ``..._geld``, ``mw_``/``min_``/
         ``mediaan_``/``gemiddelde_fout_convolutie`` en ``..._geld``,

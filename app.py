@@ -16,11 +16,11 @@ import streamlit as st
 # nog niet, dan volgt een duidelijke herstartmelding.
 for _poging in (1, 2):
     try:
-        from auditstat.geldsteek_gestratificeerd.eval_stratified import (  # pyrefly: ignore[missing-import]
-            eval_stratified,
+        from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+            evalueer_geldsteek_gestratificeerd,
         )
-        from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
-            plan_stratified_basis,
+        from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+            plan_geldsteek_gestratificeerd_basis,
             vind_beste_strata_groep,
         )
         from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
@@ -38,9 +38,9 @@ for _poging in (1, 2):
             lees_lokaal_bestand,
             schrijf_lokaal_bestand,
         )
-        from auditstat.postensteek.eval_distribution import (  # pyrefly: ignore[missing-import]
-            eval_distribution,
-            plot_eval_distribution,
+        from auditstat.postensteek.evalueer_postensteek import (  # pyrefly: ignore[missing-import]
+            evalueer_postensteek,
+            plot_evalueer_postensteek,
         )
         from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
             evalueer_SSO_klant_exact,
@@ -1573,7 +1573,7 @@ with tab_enkel:
             st.error("\n".join(enkel_fouten))
         else:
             try:
-                enkel_res = eval_distribution(
+                enkel_res = evalueer_postensteek(
                     n=enkel_n,
                     k=enkel_k,
                     verdeling=enkel_verdeling_gebruikt,
@@ -1609,7 +1609,7 @@ with tab_enkel:
                         f"kans op een fout boven de norm ({_nl(enkel_norm * 100, 2)}%)",
                         f"{_nl(enkel_res['kans_boven_norm'] * 100, 2)}%",
                     )
-                _fig_enkel = plot_eval_distribution(
+                _fig_enkel = plot_evalueer_postensteek(
                     enkel_res,
                     toon_massa=enkel_res["verdeling"] == "hypergeometrisch",
                     figsize=(8.27, 9.5),
@@ -1887,7 +1887,7 @@ with tab_eval:
                     st.stop()
                 try:
                     # Bereken de geconvolueerde resultaten via de rekenmotor.
-                    res = eval_stratified(
+                    res = evalueer_geldsteek_gestratificeerd(
                         df_clean,
                         model=strat_model,
                         zekerheid=strat_conf,
@@ -2239,13 +2239,13 @@ with tab_plan:
 
         # Bereken de basisplanning op basis van de risico's en de invoerparameters.
         try:
-            strata_init = plan_stratified_basis(df_clean, model=plan_model)
+            strata_init = plan_geldsteek_gestratificeerd_basis(df_clean, model=plan_model)
         except Exception as e:
             st.error(f"Fout bij basisplanning: {e}")
             st.stop()
 
         try:
-            init_fout = eval_stratified(
+            init_fout = evalueer_geldsteek_gestratificeerd(
                 strata_init,
                 model=plan_model,
                 zekerheid=plan_conf,
@@ -2326,7 +2326,7 @@ with tab_plan:
                     strata.at[idx, "n_laag"] * strata.at[idx, "verwachte_foutfractie"]
                 )
 
-            huidige_fout = eval_stratified(
+            huidige_fout = evalueer_geldsteek_gestratificeerd(
                 strata,
                 model=model,
                 zekerheid=conf,

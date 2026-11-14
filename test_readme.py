@@ -3,11 +3,11 @@ import time
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from auditstat.geldsteek_gestratificeerd.eval_stratified import (  # pyrefly: ignore[missing-import]
-    eval_stratified,
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    evalueer_geldsteek_gestratificeerd,
 )
-from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
-    plan_stratified,
+from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+    plan_geldsteek_gestratificeerd,
 )
 from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
     plot_kanskromme,
@@ -31,7 +31,7 @@ data = pd.DataFrame({
 
 print("2. Plannen (dit kan even duren door het klimalgoritme)...", flush=True)
 t0 = time.time()
-plan = plan_stratified(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
+plan = plan_geldsteek_gestratificeerd(steekproeven=data, materialiteit=0.03, zekerheid=0.95)
 t1 = time.time()
 print(f"   Klaar met plannen in {t1 - t0:.1f} seconden!", flush=True)
 print(plan[["naam", "kosten", "n_basis", "n_laag"]])
@@ -43,7 +43,7 @@ data["n_laag"] = [60, 30]
 data["k_laag"] = [1, 0]
 
 # Voer de evaluatie uit met FFT-convolutie
-resultaat = eval_stratified(steekproeven=data, zekerheid=0.95, methode="FFT samen")
+resultaat = evalueer_geldsteek_gestratificeerd(steekproeven=data, zekerheid=0.95, methode="FFT samen")
 
 # Rapporteer de resultaten
 print(f"Maximale fout (convolutie): {resultaat['max_fout_convolutie']:.4f}")

@@ -7,10 +7,10 @@ from auditstat.sso.moment_match_SSO import moment_match_SSO
 from auditstat.sso.naief_SSO import naief_match_SSO
 
 # Optionele kolommen die, indien aanwezig, worden doorgegeven aan
-# eval_stratified (dat zelf standaardwaarden invult als ze ontbreken).
+# evalueer_geldsteek_gestratificeerd (dat zelf standaardwaarden invult als ze ontbreken).
 # ``ihr``, ``ibr``, ``car`` en ``materialiteit`` horen bij de eerste trap
 # (de SSO-steekproef) en worden hier al verwerkt; ze worden niet doorgegeven,
-# anders zou eval_stratified de correctie nogmaals op de klant toepassen.
+# anders zou evalueer_geldsteek_gestratificeerd de correctie nogmaals op de klant toepassen.
 _OPTIONELE_KOLOMMEN = (
     "waarde_hoog",
     "fout_hoog",
@@ -25,7 +25,7 @@ def bouw_strata_SSO_klant(
 ):
     """
     Bouwt een stratatabel voor één klant op basis van SSO-steekproeven per
-    type post, geschikt als invoer voor ``auditstat.geldsteek_gestratificeerd.eval_stratified``.
+    type post, geschikt als invoer voor ``auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd``.
 
     Achtergrond
     -----------
@@ -40,7 +40,7 @@ def bouw_strata_SSO_klant(
     post.
 
     ``moment_match_SSO`` kalibreert (n_eff, k_eff) zodanig dat de Beta-
-    resp. Gamma-verdeling die ``eval_stratified`` hieruit opbouwt dezelfde
+    resp. Gamma-verdeling die ``evalueer_geldsteek_gestratificeerd`` hieruit opbouwt dezelfde
     gemiddelde én variantie heeft als de werkelijke, continue samengestelde
     verdeling van de foutfractie bij de klant. Dat behoudt beide
     onzekerheidslagen (posterior-onzekerheid over de ware foutkans, én
@@ -63,7 +63,7 @@ def bouw_strata_SSO_klant(
         type post, standaard 0; niveau 2/3 van de theorie, zie
         ``naief_match_SSO`` en ``moment_match_SSO``).
 
-        Optioneel (standaardwaarden conform ``eval_stratified`` als ze
+        Optioneel (standaardwaarden conform ``evalueer_geldsteek_gestratificeerd`` als ze
         ontbreken): ``ihr``, ``ibr``, ``car``, ``waarde_hoog``,
         ``fout_hoog``, ``materialiteit``.
 
@@ -73,11 +73,11 @@ def bouw_strata_SSO_klant(
         SSO-``n`` opgeteld (``n + extra``, ``k`` blijft); daaruit wordt dan
         (n_eff, k_eff) voor de klant gekalibreerd. De klantsteekproef zelf
         kent geen risicocorrectie, dus deze kolommen worden niet aan
-        ``eval_stratified`` doorgegeven (dat zou de correctie dubbel
+        ``evalueer_geldsteek_gestratificeerd`` doorgegeven (dat zou de correctie dubbel
         toepassen, op ``n_eff``).
     model : {"binomiaal", "poisson"}, standaard "binomiaal"
         Kansmodel waarop gekalibreerd wordt. Moet overeenkomen met het
-        ``model``-argument dat straks aan ``eval_stratified`` wordt
+        ``model``-argument dat straks aan ``evalueer_geldsteek_gestratificeerd`` wordt
         doorgegeven (zie ``evalueer_SSO_klant_gestratificeerd``).
     kalibratiemethode : {"momentmatching", "naief"}, standaard "momentmatching"
         Welke functie per type post (n_eff, k_eff) berekent:
@@ -96,7 +96,7 @@ def bouw_strata_SSO_klant(
     zekerheid : float, standaard 0,95
         Zekerheidsniveau waarop ``moment_match_SSO`` bij klemming op de
         exacte grens kalibreert. Geef hier dezelfde zekerheid door als aan
-        ``eval_stratified`` (``evalueer_SSO_klant_gestratificeerd`` doet
+        ``evalueer_geldsteek_gestratificeerd`` (``evalueer_SSO_klant_gestratificeerd`` doet
         dat automatisch). Heeft geen invloed bij ``"naief"`` en bij
         momentmatching zonder klemming.
 
@@ -106,14 +106,14 @@ def bouw_strata_SSO_klant(
         Eén rij per type post, met kolommen ``naam``, ``waarde_laag``,
         ``n_laag``, ``k_laag`` en de eventueel meegegeven optionele
         kolommen — rechtstreeks bruikbaar als ``steekproeven``-argument
-        van ``eval_stratified``.
+        van ``evalueer_geldsteek_gestratificeerd``.
 
     Let op
     ------
-    ``eval_stratified`` accepteert een niet-geheel ``n_laag`` (het rekent met
+    ``evalueer_geldsteek_gestratificeerd`` accepteert een niet-geheel ``n_laag`` (het rekent met
     Beta-/Gamma-verdelingen), dus (n_eff, k_eff) worden ongeafgerond
     doorgegeven; afronden zou de gekalibreerde variantie en het gemiddelde
-    verstoren. ``n_laag`` is minstens ``k_laag`` (eis van ``eval_stratified``).
+    verstoren. ``n_laag`` is minstens ``k_laag`` (eis van ``evalueer_geldsteek_gestratificeerd``).
 
     Als ``moment_match_SSO`` voor een type post moet klemmen, vuurt die
     functie een ``RuntimeWarning`` af; deze functie vangt die op en vuurt

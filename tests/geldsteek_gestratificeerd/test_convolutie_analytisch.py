@@ -5,7 +5,7 @@ import pytest
 from scipy.optimize import brentq
 from scipy.stats import beta, gamma
 
-from auditstat.geldsteek_gestratificeerd import eval_stratified
+from auditstat.geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
 
 # --- Globale testconstanten ---
 DEFAULT_TOL = 5e-3
@@ -70,7 +70,7 @@ class TestAnalytischeValidatie:
         })
 
         # Bereken het resultaat via het primaire FFT-algoritme.
-        res = eval_stratified(
+        res = evalueer_geldsteek_gestratificeerd(
             steekproeven=data,
             model="binomiaal",
             zekerheid=zekerheid,
@@ -145,7 +145,7 @@ class TestAnalytischeValidatie:
         })
 
         # Voer de FFT-convolutie uit voor de gecombineerde strata.
-        res = eval_stratified(
+        res = evalueer_geldsteek_gestratificeerd(
             steekproeven=data,
             model="poisson",
             zekerheid=zekerheid,
@@ -212,7 +212,7 @@ class TestAnalytischeValidatie:
             "materialiteit": [0.05] * m,
         })
 
-        res = eval_stratified(
+        res = evalueer_geldsteek_gestratificeerd(
             steekproeven=data,
             model="binomiaal",
             zekerheid=zekerheid,

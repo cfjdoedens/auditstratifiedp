@@ -55,7 +55,7 @@ def plot_kanskromme(res: dict) -> plt.Figure:
     Parameters
     ----------
     res:
-        Het resultaatobject uit ``eval_stratified``.
+        Het resultaatobject uit ``evalueer_geldsteek_gestratificeerd``.
 
     Returns
     -------

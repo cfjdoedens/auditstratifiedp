@@ -1,4 +1,6 @@
-from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (
+    evalueer_geldsteek_gestratificeerd,
+)
 from auditstat.sso.strata_SSO_klant import bouw_strata_SSO_klant
 
 
@@ -15,8 +17,8 @@ def evalueer_SSO_klant_gestratificeerd(
     basis van SSO-steekproeven per type post.
 
     Bouwt eerst de stratatabel via ``bouw_strata_SSO_klant`` en roept
-    daarna ``eval_stratified`` aan. Zie ``bouw_strata_SSO_klant`` voor het
-    formaat van ``post_typen``, en ``eval_stratified`` voor de overige
+    daarna ``evalueer_geldsteek_gestratificeerd`` aan. Zie ``bouw_strata_SSO_klant`` voor het
+    formaat van ``post_typen``, en ``evalueer_geldsteek_gestratificeerd`` voor de overige
     parameters en het resultaatformaat.
 
     Per type post wordt een effectieve steekproefomvang en een effectief
@@ -40,14 +42,14 @@ def evalueer_SSO_klant_gestratificeerd(
     methode : {"FFT paarsgewijs", "FFT samen", "direct", "Monte Carlo"}
         Methode voor de convolutieberekening.
     granulariteit : int, optioneel
-        Zie ``eval_stratified``; standaard ``None`` (automatisch bepaald).
+        Zie ``evalueer_geldsteek_gestratificeerd``; standaard ``None`` (automatisch bepaald).
     kalibratiemethode : {"momentmatching", "naief"}, standaard "momentmatching"
         Zie ``bouw_strata_SSO_klant``.
 
     Returns
     -------
     dict
-        Het resultaat van ``eval_stratified``, inclusief de kanskromme
+        Het resultaat van ``evalueer_geldsteek_gestratificeerd``, inclusief de kanskromme
         (bruikbaar met ``auditstat.geldsteek_gestratificeerd.plot_kanskromme.plot_kanskromme``)
         en de opgebouwde stratatabel onder ``"steekproeven"``.
     """
@@ -57,7 +59,7 @@ def evalueer_SSO_klant_gestratificeerd(
         kalibratiemethode=kalibratiemethode,
         zekerheid=zekerheid,
     )
-    return eval_stratified(
+    return evalueer_geldsteek_gestratificeerd(
         steekproeven=steekproeven,
         model=model,
         zekerheid=zekerheid,
