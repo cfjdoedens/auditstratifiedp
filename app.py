@@ -41,8 +41,11 @@ for _poging in (1, 2):
             kenmerken_empirisch,
             kenmerken_gamma,
             plot_ecdf_postgroottes,
+            plot_histogram_postgroottes,
             plot_lorenz_per_type_post,
             plot_lorenz_postgroottes,
+            plot_omgekeerde_lorenz_postgroottes,
+            plot_overschrijdingscurve_postgroottes,
             plot_pareto_postgroottes,
             plot_strip_postgroottes,
             simuleer_gamma_posten,
@@ -307,9 +310,22 @@ def _lees_cv(ruw, label: str, fouten: list) -> float:
 
 def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
     """Pareto-diagram, ECDF en strip plot van postbedragen in drie tabbladen."""
-    tab_p, tab_e, tab_s = st.tabs(["Pareto", "ECDF", "Strip plot"])
+    tab_p, tab_e, tab_s, tab_o, tab_h, tab_x = st.tabs([
+        "Pareto",
+        "ECDF",
+        "Strip plot",
+        "Omgekeerde Lorenz",
+        "Histogram",
+        "Overschrijdingscurve",
+    ])
     figuren = (
         (tab_p, lambda: plot_pareto_postgroottes(waarden, compact=True)),
+        (tab_o, lambda: plot_omgekeerde_lorenz_postgroottes(waarden, compact=True)),
+        (tab_h, lambda: plot_histogram_postgroottes(waarden, compact=True)),
+        (
+            tab_x,
+            lambda: plot_overschrijdingscurve_postgroottes(waarden, compact=True),
+        ),
         (tab_e, lambda: plot_ecdf_postgroottes({"posten": waarden}, compact=True)),
         (tab_s, lambda: plot_strip_postgroottes({"posten": waarden}, compact=True)),
     )
@@ -330,13 +346,33 @@ def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
         "waarde (staven) en het cumulatieve aandeel (lijn). ECDF: het "
         "aandeel posten tot een bepaald bedrag, log-schaal. Strip plot: "
         "elke post een punt (bij veel posten een willekeurige "
-        "deelverzameling), met mediaan (groen) en gemiddelde (rood)."
+        "deelverzameling), met mediaan (groen) en gemiddelde (rood). "
+        "Omgekeerde Lorenz: het aandeel van de waarde in de grootste x% "
+        "van de posten. Histogram: aandeel posten per bedragklasse op "
+        "log-schaal. Overschrijdingscurve: aandeel posten met minstens "
+        "een bepaald bedrag (log-log); een flauw dalende rechte lijn wijst "
+        "op een zware staart."
     )
 
 
 def _toon_postgroottes_per_type(groepen: dict, gesimuleerd: bool) -> None:
     """ECDF en strip plot met alle typen posten in één figuur."""
-    tab_e, tab_s = st.tabs(["ECDF per type post", "Strip plot per type post"])
+    tab_e, tab_s, tab_o, tab_h, tab_x = st.tabs([
+        "ECDF per type post",
+        "Strip plot per type post",
+        "Omgekeerde Lorenz per type post",
+        "Histogram per type post",
+        "Overschrijdingscurve per type post",
+    ])
+    for tab, maak in (
+        (tab_o, plot_omgekeerde_lorenz_postgroottes),
+        (tab_h, plot_histogram_postgroottes),
+        (tab_x, plot_overschrijdingscurve_postgroottes),
+    ):
+        with tab:
+            fig = maak(groepen, compact=True)
+            st.pyplot(fig)
+            plt.close(fig)
     with tab_e:
         fig = plot_ecdf_postgroottes(groepen, compact=True)
         st.pyplot(fig)

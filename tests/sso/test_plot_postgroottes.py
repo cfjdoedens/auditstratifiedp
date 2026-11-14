@@ -135,3 +135,30 @@ def test_ecdf_en_strip_met_meerdere_typen_posten():
     fig = plot_strip_postgroottes(g, compact=True)
     assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["A", "B"]
     assert len(plot_ecdf_postgroottes(g).axes[0].lines) == 2
+
+
+def test_omgekeerde_lorenz_histogram_overschrijding():
+    from auditstat.sso.plot_postgroottes import (
+        plot_histogram_postgroottes,
+        plot_omgekeerde_lorenz_postgroottes,
+        plot_overschrijdingscurve_postgroottes,
+        simuleer_gamma_posten,
+    )
+
+    w = simuleer_gamma_posten(1.0, 500.0, 2000)
+    g = {"A": w, "B": w * 3}
+    lijn = plot_omgekeerde_lorenz_postgroottes(w).axes[0].lines[1]
+    assert lijn.get_ydata()[-1] == pytest.approx(1.0)
+    assert lijn.get_ydata()[10] >= lijn.get_xdata()[10]  # boven de diagonaal
+    plot_histogram_postgroottes(w, compact=True)
+    plot_histogram_postgroottes(g)
+    fig = plot_overschrijdingscurve_postgroottes(g)
+    assert fig.axes[0].get_yscale() == "log"
+    assert fig.axes[0].lines[0].get_ydata()[0] == pytest.approx(1.0)
+    for f in (
+        plot_omgekeerde_lorenz_postgroottes,
+        plot_histogram_postgroottes,
+        plot_overschrijdingscurve_postgroottes,
+    ):
+        with pytest.raises(ValueError):
+            f({})

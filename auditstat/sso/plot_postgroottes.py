@@ -453,3 +453,137 @@ def simuleer_gamma_posten(
         return np.full(aantal, float(gemiddelde))
     rng = np.random.default_rng(seed)
     return rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
+
+
+def _groepen_dict(waarden) -> dict:
+    """Maak van een rij postbedragen een dict met één groep (dicts blijven staan)."""
+    return waarden if isinstance(waarden, dict) else {"posten": waarden}
+
+
+def plot_omgekeerde_lorenz_postgroottes(waarden, compact: bool = False) -> Figure:
+    """Omgekeerde Lorenz-curve: aandeel van de waarde in de grootste x% van de posten.
+
+    ``waarden`` is een rij postbedragen of een dict naam -> postbedragen. De
+    diagonaal is het geval van gelijke posten; hoe verder de curve erboven
+    ligt, hoe meer waarde in enkele grote posten zit.
+    """
+    groepen = _groepen_dict(waarden)
+    if not groepen:
+        raise ValueError("Geef minstens één groep postbedragen.")
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    ax.plot([0, 1], [0, 1], color="black", linestyle="--", linewidth=1)
+    for i, (naam, w) in enumerate(groepen.items()):
+        w = np.sort(_controleer_waarden(w))[::-1]
+        p = np.arange(w.size + 1) / w.size
+        cum = np.concatenate(([0.0], np.cumsum(w) / w.sum()))
+        stap = max(1, w.size // _PUNTEN)
+        idx = np.unique(np.concatenate((np.arange(0, w.size + 1, stap), [w.size])))
+        ax.plot(
+            p[idx],
+            cum[idx],
+            color=plt.get_cmap("tab10")(i % 10),
+            linewidth=2,
+            label=naam,
+        )
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
+    ax.xaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.yaxis.set_major_formatter(nl_tick_formatter(1))
+    ax.set_xlabel(
+        "aandeel van de posten (grootste eerst)", fontsize=8 if compact else None
+    )
+    ax.set_ylabel("aandeel van de totale waarde", fontsize=8 if compact else None)
+    ax.set_title("Omgekeerde Lorenz-curve", fontsize=10 if compact else None)
+    ax.grid(alpha=0.3)
+    if len(groepen) > 1:
+        ax.legend(fontsize=7 if compact else 8, loc="lower right")
+    fig.tight_layout()
+    return fig
+
+
+def plot_histogram_postgroottes(
+    waarden, klassen: int = 40, compact: bool = False
+) -> Figure:
+    """Histogram van de postbedragen met een logaritmische bedragenas.
+
+    Klassen zijn even breed op de log-schaal. ``waarden`` is een rij of een
+    dict naam -> postbedragen (dan staan de histogrammen als lijn over
+    elkaar, als aandeel van de posten per klasse).
+    """
+    groepen = _groepen_dict(waarden)
+    if not groepen:
+        raise ValueError("Geef minstens één groep postbedragen.")
+    alle = [_controleer_waarden(w) for w in groepen.values()]
+    laag = min(float(np.quantile(w, 0.002)) for w in alle)
+    hoog = max(float(w.max()) for w in alle)
+    if not hoog > laag:
+        laag, hoog = laag / 2, hoog * 2
+    randen = np.logspace(np.log10(laag), np.log10(hoog), klassen + 1)
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    for i, (naam, w) in enumerate(zip(groepen, alle, strict=True)):
+        kleur = plt.get_cmap("tab10")(i % 10)
+        aantallen, _ = np.histogram(np.clip(w, laag, hoog), bins=randen)
+        aandeel = aantallen / w.size
+        if len(groepen) == 1:
+            ax.stairs(aandeel, randen, fill=True, color=kleur, alpha=0.7)
+        else:
+            ax.stairs(aandeel, randen, color=kleur, linewidth=1.8, label=naam)
+    ax.set_xscale("log")
+    ax.xaxis.set_major_formatter(_bedrag_formatter())
+    ax.yaxis.set_major_formatter(nl_tick_formatter(2))
+    ax.set_xlabel(
+        "bedrag van de post (euro, log-schaal)", fontsize=8 if compact else None
+    )
+    ax.set_ylabel("aandeel van de posten", fontsize=8 if compact else None)
+    ax.set_title(
+        "Histogram (log-schaal) van de postbedragen", fontsize=10 if compact else None
+    )
+    ax.grid(alpha=0.3, which="both")
+    if len(groepen) > 1:
+        ax.legend(fontsize=7 if compact else 8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_overschrijdingscurve_postgroottes(waarden, compact: bool = False) -> Figure:
+    """Overschrijdingscurve: aandeel van de posten groter dan een bedrag.
+
+    Dubbel-logaritmisch. Een rechte, flauw dalende lijn wijst op een zware
+    staart (Pareto-achtig), een steil afbuigende curve op een lichte staart.
+    ``waarden`` is een rij of een dict naam -> postbedragen.
+    """
+    groepen = _groepen_dict(waarden)
+    if not groepen:
+        raise ValueError("Geef minstens één groep postbedragen.")
+    fig, ax = plt.subplots(figsize=_afmeting(compact))
+    for i, (naam, w) in enumerate(groepen.items()):
+        w = np.sort(_controleer_waarden(w))
+        # P(X >= w_(i)) = (n - i) / n, i = 0..n-1: de kleinste post heeft 1
+        y = (w.size - np.arange(w.size)) / w.size
+        ax.step(
+            w,
+            y,
+            where="post",
+            color=plt.get_cmap("tab10")(i % 10),
+            linewidth=1.8,
+            label=naam,
+        )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    _zet_logbereik(ax, groepen)
+    ax.xaxis.set_major_formatter(_bedrag_formatter())
+    ax.yaxis.set_major_formatter(_bedrag_formatter())
+    ax.set_xlabel(
+        "bedrag van de post (euro, log-schaal)", fontsize=8 if compact else None
+    )
+    ax.set_ylabel(
+        "aandeel posten met minstens dit bedrag", fontsize=8 if compact else None
+    )
+    ax.set_title(
+        "Overschrijdingscurve van de postbedragen", fontsize=10 if compact else None
+    )
+    ax.grid(alpha=0.3, which="both")
+    if len(groepen) > 1:
+        ax.legend(fontsize=7 if compact else 8)
+    fig.tight_layout()
+    return fig
