@@ -452,7 +452,10 @@ def simuleer_gamma_posten(
     if cv == 0:
         return np.full(aantal, float(gemiddelde))
     rng = np.random.default_rng(seed)
-    return rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
+    waarden = rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
+    # bij zeer grote cv geeft de gammatrekking soms exact 0 (underflow);
+    # een post van 0 euro bestaat in dit voorbeeld niet
+    return np.maximum(waarden, gemiddelde * 1e-12)
 
 
 def _groepen_dict(waarden) -> dict:

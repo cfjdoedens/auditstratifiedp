@@ -162,3 +162,14 @@ def test_omgekeerde_lorenz_histogram_overschrijding():
     ):
         with pytest.raises(ValueError):
             f({})
+
+
+def test_simuleer_gamma_posten_blijft_positief_bij_zeer_grote_cv():
+    from auditstat.sso.plot_postgroottes import (
+        plot_pareto_postgroottes,
+        simuleer_gamma_posten,
+    )
+
+    w = simuleer_gamma_posten(10.0, 500.0, 5000)
+    assert np.all(w > 0)
+    plot_pareto_postgroottes(w, compact=True)
