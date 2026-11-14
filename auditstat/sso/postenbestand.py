@@ -112,9 +112,18 @@ def postenbestand_csv(df: pd.DataFrame) -> bytes:
 
 MAX_BYTES_SSO = 50_000_000
 MAX_POSTEN_SSO = 1_000_000
+# Ruimere limieten voor een lokaal draaiende app (geen uploadgrens van de
+# server, eigen geheugen).
+MAX_BYTES_LOKAAL = 500_000_000
+MAX_POSTEN_LOKAAL = 10_000_000
 
 
-def lees_postenbestand(data: bytes, meerdere_klanten: bool = False) -> pd.DataFrame:
+def lees_postenbestand(
+    data: bytes,
+    meerdere_klanten: bool = False,
+    max_bytes: int | None = None,
+    max_posten: int | None = None,
+) -> pd.DataFrame:
     """Lees en valideer een postenbestand; gooit ``ValueError`` bij de eerste fout.
 
     Het resultaat heeft de kolommen van ``POSTEN_KOLOMMEN`` (als tekst) plus
@@ -122,10 +131,13 @@ def lees_postenbestand(data: bytes, meerdere_klanten: bool = False) -> pd.DataFr
 
     Met ``meerdere_klanten=True`` (postenbestand van de hele SSO) mag het
     bestand meerdere klanten bevatten en gelden ruimere limieten
-    (``MAX_BYTES_SSO``, ``MAX_POSTEN_SSO``).
+    (``MAX_BYTES_SSO``, ``MAX_POSTEN_SSO``). ``max_bytes`` en ``max_posten``
+    overschrijven de limieten (bijv. ``MAX_*_LOKAAL`` bij een lokale app).
     """
-    max_bytes = MAX_BYTES_SSO if meerdere_klanten else MAX_BYTES
-    max_posten = MAX_POSTEN_SSO if meerdere_klanten else MAX_POSTEN
+    if max_bytes is None:
+        max_bytes = MAX_BYTES_SSO if meerdere_klanten else MAX_BYTES
+    if max_posten is None:
+        max_posten = MAX_POSTEN_SSO if meerdere_klanten else MAX_POSTEN
     if len(data) > max_bytes:
         raise ValueError(
             f"Het postenbestand mag maximaal {max_bytes // 1_000_000} MB groot zijn."

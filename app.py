@@ -52,6 +52,8 @@ for _poging in (1, 2):
             simuleer_gamma_posten,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
+            MAX_BYTES_LOKAAL,
+            MAX_POSTEN_LOKAAL,
             POSTEN_KOLOMMEN,
             lees_postenbestand,
             maak_voorbeeld_postenbestand,
@@ -1090,6 +1092,16 @@ def _is_lokaal():
         return False
 
 
+def _posten_limieten():
+    """Limieten voor een postenbestand: ruimer als de app lokaal draait."""
+    if _is_lokaal():
+        return {"max_bytes": MAX_BYTES_LOKAAL, "max_posten": MAX_POSTEN_LOKAAL}
+    return {}
+
+
+_LIMIET_LOKAAL_TEKST = " (lokaal: maximaal 500 MB en 10.000.000 posten)"
+
+
 def _lees_lokaal_pad(pad_sleutel, verwerk, meld_fout, bladeren):
     """Lees een lokaal bestand (via het pad in het tekstveld of via een
     bestandsvenster) en geef het aan `verwerk`; fouten gaan naar `meld_fout`."""
@@ -1297,7 +1309,11 @@ def on_sso_niveau3_upload(lokaal_bestand=None):
         st.session_state.sso_niveau3_fout = None
         return
     try:
-        gelezen = lees_postenbestand(bestand.getvalue(), meerdere_klanten=True)
+        gelezen = lees_postenbestand(
+            bestand.getvalue(),
+            meerdere_klanten=True,
+            **_posten_limieten(),
+        )
     except ValueError as exc:
         st.session_state.sso_niveau3_fout = str(exc)
         return  # Bij fout blijft een eerder geldig bestand bewaard.
@@ -1317,7 +1333,7 @@ def on_sso_postenbestand_upload(lokaal_bestand=None):
         st.session_state.sso_postenbestand_fout = None
         return
     try:
-        gelezen = lees_postenbestand(bestand.getvalue())
+        gelezen = lees_postenbestand(bestand.getvalue(), **_posten_limieten())
     except ValueError as exc:
         st.session_state.sso_postenbestand_fout = str(exc)
         return  # Bij fout blijft een eerder geldig postenbestand bewaard.
@@ -2479,7 +2495,11 @@ with tab_sso:
                     "anders worden alle posten samen gebruikt."
                 ),
             )
-            st.caption("Maximaal 50 MB en 1.000.000 posten per bestand.")
+            st.caption(
+                "Maximaal 50 MB en 1.000.000 posten per bestand"
+                + (_LIMIET_LOKAAL_TEKST if _is_lokaal() else "")
+                + "."
+            )
             _toon_lokaal_inlezen(
                 "lok_niveau3", on_sso_niveau3_upload, _meld_niveau3_fout
             )
@@ -3540,7 +3560,15 @@ with tab_sso:
             key="sso_posten_upload",
             on_change=on_sso_postenbestand_upload,
         )
-        st.caption("Maximaal 20 MB en 100.000 posten per bestand.")
+        st.caption(
+            "Maximaal 20 MB en 100.000 posten per bestand"
+            + (
+                " (lokaal: maximaal 500 MB en 10.000.000 posten)"
+                if _is_lokaal()
+                else ""
+            )
+            + "."
+        )
         _toon_lokaal_inlezen(
             "lok_posten", on_sso_postenbestand_upload, _meld_postenbestand_fout
         )

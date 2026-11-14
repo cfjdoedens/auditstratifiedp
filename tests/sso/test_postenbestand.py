@@ -194,3 +194,10 @@ def test_voorbeeld_sso_postenbestand_is_geldig_en_reproduceerbaar():
 def test_voorbeeld_sso_postenbestand_weigert_lege_invoer():
     with pytest.raises(ValueError):
         maak_voorbeeld_sso_postenbestand([])
+
+
+def test_limieten_zijn_te_overschrijven():
+    data = b"klant;post_id;type_post;bedrag\nA;1;t;1,00\nA;2;t;2,00\n"
+    with pytest.raises(ValueError, match="maximaal 1 posten"):
+        lees_postenbestand(data, max_posten=1)
+    assert len(lees_postenbestand(data, max_posten=2)) == 2
