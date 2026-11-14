@@ -185,7 +185,7 @@ Met de volledige dataset kennen we de exacte empirische verdeling van de stochas
 
 Dit combineert de exacte onzekerheid van de steekproef met de exacte verdeling van het geldelijk belang per post.
 
-De empirische Lorenz-curve van het postenbestand laat zien in hoeverre het gammamodel van niveau 2 bij de werkelijke postgroottes past. In de app (tabblad "evaluatie SSO", uitklapper "Wat betekent de CV voor de postgroottes?") staat deze figuur voor het eigen bestand.
+De empirische Lorenz-curve van het postenbestand laat zien in hoeverre het gammamodel van niveau 2 bij de werkelijke postgroottes past. In de app (tabblad "evaluatie SSO") staat bij "conform voorbeeldbestand" een histogram van de postbedragen van het eigen bestand.
 
 ```{python}
 #| label: fig-lorenz-niveau3

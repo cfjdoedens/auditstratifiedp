@@ -40,14 +40,7 @@ for _poging in (1, 2):
         from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
             kenmerken_empirisch,
             kenmerken_gamma,
-            plot_ecdf_postgroottes,
             plot_histogram_postgroottes,
-            plot_lorenz_per_type_post,
-            plot_lorenz_postgroottes,
-            plot_omgekeerde_lorenz_postgroottes,
-            plot_overschrijdingscurve_postgroottes,
-            plot_pareto_postgroottes,
-            plot_strip_postgroottes,
             simuleer_gamma_posten,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
@@ -309,85 +302,27 @@ def _lees_cv(ruw, label: str, fouten: list) -> float:
 
 
 def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
-    """Pareto-diagram, ECDF en strip plot van postbedragen in drie tabbladen."""
-    tab_p, tab_e, tab_s, tab_o, tab_h, tab_x = st.tabs([
-        "Pareto",
-        "ECDF",
-        "Strip plot",
-        "Omgekeerde Lorenz",
-        "Histogram",
-        "Overschrijdingscurve",
-    ])
-    figuren = (
-        (tab_p, lambda: plot_pareto_postgroottes(waarden, compact=True)),
-        (tab_o, lambda: plot_omgekeerde_lorenz_postgroottes(waarden, compact=True)),
-        (tab_h, lambda: plot_histogram_postgroottes(waarden, compact=True)),
-        (
-            tab_x,
-            lambda: plot_overschrijdingscurve_postgroottes(waarden, compact=True),
-        ),
-        (tab_e, lambda: plot_ecdf_postgroottes({"posten": waarden}, compact=True)),
-        (tab_s, lambda: plot_strip_postgroottes({"posten": waarden}, compact=True)),
-    )
-    for tab, maak in figuren:
-        with tab:
-            fig = maak()
-            st.pyplot(fig)
-            plt.close(fig)
+    """Histogram (log-schaal) van de postbedragen."""
+    fig = plot_histogram_postgroottes(waarden, compact=True)
+    st.pyplot(fig)
+    plt.close(fig)
     bron = (
         "gesimuleerde posten (5.000 trekkingen uit het Gamma-model, vaste "
         "seed, afgerond op centen; posten kleiner dan 1,5 cent zijn 1 cent)"
         if gesimuleerd
         else "alle posten in het bestand"
     )
-    nullen = sum(1 for x in waarden if x == 0) / len(waarden) if gesimuleerd else 0.0
-    if nullen > 0:
-        st.caption(
-            f"{_nl(100 * nullen, 1)}% van de gesimuleerde posten is 0 cent. "
-            "Die tellen mee in de aandelen, maar staan niet op de "
-            "log-assen (histogram, ECDF, strip plot, overschrijdingscurve)."
-        )
     st.caption(
-        f"Getoond op basis van {bron}. Pareto: de posten van groot naar "
-        "klein in 20 gelijke groepen, met per groep het aandeel van de "
-        "waarde (staven) en het cumulatieve aandeel (lijn). ECDF: het "
-        "aandeel posten tot een bepaald bedrag, log-schaal. Strip plot: "
-        "elke post een punt (bij veel posten een willekeurige "
-        "deelverzameling), met mediaan (groen) en gemiddelde (rood). "
-        "Omgekeerde Lorenz: het aandeel van de waarde in de grootste x% "
-        "van de posten. Histogram: aandeel posten per bedragklasse op "
-        "log-schaal. Overschrijdingscurve: aandeel posten met minstens "
-        "een bepaald bedrag (log-log); een flauw dalende rechte lijn wijst "
-        "op een zware staart."
+        f"Histogram van de postbedragen op basis van {bron}: het aandeel "
+        "posten per bedragklasse, met een logaritmische bedragenas."
     )
 
 
 def _toon_postgroottes_per_type(groepen: dict, gesimuleerd: bool) -> None:
-    """ECDF en strip plot met alle typen posten in één figuur."""
-    tab_e, tab_s, tab_o, tab_h, tab_x = st.tabs([
-        "ECDF per type post",
-        "Strip plot per type post",
-        "Omgekeerde Lorenz per type post",
-        "Histogram per type post",
-        "Overschrijdingscurve per type post",
-    ])
-    for tab, maak in (
-        (tab_o, plot_omgekeerde_lorenz_postgroottes),
-        (tab_h, plot_histogram_postgroottes),
-        (tab_x, plot_overschrijdingscurve_postgroottes),
-    ):
-        with tab:
-            fig = maak(groepen, compact=True)
-            st.pyplot(fig)
-            plt.close(fig)
-    with tab_e:
-        fig = plot_ecdf_postgroottes(groepen, compact=True)
-        st.pyplot(fig)
-        plt.close(fig)
-    with tab_s:
-        fig = plot_strip_postgroottes(groepen, compact=True)
-        st.pyplot(fig)
-        plt.close(fig)
+    """Histogram (log-schaal) met alle typen posten in één figuur."""
+    fig = plot_histogram_postgroottes(groepen, compact=True)
+    st.pyplot(fig)
+    plt.close(fig)
     bron = (
         "gesimuleerde posten (Gamma-model met de CV per type post en als "
         "gemiddelde de totale waarde / aantal posten van dat type bij de "
@@ -395,7 +330,7 @@ def _toon_postgroottes_per_type(groepen: dict, gesimuleerd: bool) -> None:
         if gesimuleerd
         else "de posten uit het bestand per type post"
     )
-    st.caption(f"Typen posten naast elkaar, op basis van {bron}.")
+    st.caption(f"Histogram per type post, op basis van {bron}.")
 
 
 def _cv_voor_rapport(naam, cv_ruw, postgroottes: str, niveau3_cv: dict) -> str:
@@ -2311,12 +2246,12 @@ with tab_sso:
                 "posten bij de klant. Zie tabblad \u2018theorie SSO\u2019."
             ),
         )
-        _lorenz_posten = None
-        _lorenz_gemiddelde = None
+        _voorbeeld_posten = None
+        _sso_gemiddelde = None
         _massa_sso = _parse_nl(st.session_state.sso_totaal_massa_text)
         _N_sso = _parse_nl(st.session_state.sso_totaal_N_text)
         if _massa_sso and _N_sso and _massa_sso > 0 and _N_sso > 0:
-            _lorenz_gemiddelde = _massa_sso / _N_sso
+            _sso_gemiddelde = _massa_sso / _N_sso
         if sso_postgroottes == "variabel":
             if "sso_totaal_cv_text" not in st.session_state:
                 st.session_state.sso_totaal_cv_text = (
@@ -2338,35 +2273,32 @@ with tab_sso:
             st.session_state.sso_cv_bewaard = sso_totaal_cv_text
             _cv_veld = _parse_nl(sso_totaal_cv_text)
             _cv_getoond = _cv_veld if _cv_veld and _cv_veld > 0 else 1.0
-            _fig_lorenz = plot_lorenz_postgroottes(cv=_cv_getoond, compact=True)
-            st.pyplot(_fig_lorenz)
-            plt.close(_fig_lorenz)
-            _kenm = kenmerken_gamma(_cv_getoond, _lorenz_gemiddelde)
+            _kenm = kenmerken_gamma(_cv_getoond, _sso_gemiddelde)
             _tekst = (
-                "Voorbeeld-Lorenz-curve bij CV "
+                "Voorbeeld bij CV "
                 f"{_nl(_cv_getoond, 2)}"
                 + (
                     ""
                     if _cv_veld and _cv_veld > 0
-                    else " (exponentiële verdeling; vul een CV in om de "
-                    "curve aan te passen)"
+                    else " (exponentiële verdeling; vul een CV in om het "
+                    "histogram aan te passen)"
                 )
                 + ". "
             )
-            if _lorenz_gemiddelde is not None:
+            if _sso_gemiddelde is not None:
                 _tekst += (
-                    f"Met het gemiddelde van de SSO (€ {_nl(_lorenz_gemiddelde, 2)} "
+                    f"Met het gemiddelde van de SSO (€ {_nl(_sso_gemiddelde, 2)} "
                     f"per post = totale massa / N totaal) is de mediaan "
                     f"€ {_nl(_kenm['mediaan'], 2)} en hoort een post vanaf "
                     f"€ {_nl(_kenm['drempel_top10'], 2)} bij de grootste 10%."
                 )
-            st.caption(_tekst)
             _toon_postgroottes_weergaven(
                 simuleer_gamma_posten(
-                    _cv_getoond, _lorenz_gemiddelde or 1.0, 5000
+                    _cv_getoond, _sso_gemiddelde or 1.0, 5000
                 ),
                 gesimuleerd=True,
             )
+            st.caption(_tekst)
             with st.expander("Waarom een exponentiële verdeling?"):
                 st.markdown(
                     "De exponentiële verdeling is de Gamma-verdeling met "
@@ -2375,9 +2307,9 @@ with tab_sso:
                     "CV = 1 precies deze verdeling. Bij een CV boven 1 is "
                     "de dichtheid ook dalend maar met een zwaardere staart; "
                     "bij een CV onder 1 komen posten rond het gemiddelde "
-                    "het vaakst voor. De Lorenz-curve hangt alleen van de "
-                    "CV af; het gemiddelde bepaalt alleen de bedragen in "
-                    "euro\u2019s."
+                    "het vaakst voor. De vorm van de verdeling hangt alleen "
+                    "van de CV af; het gemiddelde bepaalt alleen de "
+                    "bedragen in euro\u2019s."
                 )
         else:
             sso_totaal_cv_text = st.session_state.get(
@@ -2435,18 +2367,13 @@ with tab_sso:
                     f"Ingelezen: {st.session_state.sso_niveau3_naam} \u2014 "
                     f"{len(_niveau3_df):,} posten."
                 )
-                _lorenz_posten = (_niveau3_df["bedrag_cent"] / 100).to_numpy()
-                _lorenz_posten = _lorenz_posten[_lorenz_posten > 0]
-                if _lorenz_posten.size:
-                    _fig_lorenz = plot_lorenz_postgroottes(
-                        postwaarden=_lorenz_posten, compact=True
-                    )
-                    st.pyplot(_fig_lorenz)
-                    plt.close(_fig_lorenz)
-                    _ke = kenmerken_empirisch(_lorenz_posten)
-                    _toon_postgroottes_weergaven(_lorenz_posten, False)
+                _voorbeeld_posten = (_niveau3_df["bedrag_cent"] / 100).to_numpy()
+                _voorbeeld_posten = _voorbeeld_posten[_voorbeeld_posten > 0]
+                if _voorbeeld_posten.size:
+                    _ke = kenmerken_empirisch(_voorbeeld_posten)
+                    _toon_postgroottes_weergaven(_voorbeeld_posten, False)
                     st.caption(
-                        f"Lorenz-curve van alle posten in het bestand. CV "
+                        f"Alle posten in het bestand: CV "
                         f"{_nl(_ke['cv'], 2)}, gemiddelde € "
                         f"{_nl(_ke['gemiddelde'], 2)}, mediaan € "
                         f"{_nl(_ke['mediaan'], 2)}; vanaf € "
@@ -2637,23 +2564,13 @@ with tab_sso:
                             (
                                 _gem_type[_nm][0] / _gem_type[_nm][1]
                                 if _nm in _gem_type and _gem_type[_nm][1] > 0
-                                else (_lorenz_gemiddelde or 1.0)
+                                else (_sso_gemiddelde or 1.0)
                             ),
                             3000,
                             seed=4417 + _i,
                         )
                         for _i, (_nm, _cv) in enumerate(_cvs_per_type.items())
                     }
-                    _fig_types = plot_lorenz_per_type_post(_cvs_per_type)
-                    st.pyplot(_fig_types)
-                    plt.close(_fig_types)
-                    st.caption(
-                        "Lorenz-curve per type post, bij de CV in de "
-                        "tabel hierboven (Gamma-model; leeg of 0 = alle posten "
-                        "even groot, de stippellijn). Hoe verder een curve "
-                        "onder de stippellijn ligt, hoe meer van de waarde in "
-                        "enkele grote posten zit."
-                    )
                     _toon_postgroottes_per_type(_sim_types, True)
             elif st.session_state.sso_niveau3_posten is not None:
                 _bestand_typen = postgroottes_per_type_post(
@@ -3425,8 +3342,7 @@ with tab_sso:
                 help=(
                     "Variatiecoëfficiënt (standaardafwijking / gemiddelde) "
                     "van de verzonnen bedragen; het gemiddelde is 500 euro. "
-                    "0 geeft gelijke posten. Zie het Lorenz-plaatje bovenaan "
-                    "het tabblad."
+                    "0 geeft gelijke posten."
                 ),
             )
         if typen_voorbeeld:
