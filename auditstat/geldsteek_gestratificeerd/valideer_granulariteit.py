@@ -3,7 +3,7 @@ Validatiehulpfunctie die controleert of de granulariteit hoog genoeg is
 om bij de gegeven (of verwachte) steekproefgrootte nog een meetbare
 foutreductie te garanderen.
 
-Zie §5.2 van VERANTWOORDING.md voor de theoretische achtergrond en voorbeelden.
+Zie §5.2 van VERANTWOORDING_PLAN_GELDSTEEK_GESTRATIFICEERD.md voor de theoretische achtergrond en voorbeelden.
 """
 
 __all__ = ["valideer_granulariteit"]
@@ -30,7 +30,7 @@ def valideer_granulariteit(
     een waarschuwing bij overschrijding.
 
     De berekening is gebaseerd op de exacte Beta-verdeling (zie §5.2 van
-    VERANTWOORDING.md) en maakt geen gebruik van benaderingen.
+    VERANTWOORDING_PLAN_GELDSTEEK_GESTRATIFICEERD.md) en maakt geen gebruik van benaderingen.
     Als ``verwachte_foutfractie`` aanwezig is in steekproeven, wordt die
     meegenomen; anders wordt d_i = 0 aangenomen.
 
