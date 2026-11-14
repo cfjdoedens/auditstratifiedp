@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
     plan_stratified,
     plan_stratified_basis,
 )

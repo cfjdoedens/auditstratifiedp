@@ -6,11 +6,11 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import fftconvolve
 from scipy.special import betaln, gammaln, nbdtr
 
+from auditstat.geldsteek_gestratificeerd.utils import foutloze_posten_equivalent
 from auditstat.sso.compound_postwaarden import (
     kansmassa_compound,
     schat_rekentijd_compound,
 )
-from auditstat.stratified.utils import foutloze_posten_equivalent
 
 # Standaard aantal cellen van het euro-rooster waarop de strata worden
 # gecombineerd. De roosterfout is positief (conservatief) en bij 20.000

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
 

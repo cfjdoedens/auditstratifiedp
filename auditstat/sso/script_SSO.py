@@ -1,9 +1,9 @@
 # Demonstreert de gestratificeerde, geld-gebaseerde SSO-klantevaluatie.
 
+from auditstat.geldsteek_gestratificeerd.plot_kanskromme import plot_kanskromme
 from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (
     evalueer_SSO_klant_gestratificeerd,
 )
-from auditstat.stratified.plot_kanskromme import plot_kanskromme
 
 
 def script_SSO():

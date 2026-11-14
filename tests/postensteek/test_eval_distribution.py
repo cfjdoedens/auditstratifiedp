@@ -7,7 +7,7 @@ import numpy as np  # noqa: E402
 import pytest  # noqa: E402
 from scipy.stats import beta, gamma  # noqa: E402
 
-from auditstat.single.eval_distribution import (  # noqa: E402
+from auditstat.postensteek.eval_distribution import (  # noqa: E402
     _signifdig,
     eval_distribution,
     plot_eval_distribution,

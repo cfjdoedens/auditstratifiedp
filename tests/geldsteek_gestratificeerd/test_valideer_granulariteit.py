@@ -6,7 +6,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from auditstat.stratified.valideer_granulariteit import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.valideer_granulariteit import (  # pyrefly: ignore[missing-import]
     _delta_i,
     valideer_granulariteit,
 )

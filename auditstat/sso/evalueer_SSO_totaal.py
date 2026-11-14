@@ -1,6 +1,6 @@
 import pandas as pd
 
-from auditstat.stratified.eval_stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
 
 # Naam waaronder de evaluatie van de hele SSO in samenvattingen en rapporten
 # verschijnt; daarom niet toegestaan als naam van een klant.

@@ -1,5 +1,5 @@
 """
-auditstat.single: evaluatie van één enkele steekproef (binomiaal of
+auditstat.postensteek: evaluatie van één enkele steekproef (binomiaal of
 hypergeometrisch), een omzetting van de SAS-macro ``%eval_distribution``.
 """
 

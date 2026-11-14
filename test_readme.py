@@ -3,13 +3,13 @@ import time
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from auditstat.stratified.eval_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.eval_stratified import (  # pyrefly: ignore[missing-import]
     eval_stratified,
 )
-from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
     plan_stratified,
 )
-from auditstat.stratified.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
     plot_kanskromme,
 )
 

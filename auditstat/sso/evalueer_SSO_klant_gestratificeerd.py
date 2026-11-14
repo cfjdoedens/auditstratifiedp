@@ -1,5 +1,5 @@
+from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
 from auditstat.sso.strata_SSO_klant import bouw_strata_SSO_klant
-from auditstat.stratified.eval_stratified import eval_stratified
 
 
 def evalueer_SSO_klant_gestratificeerd(
@@ -48,7 +48,7 @@ def evalueer_SSO_klant_gestratificeerd(
     -------
     dict
         Het resultaat van ``eval_stratified``, inclusief de kanskromme
-        (bruikbaar met ``auditstat.stratified.plot_kanskromme.plot_kanskromme``)
+        (bruikbaar met ``auditstat.geldsteek_gestratificeerd.plot_kanskromme.plot_kanskromme``)
         en de opgebouwde stratatabel onder ``"steekproeven"``.
     """
     steekproeven = bouw_strata_SSO_klant(

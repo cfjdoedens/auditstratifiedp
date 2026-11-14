@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from hypothesis import given, settings
 
-from auditstat.stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd import eval_stratified
 
 
 @st.composite

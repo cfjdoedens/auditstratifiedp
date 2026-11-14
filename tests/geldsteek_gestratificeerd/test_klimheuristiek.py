@@ -3,11 +3,11 @@
 import pandas as pd
 import pytest
 
-from auditstat.stratified.analyseer_klimheuristiek import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.analyseer_klimheuristiek import (  # pyrefly: ignore[missing-import]
     analyseer_exchange_convexiteit,
     analyseer_klimheuristiek,
 )
-from auditstat.stratified.plan_stratified import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.plan_stratified import (  # pyrefly: ignore[missing-import]
     plan_stratified_basis,
     vind_beste_strata_groep,
 )

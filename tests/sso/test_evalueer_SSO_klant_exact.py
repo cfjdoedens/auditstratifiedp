@@ -3,13 +3,13 @@ import numpy as np
 import pytest
 from scipy.stats import beta, betabinom
 
+from auditstat.geldsteek_gestratificeerd.plot_kanskromme import plot_kanskromme
 from auditstat.sso.evalueer_SSO_klant_exact import (
     STANDAARD_GRANULARITEIT,
     _cdf_aantal_fouten,
     evalueer_SSO_klant_exact,
 )
 from auditstat.sso.moment_match_SSO import _max_fout_exact
-from auditstat.stratified.plot_kanskromme import plot_kanskromme
 
 matplotlib.use("Agg")
 
@@ -154,7 +154,7 @@ def test_ongeldige_invoer(post_typen, kwargs, fragment):
 def test_risicocorrectie_hoort_bij_de_eerste_trap(model):
     """Met lage risico's wordt n verhoogd met foutloze posten (eerste trap);
     het resultaat is dan gelijk aan de exacte grens bij n + extra."""
-    from auditstat.stratified.utils import foutloze_posten_equivalent
+    from auditstat.geldsteek_gestratificeerd.utils import foutloze_posten_equivalent
 
     post = _post("a", 120, 1, 5_000, 1_000_000.0)
     post.update(ihr="L", ibr="M", car="L", materialiteit=0.02)

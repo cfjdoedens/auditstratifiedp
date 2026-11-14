@@ -1,6 +1,6 @@
 import pytest
 
-from auditstat.stratified.utils import (  # pyrefly: ignore[missing-import]
+from auditstat.geldsteek_gestratificeerd.utils import (  # pyrefly: ignore[missing-import]
     drawsneeded,
     foutloze_posten_equivalent,
     get_R,

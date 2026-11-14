@@ -2,9 +2,9 @@ import warnings
 
 import pandas as pd
 
+from auditstat.geldsteek_gestratificeerd.utils import foutloze_posten_equivalent
 from auditstat.sso.moment_match_SSO import moment_match_SSO
 from auditstat.sso.naief_SSO import naief_match_SSO
-from auditstat.stratified.utils import foutloze_posten_equivalent
 
 # Optionele kolommen die, indien aanwezig, worden doorgegeven aan
 # eval_stratified (dat zelf standaardwaarden invult als ze ontbreken).
@@ -25,7 +25,7 @@ def bouw_strata_SSO_klant(
 ):
     """
     Bouwt een stratatabel voor één klant op basis van SSO-steekproeven per
-    type post, geschikt als invoer voor ``auditstat.stratified.eval_stratified``.
+    type post, geschikt als invoer voor ``auditstat.geldsteek_gestratificeerd.eval_stratified``.
 
     Achtergrond
     -----------

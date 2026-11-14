@@ -4,11 +4,11 @@
 
 Python-pakket voor statistische auditmethoden voor de Rijksoverheid. Overkoepelend pakket `auditstat` met subpakketten:
 
-- `auditstat.stratified` — gestratificeerde steekproefaudits (HARo-compatibel)
+- `auditstat.geldsteek_gestratificeerd` — gestratificeerde steekproefaudits (HARo-compatibel)
   - `plan_stratified()` — berekent optimale steekproefomvang per stratum
   - `eval_stratified()` — combineert steekproeven via convolutie tot één gezamenlijke foutschatting
   - `plot_kanskromme()` — visualiseert de resulterende kansverdeling
-- `auditstat.sso` — steekproefaudits voor shared service organisaties (SSO's); evalueert gestratificeerd (één stratum per type post) een klant op basis van per-type-post SSO-steekproeven, volledig continu en in euro's (`evalueer_SSO_klant_gestratificeerd` → `eval_stratified`/`plot_kanskromme` uit `auditstat.stratified`). Zie "Item-count-gebaseerd SSO-pad: verwijderd" hieronder voor de achtergrond.
+- `auditstat.sso` — steekproefaudits voor shared service organisaties (SSO's); evalueert gestratificeerd (één stratum per type post) een klant op basis van per-type-post SSO-steekproeven, volledig continu en in euro's (`evalueer_SSO_klant_gestratificeerd` → `eval_stratified`/`plot_kanskromme` uit `auditstat.geldsteek_gestratificeerd`). Zie "Item-count-gebaseerd SSO-pad: verwijderd" hieronder voor de achtergrond.
 
 Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.app/
 
@@ -18,7 +18,7 @@ Live Streamlit-app: https://auditstratifiedp-ko3vmnx8pfjkuf8xacb8kx.streamlit.ap
 auditstat/
   __init__.py
   _formatting.py           # Gedeelde NL-getalnotatie voor alle plots: nl_getal, nl_getal_variabel, nl_tick_formatter
-  stratified/               # Was: auditstratified/
+  geldsteek_gestratificeerd/  # Was: stratified/ (en daarvoor auditstratified/); hernoemd 2026-11-14 naar de tabbladnaam
     __init__.py
     eval_stratified.py      # Convolutie-evaluatie (FFT, Monte Carlo, direct)
     plan_stratified.py      # Heuvelklimalgoritme voor steekproefplanning
@@ -41,7 +41,7 @@ auditstat/
     rapport_pdf.py                    # PDF-rapport van een SSO-evaluatie (reportlab): maak_sso_rapport_pdf
 tests/
   __init__.py
-  stratified/              # Spiegelt auditstat/stratified/
+  geldsteek_gestratificeerd/  # Spiegelt auditstat/geldsteek_gestratificeerd/
     __init__.py
     test_eval.py
     test_plan.py
@@ -50,7 +50,7 @@ tests/
     test_valideer_granulariteit.py
     test_convolutie_analytisch.py
     test_hypothesis_properties.py
-  single/                  # Spiegelt auditstat/single/
+  postensteek/             # Spiegelt auditstat/postensteek/
     __init__.py
     test_eval_distribution.py
   sso/                     # Spiegelt auditstat/sso/
@@ -277,9 +277,9 @@ sso_typen_posten_rijen = [
 
 349 tests; alle groen, 0 warnings. Testbestanden gebruiken `@pytest.fixture` en `@pytest.mark.parametrize`.
 
-**Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/stratified/` voor `auditstat.stratified`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
+**Testmapstructuur:** `tests/` spiegelt de subpakketten van `auditstat`: `tests/geldsteek_gestratificeerd/` voor `auditstat.geldsteek_gestratificeerd`, `tests/sso/` voor `auditstat.sso`. Elke (sub)map heeft een `__init__.py`. Testbestanden importeren rechtstreeks uit het volledige pad, bijv. `from auditstat.sso.moment_match_SSO import moment_match_SSO` — niet uit een kale modulenaam.
 
-**Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `tests/stratified/test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
+**Let op bij warnings in tests:** Als een bibliotheekfunctie een `warnings.warn()` afvuurt en een test dat gedrag uitlokt, gebruik dan `pytest.warns(RuntimeWarning, match="...")` om de warning expliciet te verwachten. Zo blijft de testuitvoer schoon en is de intentie gedocumenteerd. Zie `tests/geldsteek_gestratificeerd/test_klimheuristiek.py::test_fallback_proxy_symmetrisch` als voorbeeld.
 
 ## App starten
 
@@ -309,7 +309,7 @@ git push origin main   # geen tag → alleen test-workflow
 - `.github/workflows/python-tests.yml` — aparte "Python tests"-workflow, cross-platform matrix (ubuntu/windows/macos); installeert met `pip install -e ".[dev]"` (net als `test.yml`)
 - `.github/workflows/publish.yml` — triggert op `v*`-tags; draait eerst de testmatrix, publiceert daarna naar PyPI (`pypi.org/p/auditstat`) via Trusted Publishing (OIDC, geen API-token)
 
-**Valkuil: dev-dependencies op twee plekken in `pyproject.toml`.** `[dependency-groups] dev` (gebruikt door lokale `uv sync`) en `[project.optional-dependencies] dev` (gebruikt door CI's `pip install -e ".[dev]"`) moeten **beide** worden bijgewerkt als er een nieuwe dev-dependency wordt toegevoegd. Toen `hypothesis` alleen aan de eerste was toegevoegd en niet aan de tweede, faalden zowel `test.yml` als `publish.yml` met `ModuleNotFoundError: No module named 'hypothesis'` bij het verzamelen van `tests/stratified/test_hypothesis_properties.py`. Fix: voeg de dependency aan beide secties toe.
+**Valkuil: dev-dependencies op twee plekken in `pyproject.toml`.** `[dependency-groups] dev` (gebruikt door lokale `uv sync`) en `[project.optional-dependencies] dev` (gebruikt door CI's `pip install -e ".[dev]"`) moeten **beide** worden bijgewerkt als er een nieuwe dev-dependency wordt toegevoegd. Toen `hypothesis` alleen aan de eerste was toegevoegd en niet aan de tweede, faalden zowel `test.yml` als `publish.yml` met `ModuleNotFoundError: No module named 'hypothesis'` bij het verzamelen van `tests/geldsteek_gestratificeerd/test_hypothesis_properties.py`. Fix: voeg de dependency aan beide secties toe.
 
 **Trusted Publishing registreren bij naamswijziging van het pakket.** Na het hernoemen van het PyPI-project (van `auditstratified` naar `auditstat`) moet er handmatig, eenmalig, een nieuwe "pending publisher" worden geregistreerd op https://pypi.org/manage/account/publishing/ (Project Name = `auditstat`, Owner = `cfjdoedens`, Repository = `auditstratifiedp`, Workflow = `publish.yml`, Environment = `pypi`). Zonder dit faalt de publish-stap met `400 ... Non-user identities cannot create new projects`, ook als de testmatrix wel slaagt. Dit is al gedaan voor `auditstat`; alleen relevant bij een volgende naamswijziging.
 
@@ -491,7 +491,7 @@ De tekst van het Theorie-tabblad staat niet meer in `app.py` maar in `theorie.qm
 
 ## Omzetting SAS-macro `%eval_distribution` (2026-11-11)
 
-`auditstat/single/eval_distribution.py` (eigen subpakket `auditstat.single`; tests: `tests/single/test_eval_distribution.py`) is een Python-omzetting van de SAS-macro `%eval_distribution` (één steekproef, binomiaal, hypergeometrisch, Poisson of normaal, vlakke prior). `eval_distribution(n, k, verdeling (standaard hypergeometrisch), massa, zekerheid, norm, m, band_links, band_rechts)` geeft een dict met `tabel` (DataFrame `p, c_raw, c, cc`), `pmin`, `pmax`, `phigh`, `kans_boven_norm`, `band_kans`; `plot_eval_distribution(res, ...)` tekent het SAS-rapport na (matplotlib, A4, NL-notatie). Bewuste afwijkingen van SAS: bij hypergeometrisch roostergewicht `1/(m+1)` voor band/norm (SAS: `1/m`), en de meest waarschijnlijke fout met relatieve tolerantie 1e-12 i.p.v. exacte gelijkheid. Bij `n = 0` is `phigh = 1` (k = n wint van k = 0, zoals in SAS). Poisson (toegevoegd 2026-11-11, niet in SAS): aantal fouten ~ Poisson(n·p) op hetzelfde rooster over [0, 1] als binomiaal (foutfractie boven 1 uitgesloten; tegen de Gamma(k+1, 1/n)-grens getest); alleen de regels voor k = 0 gelden (bij n = 0 niet), de k = n-regel (pmax = 1, phigh = 1) niet; geen massa. Normaal (toegevoegd 2026-11-11, uit het ADR-voorbeeld "postensteekproef bij normale verdeling"): foutfractie ~ Normaal(f' = k/n, sqrt(f'(1-f')/n)) (Wald) op het rooster over [0, 1] (afgekapt); grenzen f' -/+ z·s bij de eenzijdige zekerheid (tweezijdig 95% uit dat document = zekerheid 0,975); alleen voor 0 < k < n (anders `ValueError`); geen massa; benadering, iets minder ruim dan de exacte verdelingen. Niet overgenomen: papersize/lettertype-opties, SAS-uitvoerbestand, `clip` werkt via `clip_bij`.
+`auditstat/postensteek/eval_distribution.py` (eigen subpakket `auditstat.postensteek`; tests: `tests/postensteek/test_eval_distribution.py`) is een Python-omzetting van de SAS-macro `%eval_distribution` (één steekproef, binomiaal, hypergeometrisch, Poisson of normaal, vlakke prior). `eval_distribution(n, k, verdeling (standaard hypergeometrisch), massa, zekerheid, norm, m, band_links, band_rechts)` geeft een dict met `tabel` (DataFrame `p, c_raw, c, cc`), `pmin`, `pmax`, `phigh`, `kans_boven_norm`, `band_kans`; `plot_eval_distribution(res, ...)` tekent het SAS-rapport na (matplotlib, A4, NL-notatie). Bewuste afwijkingen van SAS: bij hypergeometrisch roostergewicht `1/(m+1)` voor band/norm (SAS: `1/m`), en de meest waarschijnlijke fout met relatieve tolerantie 1e-12 i.p.v. exacte gelijkheid. Bij `n = 0` is `phigh = 1` (k = n wint van k = 0, zoals in SAS). Poisson (toegevoegd 2026-11-11, niet in SAS): aantal fouten ~ Poisson(n·p) op hetzelfde rooster over [0, 1] als binomiaal (foutfractie boven 1 uitgesloten; tegen de Gamma(k+1, 1/n)-grens getest); alleen de regels voor k = 0 gelden (bij n = 0 niet), de k = n-regel (pmax = 1, phigh = 1) niet; geen massa. Normaal (toegevoegd 2026-11-11, uit het ADR-voorbeeld "postensteekproef bij normale verdeling"): foutfractie ~ Normaal(f' = k/n, sqrt(f'(1-f')/n)) (Wald) op het rooster over [0, 1] (afgekapt); grenzen f' -/+ z·s bij de eenzijdige zekerheid (tweezijdig 95% uit dat document = zekerheid 0,975); alleen voor 0 < k < n (anders `ValueError`); geen massa; benadering, iets minder ruim dan de exacte verdelingen. Niet overgenomen: papersize/lettertype-opties, SAS-uitvoerbestand, `clip` werkt via `clip_bij`.
 
 **App-koppeling (2026-11-11):** tabblad "evaluatie postensteek" (tot 2026-11-12 "evaluatie postensteekproef") in `app.py` (`tab_enkel`, na "foutlozepostenequivalent"): invoer n, k, verdeling (standaard hypergeometrisch), zekerheid en norm (verdeling: binomiaal, hypergeometrisch, Poisson of normaal), en alleen bij hypergeometrisch een optionele massa N (tekstveld, vooraf gevuld met 300 = 3 × de standaard-n; de ingevulde waarde blijft bewaard (`enkel_massa_bewaard`) als je naar een andere verdeling wisselt en terug, omdat Streamlit de widgetstatus anders wist; leeg veld geeft 3 × n; bij binomiaal bestaat geen massa); toont minimale/meest waarschijnlijke/maximale fout (met aantal posten als N bekend), kans boven de norm (onder de kromme: donkerblauw tussen minimale en maximale fout, lichtblauw daarbuiten; kromme lichtblauw; lijnen: minimaal groen, meest waarschijnlijk geel, norm rood, maximaal oranje) en de plot (geen tabel met de kansdichtheid meer; die zit wel in `res["tabel"]`). Bij hypergeometrisch met een massa (N, of de standaard 3 × n) boven `ENKEL_OVERSTAP_MASSA` = 100.000 (roosterpunten = N + 1) rekent de app automatisch met de binomiale verdeling en meldt dat met een `st.info` onder het kopje Resultaat. Zonder opgegeven massa (0) is de standaard bij hypergeometrisch **3 × n** (code, en in de app bij een leeg massaveld; `res["massa_aangenomen"]`, de app toont daar geen aparte melding over); bij n = 0 is de standaard 100. Met `AppTest` gecontroleerd, niet in de pytest-suite.
 
@@ -553,3 +553,5 @@ App: `_is_lokaal`, `_toon_lokaal_inlezen(sleutel, verwerk, meld_fout)` en `_toon
 **Piekgeheugen bij 1.000.000 posten (2026-11-14, los script, niet in de repo):** fictief postenbestand van de hele SSO (5 klanten x 2 typen x 100.000 posten, lognormaal, gemiddelde 500 euro; CSV 20,0 MB). In een los Python-proces gemeten (RSS en `ru_maxrss`): na het importeren 0,20 GB; inlezen met `lees_postenbestand(..., meerdere_klanten=True)` 1,9 s, RSS 0,47 GB, piek 0,49 GB; `postgroottes_per_type_post` en de evaluatie met `evalueer_SSO_klant_exact` (2 typen per klant, N_klant 100.000, n=200, k=2, 95%, met `postwaarden`) verhogen de piek niet (0,7-0,8 s per klant, RSS 0,44 GB). Het inlezen bepaalt dus de piek (ca. 0,3 GB boven de basis); de evaluatie zelf voegt weinig toe. Niet gemeten: de Streamlit-app zelf (de upload staat daar nog eens in het geheugen, plus kopieen in `session_state`, per sessie), meerdere gelijktijdige sessies, en een klant met een veel grotere N_klant. Eerder (3 mln posten, 55 MB): inlezen 5,5 s, piek ca. 1,1 GB. Community Cloud: zie de opgezochte limieten (officieel 690 MB-2,7 GB per app, wisselend; oudere bronnen 1 GB); een sessie met de maximale 1 mln posten past daar ruim, meerdere gelijktijdige sessies tellen op.
 
 **`MAX_K_VENSTER` verhoogd naar 1.000.000 (2026-11-14, was 300.000).** Gemeten (los script, 20.000 cellen, 200.000 lognormale posten, binomiaal en poisson vrijwel gelijk): het venster van het aantal foute posten is ruwweg evenredig met N_klant/n (n=200, k=2: 157.000 bij N_klant 1 mln; n=100, k=5: 345.000; n=1000, k=10: 51.000) en het FFT-rooster (65.536) blijft constant, dus `_MAX_FFT_LENGTE` is niet de beperking. Werkelijke rekentijd en piekgeheugen met de limiet omhoog: venster 157.000 5,8 s / 0,14 GB; 345.000 12,2 s / 0,15 GB; 1,03 mln (n=100, k=5, N_klant 3 mln) 36,6 s / 0,23 GB; ruwweg 35 s per miljoen. De tijdschatting (`_SECONDEN_PER_EENHEID`) is ca. 1,4 keer te hoog (conservatief). Eerste N_klant met `ValueError` bij de nieuwe limiet: n=100, k=5 vanaf ca. 3 mln; n=200 vanaf ca. 6 mln; n=1000 vanaf ca. 20 mln (geëxtrapoleerd uit lineaire groei, niet allemaal gemeten). Alleen 95% zekerheid en één postverdeling gemeten; de foutmelding noemt nu de limiet. Test: `test_te_groot_venster_geeft_value_error_met_limiet`.
+
+**Hernoeming van subpakketten (2026-11-14, op verzoek van de gebruiker):** de mappen volgen nu de tabbladnamen van de app: `auditstat.single` -> `auditstat.postensteek` (tab "evaluatie postensteek") en `auditstat.stratified` -> `auditstat.geldsteek_gestratificeerd` (tabs "evaluatie/planning geldsteek gestratificeerd"); idem `tests/single` -> `tests/postensteek` en `tests/stratified` -> `tests/geldsteek_gestratificeerd`. `auditstat.sso` was al gelijk. **Functie- en modulenamen zijn bewust niet gewijzigd** (`eval_distribution`, `eval_stratified`, `plan_stratified`, `plot_kanskromme`, `foutloze_posten_equivalent`, ...), en er is geen alias voor de oude importpaden: code die `auditstat.stratified`/`auditstat.single` uit PyPI 0.1.16 importeert, breekt bij de volgende versie. Oudere notities in dit bestand die `auditstat.stratified`/`auditstat.single` noemen, zijn bij de hernoeming meegenomen naar de nieuwe paden.

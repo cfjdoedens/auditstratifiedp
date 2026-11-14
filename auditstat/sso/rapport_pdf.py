@@ -46,13 +46,13 @@ except ImportError as exc:  # pragma: no cover - afhankelijk van de omgeving
     ) from exc
 
 from auditstat._formatting import nl_getal
+from auditstat.geldsteek_gestratificeerd.plot_kanskromme import plot_kanskromme
 from auditstat.sso.evalueer_SSO_totaal import (
     HELE_SSO_NAAM,
     KLANTEN_SAMEN_NAAM,
     klanten_samen,
 )
 from auditstat.sso.invoer_csv import _tekst
-from auditstat.stratified.plot_kanskromme import plot_kanskromme
 
 _LETTER = "DejaVuSans"
 _LETTER_VET = "DejaVuSans-Bold"

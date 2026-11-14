@@ -43,8 +43,8 @@ class TestBouwStrataSSOKlant(unittest.TestCase):
         )
 
     def test_risicocorrectie_in_eerste_trap_niet_doorgegeven(self):
+        from auditstat.geldsteek_gestratificeerd.utils import foutloze_posten_equivalent
         from auditstat.sso.naief_SSO import naief_match_SSO
-        from auditstat.stratified.utils import foutloze_posten_equivalent
 
         post = dict(
             naam="Emolumenten",

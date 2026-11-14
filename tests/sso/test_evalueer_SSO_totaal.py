@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
+from auditstat.geldsteek_gestratificeerd.eval_stratified import eval_stratified
 from auditstat.sso.evalueer_SSO_totaal import evalueer_SSO_totaal
-from auditstat.stratified.eval_stratified import eval_stratified
 
 
 def _post(naam="totaal", n=200, k=4, waarde=2_500_000.0):

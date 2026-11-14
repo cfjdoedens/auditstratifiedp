@@ -5,7 +5,7 @@ import pytest
 from scipy.optimize import brentq
 from scipy.stats import beta, gamma
 
-from auditstat.stratified import eval_stratified
+from auditstat.geldsteek_gestratificeerd import eval_stratified
 
 # --- Globale testconstanten ---
 DEFAULT_TOL = 5e-3
