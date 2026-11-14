@@ -164,7 +164,7 @@ def test_omgekeerde_lorenz_histogram_overschrijding():
             f({})
 
 
-def test_gesimuleerde_posten_zijn_hele_centen_en_nul_mag():
+def test_gesimuleerde_posten_zijn_hele_centen_minstens_een_cent():
     from auditstat.sso.plot_postgroottes import (
         plot_ecdf_postgroottes,
         plot_histogram_postgroottes,
@@ -177,10 +177,11 @@ def test_gesimuleerde_posten_zijn_hele_centen_en_nul_mag():
     for cv in (0.0, 0.5, 3.0, 10.0):
         w = simuleer_gamma_posten(cv, 500.0, 5000)
         assert w.size == 5000
-        assert np.all(w >= 0)
+        assert np.all(w >= 0.01)
         assert np.allclose(w * 100, np.round(w * 100))
     w = simuleer_gamma_posten(10.0, 500.0, 5000)
-    assert (w == 0).mean() > 0.5  # onder een halve cent wordt 0
+    assert w.min() == 0.01  # alles onder 1,5 cent wordt 1 cent
+    assert (w == 0.01).mean() > 0.5
     assert simuleer_gamma_posten(0.0, 12.34, 3).tolist() == [12.34] * 3
     for f in (
         plot_pareto_postgroottes,

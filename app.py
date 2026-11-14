@@ -336,7 +336,7 @@ def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
             plt.close(fig)
     bron = (
         "gesimuleerde posten (5.000 trekkingen uit het Gamma-model, vaste "
-        "seed, afgerond op centen; onder een halve cent wordt het 0)"
+        "seed, afgerond op centen; posten kleiner dan 1,5 cent zijn 1 cent)"
         if gesimuleerd
         else "alle posten in het bestand"
     )

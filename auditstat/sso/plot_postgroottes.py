@@ -462,9 +462,10 @@ def simuleer_gamma_posten(
 ) -> np.ndarray:
     """Gesimuleerde Gamma-verdeelde postbedragen (voorbeeld bij niveau 2).
 
-    De bedragen zijn afgerond op hele centen: onder een halve cent wordt het
-    0 (een post van 0 euro kan bestaan). Bij een grote cv is dat een groot
-    deel van de posten. Bij ``cv = 0`` zijn alle posten gelijk aan
+    De bedragen zijn afgerond op hele centen, en elke post kleiner dan 1,5 cent
+    wordt 1 cent (kleinste post), zodat er niets op 0 uitkomt en de log-assen
+    in de figuren alle posten kunnen tonen. Bij een grote cv geeft dat een
+    opeenhoping op 1 cent. Bij ``cv = 0`` zijn alle posten gelijk aan
     ``gemiddelde`` (op centen afgerond).
     """
     cv = _controleer_cv(cv)
@@ -473,7 +474,7 @@ def simuleer_gamma_posten(
     else:
         rng = np.random.default_rng(seed)
         waarden = rng.gamma(1.0 / cv**2, gemiddelde * cv**2, aantal)
-    return np.round(waarden, 2)
+    return np.maximum(np.round(waarden, 2), 0.01)
 
 
 def _groepen_dict(waarden) -> dict:
