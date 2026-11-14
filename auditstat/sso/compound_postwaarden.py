@@ -13,9 +13,12 @@ en ``Z_i`` de waarde van een foute post:
 
 De verdeling van ``E`` volgt uit de kanskarakteristieke functie
 ``phi_E(w) = som_K P(K) * phi_Z(w)**K`` op een euro-rooster (FFT). De
-trekkingen ``Z_i`` zijn onafhankelijk met teruglegging (een benadering van
-trekken zonder teruglegging; de spreiding is daardoor iets te groot, dus
-conservatief).
+trekkingen ``Z_i`` zijn onafhankelijk met teruglegging, maar de spreiding
+van ``Z`` wordt gecorrigeerd voor de eindige klantpopulatie van ``N`` posten
+met vaste waarden (``theorie_SSO.qmd`` 4.1): zie ``_populatiecorrectie``. De
+totale variantie van de foutfractie is daardoor gelijk aan die van
+momentmatching, ``Var(p) + (1+cv^2)/N * E[p(1-p)]``. Bij het Poisson-model is
+er geen correctie (``1-p`` is daar ongeveer 1, zoals bij momentmatching).
 
 Conventie: de kansmassa van het continue deel (``K >= 1``) wordt één roostercel
 omhoog geschoven (``E`` is dan nooit te laag in het rooster); ``K = 0`` staat
@@ -69,6 +72,40 @@ def aantal_fouten_venster(model, n, k, N):
     hoog = int(np.max(np.nonzero(staart > _STAARTMASSA)[0]))
     venster = pmf[laag : hoog + 1]
     return laag, venster / venster.sum()
+
+
+def _populatiecorrectie(model, N, k0, pmf):
+    """Factor ``f`` waarmee de variantie van ``Z`` wordt verkleind.
+
+    Voor een klant met ``N`` posten met vaste waarden (populatievariantie
+    ``sigma^2``) is ``E`` gegeven ``K`` de som van ``K`` posten zonder
+    teruglegging: ``Var(E | K) = K (N-K)/(N-1) sigma^2``. Met onafhankelijke
+    trekkingen is dat ``K sigma^2``. Dezelfde totale variantie volgt uit
+    ``sigma_eff^2 = f sigma^2`` met ``f = E[K(N-K)] / ((N-1) E[K])``. Dat
+    geeft ``Var(E) = E[K] sigma_eff^2 + Var(K) mu^2``, gelijk aan de formule
+    ``Var(X | D0)`` van de theorie (``E[K(N-K)] = N(N-1) E[p(1-p)]``).
+    Geen correctie (``f = 1``) bij het Poisson-model.
+    """
+    if model != "binomiaal":
+        return 1.0
+    if N <= 1:
+        return 0.0
+    kk = k0 + np.arange(len(pmf), dtype=float)
+    gemiddelde = float(np.dot(pmf, kk))
+    if gemiddelde <= 0:
+        return 1.0
+    return float(np.dot(pmf, kk * (N - kk))) / ((N - 1) * gemiddelde)
+
+
+def _corrigeer_z(z, f, mu):
+    """``z`` met een standaardafwijking verkleind met ``sqrt(f)``."""
+    wortel = math.sqrt(max(f, 0.0))
+    if isinstance(z, tuple):
+        return ("gamma", max(float(z[1]) * wortel, 1e-3))
+    waarden = np.asarray(z, dtype=float)
+    waarden = waarden * (mu / waarden.mean())
+    # Krimpen naar het gemiddelde houdt de bedragen positief (wortel <= 1).
+    return mu + min(wortel, 1.0) * (waarden - mu)
 
 
 def _karakteristieke_z(z, mu, dx, lengte):
@@ -178,6 +215,7 @@ def kansmassa_compound(model, n, k, N, waarde, z, dx, voortgang=None):
     """
     ncellen, mu, k0, pmf, lengte = _rooster(model, n, k, N, waarde, z, dx)
     k_max = k0 + len(pmf) - 1
+    z = _corrigeer_z(z, _populatiecorrectie(model, N, k0, pmf), mu)
     phi, _ = _karakteristieke_z(z, mu, dx, lengte)
 
     # K = 0 staat exact op cel 0. Bij een Gamma-verdeelde Z met grote cv is de

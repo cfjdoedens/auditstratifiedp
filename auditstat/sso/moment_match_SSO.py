@@ -254,8 +254,10 @@ def moment_match_SSO(
     cv : float, standaard 0
         Variatiecoëfficiënt van de postgroottes (niveau 2 van de theorie).
         De variantie van de foutfractie bij de klant wordt dan
-        ``Var(X) = Var(X | cv = 0) + cv² · E[X] / N_klant`` (afgeleid via de
-        wet van de totale variantie voor een som van ``K`` postwaarden).
+        ``Var(X) = Var(X | cv = 0) + cv² · E[p(1-p)] / N_klant`` bij het
+        binomiale model (dus ``Var(X | p) = p(1-p)(1+cv²)/N_klant``, vaste
+        geldmassa van de klant; zie ``theorie_SSO.qmd`` 4.1) en
+        ``+ cv² · E[p] / N_klant`` bij het Poisson-model (``1-p ≈ 1``).
         Bij ``cv = 0`` is het resultaat ongewijzigd. Bij klemming wordt de
         grens waarop gekalibreerd wordt dan numeriek bepaald (som van ``K``
         Gamma-verdeelde postwaarden), niet meer met de Beta-Binomiale
@@ -284,7 +286,7 @@ def moment_match_SSO(
         s = alpha + beta_
         gemiddelde = alpha / s
         variantie = alpha * beta_ * (s + N_klant) / (s**2 * (s + 1) * N_klant)
-        variantie += cv**2 * gemiddelde / N_klant
+        variantie += cv**2 * alpha * beta_ / (s * (s + 1) * N_klant)
         s_eff = gemiddelde * (1 - gemiddelde) / variantie - 1
         n_eff = s_eff - 2
         k_eff = gemiddelde * s_eff - 1

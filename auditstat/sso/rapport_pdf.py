@@ -437,8 +437,15 @@ def _methode_onderdelen(
                 "die bedragen worden gamma-verdeeld verondersteld met het "
                 "gemiddelde waarde/N_klant en de opgegeven CV. Alleen "
                 "gemiddelde en variantie komen uit de gegevens; de gammavorm "
-                "is een keuze. Er wordt getrokken met teruglegging "
-                "(licht conservatief)."
+                "is een keuze. De bedragen worden onafhankelijk getrokken, "
+                "met een correctie op hun spreiding voor de eindige "
+                "klantpopulatie (zonder teruglegging), zodat de totale "
+                "variantie gelijk is aan die van momentmatching. Bij de "
+                "eenvoudige methode en "
+                "momentmatching wordt de variantie van de foutfractie bij "
+                "de klant, gegeven de foutkans p, verhoogd van "
+                "p(1-p)/N_klant tot p(1-p)(1+CV\u00b2)/N_klant "
+                "(vaste geldmassa van de klant)."
             ),
         ]
     elif postgroottes == "postenbestand":
@@ -448,8 +455,8 @@ def _methode_onderdelen(
                 "De postgroottes volgen uit het postenbestand van de hele "
                 "SSO. Bij de exacte methode is de empirische verdeling van "
                 "de bedragen per type post gebruikt (herschaald naar het "
-                "gemiddelde waarde/N_klant van de klant, getrokken met "
-                "teruglegging); bij de andere methoden is daaruit alleen de "
+                "gemiddelde waarde/N_klant van de klant, met dezelfde "
+                "correctie voor de eindige klantpopulatie); bij de andere methoden is daaruit alleen de "
                 "variatiecoëfficiënt per type post afgeleid."
             ),
         ]

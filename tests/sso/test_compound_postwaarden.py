@@ -134,7 +134,10 @@ def test_momentmatching_cv_matcht_de_variantie(verdeling):
     if verdeling == "binomiaal":
         a, b = k + 1, n - k + 1
         s = a + b
-        doel = a * b * (s + N) / (s**2 * (s + 1) * N) + cv**2 * (a / s) / N
+        doel = (
+            a * b * (s + N) / (s**2 * (s + 1) * N)
+            + cv**2 * a * b / (s * (s + 1) * N)
+        )
         a_eff, b_eff = k_eff + 1, n_eff - k_eff + 1
         s_eff = a_eff + b_eff
         assert a_eff * b_eff / (s_eff**2 * (s_eff + 1)) == pytest.approx(doel)
@@ -228,3 +231,19 @@ def test_te_groot_venster_geeft_value_error_met_limiet():
     # N_klant 1 mln (venster ca. 0,34 mln) valt binnen de limiet.
     N = 1_000_000
     assert schat_rekentijd_compound("binomiaal", 100, 5, N, N * 500.0, z, N * 25.0) > 0
+
+
+@pytest.mark.parametrize("cv", [0.5, 1.5])
+def test_compound_variantie_sluit_aan_op_momentmatching_binomiaal(cv):
+    """Var(foutfractie) = Var(p) + (1+cv^2)/N * E[p(1-p)] (theorie 4.1a)."""
+    n, k, N, waarde = 40, 6, 60, 1000.0
+    dx = waarde / 40_000
+    massa = kansmassa_compound("binomiaal", n, k, N, waarde, ("gamma", cv), dx)
+    x = np.arange(len(massa)) * dx / waarde
+    var_model = float(np.dot(massa, x**2) - np.dot(massa, x) ** 2)
+    a, b = k + 1, n - k + 1
+    s = a + b
+    var_p = a * b / (s**2 * (s + 1))
+    e_pq = a * b / (s * (s + 1))
+    doel = var_p + (1 + cv**2) / N * e_pq
+    assert var_model == pytest.approx(doel, rel=0.01)
