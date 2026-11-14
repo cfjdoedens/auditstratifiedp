@@ -53,8 +53,12 @@ for _poging in (1, 2):
             simuleer_gamma_posten,
         )
         from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
+            MAX_BYTES,
             MAX_BYTES_LOKAAL,
+            MAX_BYTES_SSO,
+            MAX_POSTEN,
             MAX_POSTEN_LOKAAL,
+            MAX_POSTEN_SSO,
             POSTEN_KOLOMMEN,
             lees_postenbestand,
             maak_voorbeeld_postenbestand,
@@ -1100,7 +1104,14 @@ def _posten_limieten():
     return {}
 
 
-_LIMIET_LOKAAL_TEKST = " (lokaal: maximaal 500 MB en 10.000.000 posten)"
+def _limiet_tekst(max_bytes, max_posten):
+    """'50 MB en 1.000.000 posten', afgeleid uit de MAX-constanten."""
+    return f"{max_bytes // 1_000_000:,} MB en {max_posten:,} posten".replace(",", ".")
+
+
+_LIMIET_LOKAAL_TEKST = (
+    f" (lokaal: maximaal {_limiet_tekst(MAX_BYTES_LOKAAL, MAX_POSTEN_LOKAAL)})"
+)
 
 
 def _lees_lokaal_pad(pad_sleutel, verwerk, meld_fout, bladeren):
@@ -2503,14 +2514,15 @@ with tab_sso:
                 on_change=on_sso_niveau3_upload,
                 help=(
                     "Kolommen klant;post_id;type_post;bedrag, scheidingsteken "
-                    "';', meerdere klanten toegestaan (maximaal 50 MB of 1 "
-                    "miljoen posten). Bij onderscheid naar typen posten moet "
+                    "';', meerdere klanten toegestaan (maximaal "
+                    + _limiet_tekst(MAX_BYTES_SSO, MAX_POSTEN_SSO)
+                    + "). Bij onderscheid naar typen posten moet "
                     "`type_post` overeenkomen met de namen in de tabel; "
                     "anders worden alle posten samen gebruikt."
                 ),
             )
             st.caption(
-                "Maximaal 50 MB en 1.000.000 posten per bestand"
+                f"Maximaal {_limiet_tekst(MAX_BYTES_SSO, MAX_POSTEN_SSO)} per bestand"
                 + (_LIMIET_LOKAAL_TEKST if _is_lokaal() else "")
                 + "."
             )
@@ -3619,12 +3631,8 @@ with tab_sso:
             on_change=on_sso_postenbestand_upload,
         )
         st.caption(
-            "Maximaal 20 MB en 100.000 posten per bestand"
-            + (
-                " (lokaal: maximaal 500 MB en 10.000.000 posten)"
-                if _is_lokaal()
-                else ""
-            )
+            f"Maximaal {_limiet_tekst(MAX_BYTES, MAX_POSTEN)} per bestand"
+            + (_LIMIET_LOKAAL_TEKST if _is_lokaal() else "")
             + "."
         )
         _toon_lokaal_inlezen(
