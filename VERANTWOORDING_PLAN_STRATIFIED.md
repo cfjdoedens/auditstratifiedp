@@ -2,20 +2,20 @@
 
 ## 1. Inleiding
 
-De functie `plan_stratified` berekent de optimale steekproefverdeling over 
-meerdere strata. Het doel is het vinden van de meest kostenefficiënte 
-steekproefomvang waarbij de gecombineerde 
-maximale fout - berekend via convolutie (met `eval_stratified`) -
-onder de gestelde materialiteitsgrens 
+De functie `plan_geldsteek_gestratificeerd` berekent de optimale steekproefverdeling over
+meerdere strata. Het doel is het vinden van de meest kostenefficiënte
+steekproefomvang waarbij de gecombineerde
+maximale fout - berekend via convolutie (met `evalueer_geldsteek_gestratificeerd`) -
+onder de gestelde materialiteitsgrens
 blijft. We leveren hier het bewijs dat het toegepaste algoritme,
 een vorm van marginale allocatie,
-gegarandeerd het globale 
+gegarandeerd het globale
 optimum vindt, en zich niet verliest in een lokaal optimum.
 
-We zullen hieronder de te trekken posten - in de code: `n_laag` -  steeds 
+We zullen hieronder de te trekken posten - in de code: `n_laag` -  steeds
 benoemen als het aantal
 uit te voeren _waarnemingen_. Dit om te benadrukken
-dat elke waarneming extra informatie toevoegt voor de auditor, 
+dat elke waarneming extra informatie toevoegt voor de auditor,
 en daarmee inherent de onzekerheid en dus de maximale fout vermindert.
 
 ### 1.1 Lijst van symbolen
@@ -49,7 +49,7 @@ De volgende symbolen worden doorlopend gebruikt in dit document.
 
 ## 2. Probleemdefinitie
 
-Zij $S  \in {\displaystyle \mathbb {N} >= 1}$, het totaal aantal strata. Voor elk stratum $i \in \{1, \dots, S\}$ 
+Zij $S  \in {\displaystyle \mathbb {N} >= 1}$, het totaal aantal strata. Voor elk stratum $i \in \{1, \dots, S\}$
 definiëren we:
 
 - $n_i \in {\displaystyle \mathbb {N}}$, de steekproefomvang, dus het aantal uit te voeren waarnemingen;
@@ -59,8 +59,8 @@ Het probleem is het minimaliseren van de totale controlekosten $K$:
 
 $$K = \sum_{i=1}^{S} n_i \cdot c_i$$
 
-onderworpen aan de voorwaarde dat de gecombineerde maximale foutfractie 
-$F$ (geëvalueerd op de vereiste betrouwbaarheid, bijv. 95%) onder de totale 
+onderworpen aan de voorwaarde dat de gecombineerde maximale foutfractie
+$F$ (geëvalueerd op de vereiste betrouwbaarheid, bijv. 95%) onder de totale
 materialiteit $M$ komt:
 
 $$F(n_1, n_2, \ldots, n_S) < M$$
@@ -68,8 +68,8 @@ $$F(n_1, n_2, \ldots, n_S) < M$$
 ## 3. Het algoritme
 
 ### 3.1 Creëer startpositie voor de klim
-`plan_stratified` bepaalt eerst per stratum 
-het aantal waarnemingen 
+`plan_geldsteek_gestratificeerd` bepaalt eerst per stratum
+het aantal waarnemingen
 dat nodig is
 om onder de materialiteit van elk stratum te komen.
 
@@ -78,56 +78,56 @@ om onder de materialiteit van elk stratum te komen.
 Daarna worden stapsgewijs waarnemingen toegevoegd aan 1 of meer strata net zo lang
 tot de totale maximale fout onder de totale materialiteit is gezakt.
 
-Per stap 
-berekent de functie `vind_beste_strata_groep` voor elk stratum de 
+Per stap
+berekent de functie `vind_beste_strata_groep` voor elk stratum de
 marginale (= extra) opbrengst van het toevoegen van één waarneming.
 
-- Zij $j \in \{1, \dots, MAX\_ITER\}$, de $j$-de iteratie van het algoritme, 
+- Zij $j \in \{1, \dots, MAX\_ITER\}$, de $j$-de iteratie van het algoritme,
   waar MAX_ITER het maximum aantal iteraties van het algoritme is.
 - Zij $n_{ij}$ het voor stratum $i$ geplande aantal waarnemingen in de $j$-de
   iteratie.
 - Zij $c_i$ de kosten per waarneming voor stratum $i$.
 
-De marginale opbrengst  $\Delta_i(n_{ij})$ voor stratum $i$ 
+De marginale opbrengst  $\Delta_i(n_{ij})$ voor stratum $i$
 wordt gedefinieerd
 als afname, gedeeld door de kosten, van de maximale fout bij toevoeging van één waarneming
 in dat stratum:
 
 $$\Delta_i(n_{ij})  = \frac{F(\dots, n_{ij}, \dots) - F(\dots, n_{ij} + 1, \dots)}{c_i}$$
 
-Het algoritme selecteert het stratum (of de strata) met $\max(\Delta_i(n_{ij}))$ en 
-hoogt $n_{ij}$ op met $1$. Bij een gelijkstand — wanneer meerdere strata 
-dezelfde maximale $\Delta_i$ hebben — worden alle gedeelde winnaars tegelijk 
-met 1 opgehoogd. Dit proces herhaalt zich 
+Het algoritme selecteert het stratum (of de strata) met $\max(\Delta_i(n_{ij}))$ en
+hoogt $n_{ij}$ op met $1$. Bij een gelijkstand — wanneer meerdere strata
+dezelfde maximale $\Delta_i$ hebben — worden alle gedeelde winnaars tegelijk
+met 1 opgehoogd. Dit proces herhaalt zich
 totdat $F < M$ of totdat $j > MAX\_ITER$.
 
 ## 4. Bewijs van globale optimaliteit
 
 ### 4.1 Inperking
 
-Om te kunnen bewijzen dat het algoritme het globale optimum vindt, 
+Om te kunnen bewijzen dat het algoritme het globale optimum vindt,
 beperken we ons:
 
-1. $\forall i \in \{1, \dots, S\}, \; c_i = 1$ 
-   We beschouwen alleen de situatie waarbij de kosten per waarneming 
-   overal gelijk zijn. 
-   Het algoritme probeert dan de vereiste zekerheid te halen met een zo 
-   klein mogelijk totaal aantal waarnemingen $N$. 
-1. $\forall i \in \{1, \dots, S\}, \; d_i < M$ 
+1. $\forall i \in \{1, \dots, S\}, \; c_i = 1$
+   We beschouwen alleen de situatie waarbij de kosten per waarneming
+   overal gelijk zijn.
+   Het algoritme probeert dan de vereiste zekerheid te halen met een zo
+   klein mogelijk totaal aantal waarnemingen $N$.
+1. $\forall i \in \{1, \dots, S\}, \; d_i < M$
    Voor elk stratum is de verwachte fout kleiner dan de toegestane
    maximale fout over alle strata.
 
 We gebruiken de volgende hulpstellingen:
 
-*  $(\frac{1}{S} \sum_{i=1}^S d_i) < M$ De gemiddelde verwachte fout over 
+*  $(\frac{1}{S} \sum_{i=1}^S d_i) < M$ De gemiddelde verwachte fout over
    alle strata ligt onder de totale materialiteit.
-* Bij elke extra waarneming in een stratum $i$ zal de maximale fout 
+* Bij elke extra waarneming in een stratum $i$ zal de maximale fout
    in dat stratum zakken.
 * Bij elke extra waarneming in een stratum $i$ zal de totale
    maximale fout zakken.
 * Bij voldoende waarnemingen in een stratum $i$ zal de maximale fout, $F_i$,
    van dat stratum onder de totale materialiteit, $M$, zakken.
-* Bij voldoende waarnemingen in de strata zal de 
+* Bij voldoende waarnemingen in de strata zal de
   totale maximale fout, $F$, onder de materialiteitsgrens, $M$, zakken.
 
 
@@ -140,7 +140,7 @@ We gebruiken de volgende hulpstellingen:
 * Hulp3: **Ander algoritme betekent andere stratumkeuze**
    Een algoritme dat in de praktijk verschilt van
    het steilsteklimalgoritme zal op een bepaald moment in de opvolgende
-   sequentie van het kiezen welk stratum we een extra waarneming willen 
+   sequentie van het kiezen welk stratum we een extra waarneming willen
    toekennen, een andere keuze moeten maken dan het steilsteklimalgoritme.
 * Hulp4: **Ander algoritme kiest in keuzeproces voor minder meeropbrengst**
    Die keuze zal dus minder meeropbrengst opleveren dan
@@ -152,27 +152,27 @@ We gebruiken de volgende hulpstellingen:
    versmade stratum.
 
 Stel dat er een allocatie $n^$ bestaat met $K^* < K_{\text{steilsteklim}}$ die
-eveneens $F < M$ bereikt. Beschouw de eerste stap waarop $n^$ en 
-het steilsteklimalgoritme divergeren: het steilsteklimalgoritme kiest 
-stratum $i$, $n^$ kiest stratum $j \neq i$, met 
+eveneens $F < M$ bereikt. Beschouw de eerste stap waarop $n^$ en
+het steilsteklimalgoritme divergeren: het steilsteklimalgoritme kiest
+stratum $i$, $n^$ kiest stratum $j \neq i$, met
 $\Delta_i \geq \Delta_j$ (Hulp4).
-Door Hulp5 (met Hulp1 als basis) levert elke volgende 
-keuze van $n^$ in stratum $j$ minder op dan de steilsteklimkeuze in 
-stratum $i$, totdat $n^$ alsnog een extra waarneming aan 
-stratum $i$ toevoegt — wat de totale kosten van $n^$ niet 
-vermindert. Inductief volgt dat $K^ \geq K_{\text{steilsteklim}}$. 
+Door Hulp5 (met Hulp1 als basis) levert elke volgende
+keuze van $n^$ in stratum $j$ minder op dan de steilsteklimkeuze in
+stratum $i$, totdat $n^$ alsnog een extra waarneming aan
+stratum $i$ toevoegt — wat de totale kosten van $n^$ niet
+vermindert. Inductief volgt dat $K^ \geq K_{\text{steilsteklim}}$.
 Tegenspraak.
 
 ### 4.1 Bewijs van hulp1
 
 #### Stap 1: Kwantiel-functie van de bètaverdeling is convex in parameters
 
-Voor de bètaverdeling $Beta(\alpha, \beta)$ en 
-vaste $p \in (0,1)$, is 
+Voor de bètaverdeling $Beta(\alpha, \beta)$ en
+vaste $p \in (0,1)$, is
 de kwantielfunctie
-$Q(p; \alpha, \beta)$ 
+$Q(p; \alpha, \beta)$
 convex in $(\alpha, \beta)$.
-Hieruit volgt dat voor 
+Hieruit volgt dat voor
 $$\alpha(n) = n \cdot d + 1$$ en
 $$\beta(n)= n \cdot (1-d) + 1$$
 (met $d \in [0,1)$), de functie
@@ -187,23 +187,23 @@ De kansdichtheid van de bètaverdeling is gedefinieerd op het interval [0, 1] al
 
 $$f(p;\alpha,\beta) = \frac{1}{\mathrm{B}(\alpha,\beta)} p^{\alpha-1}(1-p)^{\beta-1}$$
 
-Daarin zijn $\alpha$ en $\beta$ beide positieve reële getallen en is 
+Daarin zijn $\alpha$ en $\beta$ beide positieve reële getallen en is
 $$B(\alpha,\beta) = \frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha + \beta)}$$
 de bètafunctie.
 
-Voor een gegeven kans $p$ (waarbij $0 < p < 1$) is de 
-kwantielfunctie $Q(p; \alpha, \beta)$ 
+Voor een gegeven kans $p$ (waarbij $0 < p < 1$) is de
+kwantielfunctie $Q(p; \alpha, \beta)$
 gedefinieerd als de unieke drempelwaarde waarvoor geldt:
-$$p = \frac{1}{B(\alpha, \beta)} \int_{0}^{Q(p, \alpha, \beta)} t^{\alpha-1}(1-t)^{\beta-1} \, dt$$ 
+$$p = \frac{1}{B(\alpha, \beta)} \int_{0}^{Q(p, \alpha, \beta)} t^{\alpha-1}(1-t)^{\beta-1} \, dt$$
 
 Belangrijk resultaat uit de literatuur:
 De bètaverdeling is een natuurlijke exponentiële familie met natuurlijke parameters:
 θ1=ψ(α)−ψ(α+β),θ2=ψ(β)−ψ(α+β),\theta_1 = \psi(\alpha) - \psi(\alpha + \beta), \quad \theta_2 = \psi(\beta) - \psi(\alpha + \beta),θ1​=ψ(α)−ψ(α+β),θ2​=ψ(β)−ψ(α+β),
 waar ψ\psiψ de digamma-functie is.
-Voor natuurlijke exponentiële families is de kwantiel-functie convex in de natuurlijke 
+Voor natuurlijke exponentiële families is de kwantiel-functie convex in de natuurlijke
 parameters (zie bijv. Barndorff-Nielsen, 1978, "Exponential Families").
-Omdat α\alphaα en β\betaβ stijgende functies zijn van θ1\theta_1θ1​ en 
-θ2\theta_2θ2​, volgt dat Q(p;α,β)Q(p; \alpha, \beta)Q(p;α,β) convex is 
+Omdat α\alphaα en β\betaβ stijgende functies zijn van θ1\theta_1θ1​ en
+θ2\theta_2θ2​, volgt dat Q(p;α,β)Q(p; \alpha, \beta)Q(p;α,β) convex is
 in (α,β)(\alpha, \beta)(α,β).
 
 #### Stap 2: Lineaire parameterisatie in n
@@ -228,25 +228,25 @@ Maar Δ(n)=f(n)−f(n+1)\Delta(n) = f(n) - f(n+1)Δ(n)=f(n)−f(n+1), dus:
 Δ(n)>Δ(n+1).\Delta(n) > \Delta(n+1).Δ(n)>Δ(n+1).
 QED: De marginale opbrengst (foutreductie per extra waarneming) is dalend in nnn.
 
-  
+
 ## 5. Numerieke aspecten en praktische implementatie
 
 Het algoritme in §3 is theoretisch exact, maar de praktische
-implementatie in `plan_stratified.py` en `eval_stratified.py`
+implementatie in `plan_geldsteek_gestratificeerd.py` en `evalueer_geldsteek_gestratificeerd.py`
 moet rekening houden met numerieke benaderingen en computationele beperkingen.
 Hieronder lichten we de belangrijkste aspecten toe.
 
 ### 5.1 Empirische toets van de optimaliteit
 
 Empirische validatie met de daarvoor gebouwde
-functie `analyseer_klimheuristiek` in analyseer_klimheuristiek.py, bevestigt dat 
+functie `analyseer_klimheuristiek` in analyseer_klimheuristiek.py, bevestigt dat
 het steilsteklimalgoritme dezelfde uitkomst geeft
 als gevonden met het brute-force globale optimum voor alle geteste
 $n$-waarden.
 
 ### 5.2 Granulariteit: theoretische grens
 
-Het planningsalgoritme gebruikt `eval_stratified` met FFT-convolutie
+Het planningsalgoritme gebruikt `evalueer_geldsteek_gestratificeerd` met FFT-convolutie
 over een gediscretiseerd rooster met $g$ punten (de granulariteit).
 De kleinst detecteerbare foutreductie op het rooster is van orde $1/g$.
 
@@ -269,7 +269,7 @@ $$\Delta_i(n_i) = w_i \cdot \bigl[B_\alpha(k_i+1,\; n_i-k_i+1) - B_\alpha(k_i'+1
 
 met $k_i = n_i \cdot d_i$ en $k_i' = (n_i+1) \cdot d_i$.
 
-De FFT kan de reductie alleen detecteren als $\Delta_i(n_i) > 1/g$. 
+De FFT kan de reductie alleen detecteren als $\Delta_i(n_i) > 1/g$.
 En dus ook als $g > 1/\Delta_i(n_i)$.
 
 Hieruit volgen:
@@ -325,7 +325,7 @@ reductie per stap groter, zodat een grover rooster volstaat.
 Empirische meting toont dat de FFT de foutreductie in de praktijk nooit
 exact nul bereikt, ook niet ver boven $n_{max}$.
 De oorzaak ligt in de functie `interpolate_quantile`
-in `eval_stratified.py`, die wordt aangeroepen als:
+in `evalueer_geldsteek_gestratificeerd.py`, die wordt aangeroepen als:
 
 ```python
 max_fout = interpolate_quantile(cum_p, x_totaal_fractie, zekerheid)
@@ -373,7 +373,7 @@ die wordt geactiveerd wanneer de FFT geen meetbare reductie detecteert
 
 $$proxy\_onzekerheid_i = \frac{V_i}{\sqrt{\max(n_i, 1)} \cdot c_i}$$
 
-In de praktijk wordt deze tak bij normaal gebruik van `plan_stratified()`
+In de praktijk wordt deze tak bij normaal gebruik van `plan_geldsteek_gestratificeerd()`
 nooit bereikt, om twee onafhankelijke redenen:
 
 1. **FFT-precisie (zie §5.3).** Omdat `interpolate_quantile` het kwantiel

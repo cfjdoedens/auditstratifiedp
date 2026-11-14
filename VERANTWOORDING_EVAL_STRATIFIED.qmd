@@ -1,4 +1,4 @@
-# Verantwoording van convolutie en van de implementatie in eval_stratified 
+# Verantwoording van convolutie en van de implementatie in evalueer_geldsteek_gestratificeerd
 
 ## Hoe het niet kan
 
@@ -7,15 +7,15 @@ en gegeven de steekproefresultaten van die strata de maximale fout over
 de strata samen te berekenen.
 
 Als de foutfracties in de strata bekend zijn, en de relatieve gewichten in geld van de strata, kunnen we daaruit de totale foutfractie
-gewogen berekenen. 
+gewogen berekenen.
 Echter de foutfracties van de strata kennen we niet. We hebben alleen een kansverdeling van de mogelijke waarden. Daaruit kunnen wel per stratum de maximale fout bepalen.
 
 Een eenvoudige optelling van de afzonderlijke maximale fouten is niet geschikt. Stel dat voor twee strata ieder een maximale fout bij 95% zekerheid wordt berekend. De som van deze twee 95%-bovengrenzen is in het algemeen niet gelijk aan de 95%-bovengrens van de totale fout. Door de afzonderlijke bovengrenzen simpelweg op te tellen ontstaat doorgaans een te conservatieve schatting.
 
 ## Hoe wel: convolutie
 
-Onder de aanname dat de foutverdelingen van de verschillende strata onderling onafhankelijk zijn, volgt uit de kansrekening dat de kansverdeling van de 
-totale foutfractie wordt verkregen door convolutie van de afzonderlijke, naar geldgewicht geschaalde kansverdelingen. 
+Onder de aanname dat de foutverdelingen van de verschillende strata onderling onafhankelijk zijn, volgt uit de kansrekening dat de kansverdeling van de
+totale foutfractie wordt verkregen door convolutie van de afzonderlijke, naar geldgewicht geschaalde kansverdelingen.
 
 Convolutie betekent in het geldsteekproefdomein
 dat voor ieder mogelijk totaalbedrag aan fout wordt gekeken naar alle combinaties van fouten in de afzonderlijke strata die samen precies dat totaal kunnen opleveren; en de kansen van dat totaal worden bij elkaar opgeteld. Het resultaat is één nieuwe kansverdeling die de onzekerheid over de fout in de gehele populatie beschrijft.
@@ -29,16 +29,16 @@ van de strata samen te komen.
    Dit gebaseerd op het gekozen kansmodel bijvoorbeeld binomiaal
    of Poisson.
    Bij het binomiale model
-   wordt hiervoor een Beta-verdeling gebruikt; 
-   bij het Poissonmodel een Gamma-verdeling. 
+   wordt hiervoor een Beta-verdeling gebruikt;
+   bij het Poissonmodel een Gamma-verdeling.
 1. *Combineer de kansverdelingen, gewogen naar de geldomvang van ieder stratum; dit dus met convolutie.*
-   `auditstratified` gebruikt voor deze samenvoeging bij verstek FFT. 
+   `auditstratified` gebruikt voor deze samenvoeging bij verstek FFT.
    Maar ook is ter vergelijking de Monte Carlo methode beschikbaar.
 1. *Bepaal van deze combinatie de maximale fout.*
-   Bij een zekerheid van bijvoorbeeld 95% wordt het 95%-kwantiel 
-   van de gecombineerde verdeling genomen. 
+   Bij een zekerheid van bijvoorbeeld 95% wordt het 95%-kwantiel
+   van de gecombineerde verdeling genomen.
    Dus die foutfractie, $f$ wordt opgezocht waarbij
-   95% van alle foutfracties <= $f$, gewogen naar hun kans. 
+   95% van alle foutfracties <= $f$, gewogen naar hun kans.
 
 ## Waarom FFT?
 
@@ -55,7 +55,7 @@ Eerst wordt één gemeenschappelijke rasterstap in geld bepaald. Vervolgens word
 
 Voor de FFT-berekening worden deze kansvectoren met nullen aangevuld tot dezelfde, voldoende grote lengte (zero-padding). Van iedere aldus aangevulde kansvector wordt vervolgens de Fouriertransformatie berekend. De Fouriergetransformeerde kansvectoren worden per zelfde index (overeenkomstige positie in de vector) met elkaar vermenigvuldigd. (Hier zit de snelheidswinst, geen kruisvermenigvuldiging nodig!) Eén inverse Fouriertransformatie van dit product levert tenslotte de gecombineerde kansverdeling van alle strata op.
 
-Deze aanpak heeft een belangrijk voordeel: alle strata worden op volstrekt symmetrische wijze behandeld. Er is geen eerste, tweede of laatste stratum in de rekenmethode. 
+Deze aanpak heeft een belangrijk voordeel: alle strata worden op volstrekt symmetrische wijze behandeld. Er is geen eerste, tweede of laatste stratum in de rekenmethode.
 
 De volgorde waarin de strata in het invoerbestand staan behoort daarom geen invloed te hebben op de uitkomst. Dit kan bovendien expliciet met geautomatiseerde tests worden gecontroleerd door dezelfde strata in verschillende volgorden aan te bieden en de uitkomsten met elkaar te vergelijken.
 
@@ -65,7 +65,7 @@ Een alternatieve methode is paarsgewijze FFT-convolutie. Daarbij worden bijvoorb
 
 Dat een methode wiskundig juist is, betekent nog niet automatisch dat een software-implementatie ervan correct is. Daarom wordt de implementatie van `FFT samen` afzonderlijk gevalideerd tegen situaties waarvoor de theoretische uitkomst onafhankelijk kan worden berekend.
 
-Een eerste controle betreft één enkel binomiaal stratum. In dat geval vindt feitelijk nog geen convolutie plaats en moet de door `eval_stratified()` berekende verdeling rechtstreeks overeenkomen met de theoretische Beta-verdeling. In de tests worden onder meer de minimale en maximale fout, mediaan, gemiddelde en modus vergeleken met de overeenkomstige waarden uit de analytische Beta-verdeling.
+Een eerste controle betreft één enkel binomiaal stratum. In dat geval vindt feitelijk nog geen convolutie plaats en moet de door `evalueer_geldsteek_gestratificeerd()` berekende verdeling rechtstreeks overeenkomen met de theoretische Beta-verdeling. In de tests worden onder meer de minimale en maximale fout, mediaan, gemiddelde en modus vergeleken met de overeenkomstige waarden uit de analytische Beta-verdeling.
 
 Voor het Poissonmodel bestaat een tweede exacte controle. Wanneer meerdere Gamma-verdelingen dezelfde schaalparameter hebben, is hun som opnieuw Gamma-verdeeld. Door strata zo te kiezen dat deze reproductie-eigenschap geldt, kan de gecombineerde verdeling exact vooraf worden berekend. De uitkomst van `FFT samen` wordt vervolgens rechtstreeks vergeleken met deze theoretische Gamma-verdeling.
 
