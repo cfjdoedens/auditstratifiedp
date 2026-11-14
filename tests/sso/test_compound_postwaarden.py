@@ -209,3 +209,22 @@ def test_venster_aantal_fouten_loopt_niet_door_tot_n():
     assert abs(venster.sum() - 1.0) < 1e-12
     assert laag + len(venster) - 1 >= 15_000
     assert np.all(venster >= 0)
+
+
+def test_te_groot_venster_geeft_value_error_met_limiet():
+    import numpy as np
+
+    from auditstat.sso.compound_postwaarden import (
+        MAX_K_VENSTER,
+        schat_rekentijd_compound,
+    )
+
+    assert MAX_K_VENSTER == 1_000_000
+    z = np.linspace(100, 900, 500)
+    # n=100, k=5: venster ca. 0,34 x N_klant, dus 10 mln posten is te groot.
+    N = 10_000_000
+    with pytest.raises(ValueError, match=r"maximaal 1\.000\.000"):
+        schat_rekentijd_compound("binomiaal", 100, 5, N, N * 500.0, z, N * 25.0)
+    # N_klant 1 mln (venster ca. 0,34 mln) valt binnen de limiet.
+    N = 1_000_000
+    assert schat_rekentijd_compound("binomiaal", 100, 5, N, N * 500.0, z, N * 25.0) > 0

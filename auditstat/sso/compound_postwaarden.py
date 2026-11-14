@@ -31,7 +31,7 @@ from scipy.stats import nbinom
 _STAARTMASSA = 1e-12
 # Grootste aantal waarden van K waarover wordt gesommeerd (elke waarde kost
 # één vermenigvuldiging van een rooster-lange vector).
-MAX_K_VENSTER = 300_000
+MAX_K_VENSTER = 1_000_000
 _MAX_FFT_LENGTE = 2**22
 # Aantal frequenties per blok in de K-lus (past in de L1/L2-cache).
 _FREQUENTIEBLOK = 2048
@@ -104,10 +104,14 @@ def _rooster(model, n, k, N, waarde, z, dx):
     mu = waarde / N
     k0, pmf = aantal_fouten_venster(model, n, k, N)
     if len(pmf) > MAX_K_VENSTER:
+        spreiding = f"{len(pmf):,}".replace(",", ".")
+        maximum = f"{MAX_K_VENSTER:,}".replace(",", ".")
         raise ValueError(
-            f"Het aantal mogelijke foute posten (spreiding {len(pmf):,}) is te "
-            "groot voor de exacte methode met postgroottes; gebruik een van "
-            "de andere methoden of een kleinere N_klant."
+            f"Het aantal mogelijke foute posten (spreiding {spreiding}) is te "
+            f"groot voor de exacte methode met postgroottes (maximaal {maximum}; "
+            "dat hangt vooral af van N_klant gedeeld door de "
+            "SSO-steekproefomvang n); gebruik een van de andere methoden of "
+            "een kleinere N_klant."
         )
     k_max = k0 + len(pmf) - 1
     # Voor de lengte van het FFT-rooster: boven E_max mag geen kansmassa meer
