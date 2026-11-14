@@ -2464,14 +2464,15 @@ with tab_sso:
             )
             st.session_state.sso_cv_bewaard = sso_totaal_cv_text
             _cv_veld = _parse_nl(sso_totaal_cv_text)
-            _cv_getoond = _cv_veld if _cv_veld and _cv_veld > 0 else 1.0
+            _cv_ingevuld = _cv_veld is not None and _cv_veld >= 0
+            _cv_getoond = _cv_veld if _cv_ingevuld else 1.0
             _kenm = kenmerken_gamma(_cv_getoond, _sso_gemiddelde)
             _tekst = (
                 "Voorbeeld bij CV "
                 f"{_nl(_cv_getoond, 2)}"
                 + (
                     ""
-                    if _cv_veld and _cv_veld > 0
+                    if _cv_ingevuld
                     else " (exponentiële verdeling; vul een CV in om het "
                     "histogram aan te passen)"
                 )
