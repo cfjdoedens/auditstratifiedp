@@ -1,4 +1,6 @@
+import contextlib
 import inspect
+import io
 import math
 import sys
 import time
@@ -86,6 +88,7 @@ for _poging in (1, 2):
             THEORIE_FIGUREN,
         )
         from auditstat.sso.theorie_qmd import (  # pyrefly: ignore[missing-import]
+            Rekenblok,
             lees_theorie_qmd,
         )
 
@@ -1768,6 +1771,7 @@ with tab_eval:
                         unsafe_allow_html=True,
                     )
                     st.pyplot(fig)
+                    plt.close(fig)
 
                     st.table(
                         pd.DataFrame({
@@ -2239,7 +2243,9 @@ with tab_plan:
 
         # Bereken de basisplanning op basis van de risico's en de invoerparameters.
         try:
-            strata_init = plan_geldsteek_gestratificeerd_basis(df_clean, model=plan_model)
+            strata_init = plan_geldsteek_gestratificeerd_basis(
+                df_clean, model=plan_model
+            )
         except Exception as e:
             st.error(f"Fout bij basisplanning: {e}")
             st.stop()
@@ -2603,7 +2609,8 @@ with tab_sso:
                 "ene, gezamenlijke SSO-brede steekproef; `N totaal` is het "
                 "totaal aantal posten in de hele SSO-populatie en `totale "
                 "massa` de bijbehorende geldwaarde. Zie tabblad "
-                "\u2018theorie SSO\u2019, sectie 1 voor de achtergrond."
+                "\u2018theorie SSO\u2019, paragraaf 5.1 en 5.2 voor de "
+                "achtergrond."
             )
         sso_voorbeeld_plek = {"totalen": st.empty()}
         c_n, c_k, c_N, c_massa = st.columns(4)
@@ -3803,7 +3810,9 @@ with tab_sso:
                     k_laag=lambda d: d["k_laag"].apply(lambda x: _nl(x, 0)),
                 )
             )
-            st.pyplot(plot_kanskromme(sso_totaal_res))
+            _fig_totaal = plot_kanskromme(sso_totaal_res)
+            st.pyplot(_fig_totaal)
+            plt.close(_fig_totaal)
 
         if st.session_state.sso_klanten_waarschuwingen:
             alle_waarschuwingen = [
@@ -3833,6 +3842,7 @@ with tab_sso:
             st.table(sso_klant_steekproeven_tabel)
             sso_klant_fig = plot_kanskromme(sso_klant_res)
             st.pyplot(sso_klant_fig)
+            plt.close(sso_klant_fig)
 
 # Theorie-tabblad: de wiskundige onderbouwing per deelonderwerp, apart van
 # de werktabbladen zodat een gebruiker die er niet in geïnteresseerd is er
@@ -3854,8 +3864,21 @@ with tab_theorie:
                 for _blok in _sectie.blokken:
                     if isinstance(_blok, str):
                         st.markdown(_blok)
+                    elif isinstance(_blok, Rekenblok):
+                        _uitvoer = io.StringIO()
+                        try:
+                            with contextlib.redirect_stdout(_uitvoer):
+                                exec(_blok.code, {"__name__": "theorie_rekenblok"})
+                        except Exception as _fout:
+                            _uitvoer.write(f"Fout bij uitvoeren: {_fout}")
+                        st.code(_blok.code, language="python")
+                        if _uitvoer.getvalue().strip():
+                            st.code(_uitvoer.getvalue().rstrip(), language="text")
+                        plt.close("all")
                     elif _blok.label in THEORIE_FIGUREN:
-                        st.pyplot(THEORIE_FIGUREN[_blok.label]())
+                        _fig_theorie = THEORIE_FIGUREN[_blok.label]()
+                        st.pyplot(_fig_theorie)
+                        plt.close(_fig_theorie)
                         if _blok.bijschrift:
                             st.caption(_blok.bijschrift)
                     else:

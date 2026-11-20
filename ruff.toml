@@ -4,6 +4,11 @@
 target-version = "py310"
 line-length = 88
 
+# Quarto-documenten bevatten tekst en code; editors geven ze soms expliciet door
+# aan ruff, dus ook dan uitsluiten.
+extend-exclude = ["*.qmd"]
+force-exclude = true
+
 [lint]
 select = [
     "E",   # pycodestyle fouten

@@ -53,7 +53,42 @@ def test_blok_zonder_label_geeft_value_error():
 
 def test_echte_theorie_qmd_is_consistent():
     t = lees_theorie_qmd(QMD)
-    assert len(t.secties) == 8
+    assert "Klad" not in " ".join(s.titel for s in t.secties)
+    assert t.secties[-1].titel == "Literatuur"
     figuren = [b for s in t.secties for b in s.blokken if isinstance(b, Figuur)]
-    assert {f.label for f in figuren} == set(THEORIE_FIGUREN)
+    assert {f.label for f in figuren} <= set(THEORIE_FIGUREN)
     assert all(f.bijschrift for f in figuren)
+
+
+KLAD = """## Af
+
+Tekst af.
+
+# Klad.
+
+## Klad-sectie
+
+```{python}
+#| label: fig-klad
+#| fig-cap: "Weg"
+print(1)
+```
+
+Tekst klad.
+
+## Literatuur
+
+Bronnen.
+"""
+
+
+def test_klad_wordt_overgeslagen_maar_literatuur_blijft():
+    t = parseer_theorie_qmd(KLAD)
+    assert [s.titel for s in t.secties] == ["Af", "Literatuur"]
+    assert t.secties[0].blokken == ["Tekst af."]
+    assert t.secties[1].blokken == ["Bronnen."]
+
+
+def test_zonder_klad_ongewijzigd():
+    t = parseer_theorie_qmd("## A\n\nx\n\n## B\n\ny\n")
+    assert [s.titel for s in t.secties] == ["A", "B"]

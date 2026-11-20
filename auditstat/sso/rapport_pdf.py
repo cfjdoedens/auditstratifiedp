@@ -269,6 +269,20 @@ def _methode_onderdelen(
             ParagraphStyle("methode", parent=stijlen["tekst"], spaceAfter=5),
         )
 
+    if instellingen.get("postgroottes", "homogeen") == "homogeen":
+        aanname_3 = (
+            "<b>4. Gelijke postgrootte.</b> Alle posten van een klant zijn "
+            "even groot, zodat de geldelijke foutfractie van de klant gelijk "
+            "is aan het aandeel foute posten."
+        )
+    else:
+        aanname_3 = (
+            "<b>4. Gelijke postgrootte: niet van toepassing.</b> Deze "
+            "aanname is hier losgelaten: de postgroottes bij de klant "
+            "mogen verschillen en worden meegenomen (zie "
+            "\"Postgroottes\" hieronder)."
+        )
+
     if model == "poisson":
         model_tekst = (
             "Gekozen model: <b>Poisson</b>. De foutkans heeft een "
@@ -296,6 +310,11 @@ def _methode_onderdelen(
         alinea(model_tekst),
         Paragraph("Aannames", stijlen["kop2"]),
         alinea(
+            "De nummering volgt de Theorie-tab van de app. Aanname 2 daar "
+            "(alleen hele fouten in de SSO-steekproef) is vervangen door "
+            "aanname 5 en komt in dit rapport dus niet voor."
+        ),
+        alinea(
             "<b>1. Willekeurige verspreiding.</b> De posten van elke klant "
             "liggen willekeurig verspreid tussen alle posten van de SSO, "
             "zonder herkenbaar patroon, en elke post hoort bij precies "
@@ -304,11 +323,7 @@ def _methode_onderdelen(
             "fouten te verwachten is."
         ),
         alinea(
-            "<b>2. Vlakke prior.</b> Vooraf is elke foutkans even aannemelijk; "
-            "de verdeling van de foutkans volgt dan alleen uit n en k."
-        ),
-        alinea(
-            "<b>3. Elke post volledig goed of volledig fout.</b> Voor de "
+            "<b>3. Elke klantpost volledig goed of volledig fout.</b> Voor de "
             "spreiding bij de klant wordt elke post behandeld als "
             "\u00f3f volledig goed, \u00f3f volledig fout. Dat is de "
             "maximaal conservatieve keuze: voor elke grootheid X tussen 0 "
@@ -318,6 +333,22 @@ def _methode_onderdelen(
             "spreiding, dus de berekende grens is eerder te ruim dan te "
             "krap. Een op echte tainting-data gekalibreerd model is niet "
             "toegepast."
+        ),
+        alinea(aanname_3),
+        alinea(
+            "<b>5. Partiële fouten in de SSO-steekproef.</b> Een gedeeltelijk "
+            "foute post in de SSO-steekproef telt mee met zijn foutfractie: "
+            "k is de som van die foutfracties en kan dus niet-geheel zijn. "
+            "Aangenomen wordt dat deze som zich gedraagt als een binomiale "
+            "telling. Binnen die aanname is de analyse exact, maar ze volgt "
+            "niet uit de wiskunde zelf en er is geen strikt bewijs van "
+            "dekking; in een indicatieve vergelijking met een "
+            "mengselmodel lag de 95%-grens daarvan iets hoger (0,001 tot "
+            "0,006)."
+        ),
+        alinea(
+            "<b>Vlakke prior.</b> Vooraf is elke foutkans even aannemelijk; "
+            "de verdeling van de foutkans volgt dan alleen uit n en k."
         ),
         Paragraph(
             (
@@ -414,6 +445,12 @@ def _methode_onderdelen(
             "een euro-rooster berekend; de kansmassa van elke post wordt "
             "daarbij naar boven afgerond, dus de roosterfout maakt de grens "
             "hooguit iets te ruim, nooit te krap."
+            + (
+                " Dat geldt voor het rooster zelf; de benadering bij de "
+                "postgroottes (zie hierboven) kan de grens wel te laag maken."
+                if instellingen.get("postgroottes", "homogeen") != "homogeen"
+                else ""
+            )
         )
     else:
         combineren = (
@@ -426,6 +463,35 @@ def _methode_onderdelen(
             "is bij de SSO-n opgeteld vóór de kalibratie."
         )
     postgroottes = instellingen.get("postgroottes", "homogeen")
+    grens_exact_variabel = (
+        "<b>Grens van deze methode.</b> De bedragen van de foute posten "
+        "worden benaderd als onafhankelijke trekkingen met een "
+        "gecorrigeerde spreiding; de som zonder teruglegging heeft strikt "
+        "genomen een iets andere vorm. Als de postbedragen werkelijk "
+        "gammaverdeeld zijn met de ingevulde CV, week de berekende grens "
+        "in een indicatieve simulatie (CV 0,5 tot 4; N_klant = 200 en "
+        "1.000) hooguit ongeveer 1,5% af van de simulatie, meestal minder "
+        "dan 0,5%. Echte bedragen zijn geen gammaverdeling: bij een kleine "
+        "N_klant en een grote CV (boven ongeveer 2) kan de grens bij een "
+        "concrete verzameling bedragen enkele procenten te hoog of te laag "
+        "uitvallen. Er is geen dekkingsgarantie; zie de Theorie-tab "
+        "(paragraaf 5.4)."
+    )
+    grens_exact_postenbestand = (
+        "<b>Grens van deze methode.</b> Bij de exacte methode met "
+        "postgroottes worden de bedragen van de foute posten benaderd als "
+        "onafhankelijke trekkingen met een gecorrigeerde spreiding; de som "
+        "zonder teruglegging heeft strikt genomen een iets andere vorm. "
+        "Bij weinig foute posten ten opzichte van N_klant, een kleine "
+        "N_klant en een CV boven ongeveer 2 (scheve bedragen met een zware "
+        "staart) kan de berekende grens daardoor enkele procenten te laag "
+        "uitvallen; in een indicatieve vergelijking met een simulatie was "
+        "dat tot ongeveer 4% (N_klant = 200, lognormale bedragen). Tot een "
+        "CV van ongeveer 1 was geen afwijking te zien, en bij meer foute "
+        "posten of een grotere N_klant bleef het verschil meestal onder "
+        "circa 1%. Er is dus geen dekkingsgarantie; zie de Theorie-tab "
+        "(paragraaf 5.4)."
+    )
     if postgroottes == "variabel":
         onderdelen += [
             Paragraph("Postgroottes (niveau 2)", stijlen["kop2"]),
@@ -447,6 +513,7 @@ def _methode_onderdelen(
                 "p(1-p)/N_klant tot p(1-p)(1+CV\u00b2)/N_klant "
                 "(vaste geldmassa van de klant)."
             ),
+            *([alinea(grens_exact_variabel)] if kalibratie == "exact" else []),
         ]
     elif postgroottes == "postenbestand":
         onderdelen += [
@@ -459,6 +526,7 @@ def _methode_onderdelen(
                 "correctie voor de eindige klantpopulatie); bij de andere methoden is daaruit alleen de "
                 "variatiecoëfficiënt per type post afgeleid."
             ),
+            *([alinea(grens_exact_postenbestand)] if kalibratie == "exact" else []),
         ]
     onderdelen += [
         Paragraph("Combineren en uitkomst", stijlen["kop2"]),

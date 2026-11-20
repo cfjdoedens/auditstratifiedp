@@ -317,7 +317,37 @@ def teken_lorenz_niveau3():
     )
 
 
+def teken_verdeling_beta_binomiaal():
+    """Beta-binomiale voorspellende verdeling naast een binomiaal met puntschatting."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from scipy import stats
+
+    n, k, N = 50, 4, 100
+    alpha, beta = k + 1, n - k + 1
+    x = np.arange(0, 30)
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(
+        x - 0.2,
+        stats.betabinom(N, alpha, beta).pmf(x),
+        width=0.4,
+        label=f"Beta-binomiaal (alpha={alpha}, beta={beta})",
+    )
+    ax.bar(
+        x + 0.2,
+        stats.binom(N, k / n).pmf(x),
+        width=0.4,
+        label=f"Binomiaal (p = k/n = {k / n})",
+    )
+    ax.set_xlabel("Aantal zwarte knikkers X in tweede steekproef")
+    ax.set_ylabel("Kans")
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
 THEORIE_FIGUREN = {
+    "fig-verdeling": teken_verdeling_beta_binomiaal,
     "fig-sso-steekproefschema": teken_sso_steekproefschema,
     "fig-sso-geldsteekproefschema": teken_sso_geldsteekproefschema,
     "fig-lorenz-niveau2": teken_lorenz_niveau2,

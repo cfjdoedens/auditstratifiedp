@@ -8,6 +8,8 @@ een kleine, bewust beperkte lezer (geen Quarto nodig op de server):
 * elke ``## ``-kop begint een sectie (in de app een uitklapper);
 * een ``{python}``-codeblok met ``#| label: fig-...`` is een figuur; het
   bijschrift staat in ``#| fig-cap: "..."`` (op één regel);
+* een ``{python}``-codeblok met een ander label is een rekenvoorbeeld: de app
+  voert de code uit en toont de code met de afgedrukte uitvoer;
 * HTML-commentaar wordt genegeerd;
 * alle overige tekst is gewone markdown (met ``$...$`` en ``$$...$$``).
 """
@@ -24,9 +26,17 @@ class Figuur:
 
 
 @dataclass
+class Rekenblok:
+    """Rekenvoorbeeld (label zonder ``fig-``): de app toont de code en de uitvoer."""
+
+    label: str
+    code: str
+
+
+@dataclass
 class Sectie:
     titel: str
-    blokken: list = field(default_factory=list)  # str (markdown) of Figuur
+    blokken: list = field(default_factory=list)  # str (markdown), Figuur of Rekenblok
 
 
 @dataclass
@@ -37,6 +47,7 @@ class Theorie:
 
 
 _CODEBLOK_START = re.compile(r"^```\{python\}\s*$")
+_KLAD_KOP = re.compile(r"^#\s+Klad\.?\s*$")
 _OPTIE = re.compile(r"^#\|\s*([\w-]+):\s*(.*?)\s*$")
 
 
@@ -76,22 +87,45 @@ def parseer_theorie_qmd(tekst: str) -> Theorie:
                 sectie.blokken.append(blok)
         huidige = []
 
+    in_klad = False
     i = 0
     while i < len(regels):
         regel = regels[i]
+        if _KLAD_KOP.match(regel):
+            # Alles vanaf '# Klad.' is werk in uitvoering: overslaan, tot een
+            # sectie '## Literatuur' (de literatuurlijst hoort bij het geheel).
+            sluit_tekstblok()
+            in_klad = True
+        elif in_klad:
+            if regel.strip() == "## Literatuur":
+                in_klad = False
+                continue
+        if in_klad:
+            i += 1
+            continue
         if _CODEBLOK_START.match(regel):
             opties: dict[str, str] = {}
+            code_regels: list[str] = []
             i += 1
             while i < len(regels) and not regels[i].startswith("```"):
                 m = _OPTIE.match(regels[i])
                 if m:
                     opties[m.group(1)] = _ontquote(m.group(2))
+                else:
+                    code_regels.append(regels[i])
                 i += 1
             label = opties.get("label")
             if label is None:
                 raise ValueError(
                     "Een {python}-blok in het qmd-bestand mist '#| label: ...'."
                 )
+            if not label.startswith("fig-"):
+                if sectie is None:
+                    raise ValueError("Een rekenblok staat vóór de eerste '## '-kop.")
+                sluit_tekstblok()
+                sectie.blokken.append(Rekenblok(label, "\n".join(code_regels).strip()))
+                i += 1
+                continue
             if sectie is None:
                 raise ValueError("Een figuur staat vóór de eerste '## '-kop.")
             sluit_tekstblok()
