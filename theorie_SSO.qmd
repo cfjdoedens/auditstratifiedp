@@ -550,11 +550,9 @@ Ten tweede: wat gebeurt er met een concrete verzameling bedragen die uit een gam
 - het aantal posten dat fout kan zijn, is niet extreem groot. Bij een zeer grote $N$ gedeeld door $n$ wordt het rekenwerk te zwaar en weigert de methode de berekening.
 
 
-<!-- Concept: 5.5 t/m 5.7 zijn nog niet door de gebruiker nagelopen. -->
-
 ### 5.5 Het Poisson-model als alternatief voor het binomiale model
 
-Tot nu toe telden we fouten met het binomiale model: elke gestoken eurocent of klantpost is met kans $p$ fout. Een veelgebruikt alternatief, vooral als fouten zeldzaam zijn, is het Poisson-model. Het aantal fouten in een steekproef van omvang $n$ is dan Poisson-verdeeld met verwachting $n p$. Het verschil is dat $p$ geen bovengrens van 1 meer heeft: de fractie is een intensiteit, en geen kans.
+Tot nu toe telden we fouten met het binomiale model: elke gecontroleerde post of klantpost is met kans $p$ fout. Een veelgebruikt alternatief, vooral als fouten zeldzaam zijn, is het Poisson-model. Het aantal fouten in een steekproef van omvang $n$ is dan Poisson-verdeeld met verwachting $n p$. Het verschil is dat $p$ geen bovengrens van 1 meer heeft: de fractie is een intensiteit, en geen kans.
 
 De opbouw van 5.1 tot en met 5.4 blijft hetzelfde. Alleen de twee verdelingen veranderen.
 
@@ -572,9 +570,11 @@ Hoe groot is het verschil? Bij vergelijkbare $n$ en $k$ ligt de 95%-grens voor d
 | (100, 2) | 0,0610 | 0,0630 |
 | (30, 1) | 0,1441 | 0,1581 |
 
-Voor grote $n$ en kleine $k/n$ zijn de twee modellen praktisch gelijk. Bij kleine $n$ is het Poisson-model voorzichtiger. Kies het Poisson-model als je fouten als zeldzame, onafhankelijke gebeurtenissen wilt modelleren; kies het binomiale model als je elke post als helemaal goed of helemaal fout ziet (Aanname 2 en 3).
+Voor grote $n$ en kleine $k/n$ zijn de twee modellen praktisch gelijk. Bij kleine $n$ is het Poisson-model voorzichtiger. Kies het Poisson-model als je fouten als zeldzame, onafhankelijke gebeurtenissen wilt modelleren; kies het binomiale model als je elke post als helemaal goed of helemaal fout ziet (Aanname 3).
 
-Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de eindige-populatiecorrectie voor de spreiding van 5.4 geldt alleen voor het binomiale model; bij Poisson is die correctie niet nodig, omdat de posten daar onafhankelijk worden getrokken.
+Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de correctie voor trekken zonder teruglegging in 5.4 geldt alleen voor het binomiale model. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is precies de variantie uit 5.3, zonder correctie. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
+
+<!-- Concept: 5.6 t/m 5.8 zijn nog niet door de gebruiker nagelopen. -->
 
 ### 5.6 Risicocorrectie op de SSO-steekproef: IHR, IBR, CAR en materialiteit
 
