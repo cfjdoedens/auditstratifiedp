@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 
 from auditstat.sso.schema_figuren import THEORIE_FIGUREN
-from auditstat.sso.theorie_qmd import Figuur, lees_theorie_qmd, parseer_theorie_qmd
+from auditstat.sso.theorie_qmd import (
+    Figuur,
+    Rekenblok,
+    lees_theorie_qmd,
+    parseer_theorie_qmd,
+)
 
 QMD = Path(__file__).resolve().parents[2] / "theorie_SSO.qmd"
 
@@ -40,7 +45,7 @@ def test_parseer_voorbeeld():
     assert [s.titel for s in t.secties] == ["Een", "Twee"]
     assert t.secties[0].blokken == [
         "Tekst één.",
-        Figuur("fig-x", "Bijschrift"),
+        Figuur("fig-x", "Bijschrift", "print(1)"),
         "Tekst twee.",
     ]
     assert t.secties[1].blokken == ["Alleen tekst."]
@@ -56,8 +61,32 @@ def test_echte_theorie_qmd_is_consistent():
     assert "Klad" not in " ".join(s.titel for s in t.secties)
     assert t.secties[-1].titel == "Literatuur"
     figuren = [b for s in t.secties for b in s.blokken if isinstance(b, Figuur)]
-    assert {f.label for f in figuren} <= set(THEORIE_FIGUREN)
+    assert all(f.label in THEORIE_FIGUREN or f.code for f in figuren)
     assert all(f.bijschrift for f in figuren)
+
+
+def test_figuren_met_code_in_qmd_leveren_een_figuur():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    t = lees_theorie_qmd(QMD)
+    aantal = 0
+    for sectie in t.secties:
+        omgeving: dict = {"__name__": "test"}
+        for blok in sectie.blokken:
+            if isinstance(blok, Rekenblok):
+                exec(blok.code, omgeving)
+            elif isinstance(blok, Figuur) and blok.label not in THEORIE_FIGUREN:
+                code = "\n".join(
+                    r for r in blok.code.split("\n") if r.strip() != "plt.show()"
+                )
+                exec(code, omgeving)
+                assert omgeving["fig"].axes
+                plt.close(omgeving["fig"])
+                aantal += 1
+    assert aantal >= 1
 
 
 KLAD = """## Af

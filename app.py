@@ -3904,6 +3904,9 @@ with tab_theorie:
             st.caption(_theorie.inleiding)
         for _i, _sectie in enumerate(_theorie.secties):
             with st.expander(_sectie.titel, expanded=(_i == 0)):
+                # Rekenblokken en figuurblokken in één sectie delen hun variabelen
+                # (zoals in een Quarto-document); elke sectie en sessie begint leeg.
+                _omgeving: dict = {"__name__": "theorie_rekenblok"}
                 for _blok in _sectie.blokken:
                     if isinstance(_blok, str):
                         st.markdown(_blok)
@@ -3911,7 +3914,7 @@ with tab_theorie:
                         _uitvoer = io.StringIO()
                         try:
                             with contextlib.redirect_stdout(_uitvoer):
-                                exec(_blok.code, {"__name__": "theorie_rekenblok"})
+                                exec(_blok.code, _omgeving)
                         except Exception as _fout:
                             _uitvoer.write(f"Fout bij uitvoeren: {_fout}")
                         if _blok.echo:
@@ -3925,5 +3928,23 @@ with tab_theorie:
                         plt.close(_fig_theorie)
                         if _blok.bijschrift:
                             st.caption(_blok.bijschrift)
+                    elif _blok.code:
+                        # Figuur uit de code in het qmd; de figuur staat in `fig`.
+                        # plt.show() overslaan (niet nodig in de app).
+                        _code = "\n".join(
+                            _r
+                            for _r in _blok.code.split("\n")
+                            if _r.strip() != "plt.show()"
+                        )
+                        try:
+                            exec(_code, _omgeving)
+                            _fig_theorie = _omgeving["fig"]
+                        except Exception as _fout:
+                            st.error(f"Figuur '{_blok.label}' kon niet worden getekend: {_fout}")
+                        else:
+                            st.pyplot(_fig_theorie)
+                            plt.close(_fig_theorie)
+                            if _blok.bijschrift:
+                                st.caption(_blok.bijschrift)
                     else:
                         st.error(f"Onbekende figuur in theorie_SSO.qmd: {_blok.label}")

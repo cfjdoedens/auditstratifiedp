@@ -7,7 +7,9 @@ een kleine, bewust beperkte lezer (geen Quarto nodig op de server):
 * tekst vóór de eerste ``## ``-kop is de inleiding;
 * elke ``## ``-kop begint een sectie (in de app een uitklapper);
 * een ``{python}``-codeblok met ``#| label: fig-...`` is een figuur; het
-  bijschrift staat in ``#| fig-cap: "..."`` (op één regel);
+  bijschrift staat in ``#| fig-cap: "..."`` (op één regel). Staat het label in
+  ``THEORIE_FIGUREN`` (schema_figuren.py), dan tekent de app die functie; zo niet,
+  dan voert de app de code uit en toont de figuur in de variabele ``fig``;
 * een ``{python}``-codeblok met een ander label is een rekenvoorbeeld: de app
   voert de code uit en toont de code (tenzij ``#| echo: false``) met de
   afgedrukte uitvoer;
@@ -22,8 +24,12 @@ from pathlib import Path
 
 @dataclass
 class Figuur:
+    """Figuur. Staat het label in ``THEORIE_FIGUREN``, dan tekent de app die functie;
+    anders voert de app ``code`` uit (zoals Quarto) en toont de figuur ``fig``."""
+
     label: str
     bijschrift: str = ""
+    code: str = ""
 
 
 @dataclass
@@ -133,7 +139,13 @@ def parseer_theorie_qmd(tekst: str) -> Theorie:
             if sectie is None:
                 raise ValueError("Een figuur staat vóór de eerste '## '-kop.")
             sluit_tekstblok()
-            sectie.blokken.append(Figuur(label, opties.get("fig-cap", "")))
+            sectie.blokken.append(
+                Figuur(
+                    label,
+                    opties.get("fig-cap", ""),
+                    "\n".join(code_regels).strip(),
+                )
+            )
         elif regel.startswith("## "):
             sluit_tekstblok()
             sectie = Sectie(regel[3:].strip())
