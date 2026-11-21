@@ -96,10 +96,9 @@ def parseer_theorie_qmd(tekst: str) -> Theorie:
             # sectie '## Literatuur' (de literatuurlijst hoort bij het geheel).
             sluit_tekstblok()
             in_klad = True
-        elif in_klad:
-            if regel.strip() == "## Literatuur":
-                in_klad = False
-                continue
+        elif in_klad and regel.strip() == "## Literatuur":
+            in_klad = False
+            continue
         if in_klad:
             i += 1
             continue
