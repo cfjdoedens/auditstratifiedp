@@ -3903,6 +3903,7 @@ with tab_theorie:
         st.subheader(_theorie.titel or "Theoretische achtergrond")
         if _theorie.inleiding:
             st.caption(_theorie.inleiding)
+        _fig_nr = 0  # doorlopende figuurnummering, zoals Quarto
         for _i, _sectie in enumerate(_theorie.secties):
             with st.expander(_sectie.titel, expanded=(_i == 0)):
                 # Rekenblokken en figuurblokken in één sectie delen hun variabelen
@@ -3931,8 +3932,9 @@ with tab_theorie:
                         _fig_theorie = THEORIE_FIGUREN[_blok.label]()
                         st.pyplot(_fig_theorie)
                         plt.close(_fig_theorie)
+                        _fig_nr += 1
                         if _blok.bijschrift:
-                            st.caption(_blok.bijschrift)
+                            st.caption(f"Figuur {_fig_nr}: {_blok.bijschrift}")
                     elif _blok.code:
                         # Figuur uit de code in het qmd; de figuur staat in `fig`.
                         # plt.show() overslaan (niet nodig in de app).
@@ -3949,7 +3951,8 @@ with tab_theorie:
                         else:
                             st.pyplot(_fig_theorie)
                             plt.close(_fig_theorie)
+                            _fig_nr += 1
                             if _blok.bijschrift:
-                                st.caption(_blok.bijschrift)
+                                st.caption(f"Figuur {_fig_nr}: {_blok.bijschrift}")
                     else:
                         st.error(f"Onbekende figuur in theorie_SSO.qmd: {_blok.label}")
