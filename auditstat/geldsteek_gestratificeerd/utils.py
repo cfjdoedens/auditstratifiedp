@@ -23,7 +23,7 @@ def haro_nog_nodige_zekerheid(ihr: str = "H", ibr: str = "H", car: str = "H") ->
     ):
         raise ValueError("Risico-inschattingen moeten 'H', 'M' of 'L' zijn.")
 
-    # Zie HAR0 7.3.4 voor de vertaling van risico's naar getallen.
+    # Zie HARo B7.3.4 voor de vertaling van risico's naar getallen.
     ihr_map = {"H": 1.0, "M": 0.63, "L": 0.40}
     ibr_map = {"H": 1.0, "M": 0.52, "L": 0.34}
     car_map = {"H": 1.0, "M": 0.50, "L": 0.25}

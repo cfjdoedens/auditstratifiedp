@@ -578,7 +578,7 @@ Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant bove
 
 ### 5.6 Risicocorrectie op de SSO-steekproef: IHR, IBR, CAR en materialiteit
 
-De auditor heeft vaak al zekerheid uit andere werkzaamheden. In de HARo wordt die uitgedrukt in drie risico's, elk hoog (H), midden (M) of laag (L): het inherent risico (IHR), het interne-beheersingsrisico (IBR) en het controlerisico (CAR). Samen bepalen ze de zekerheid die de gegevensgerichte steekproef nog moet opleveren. Bij alle drie hoog is dat 95%. Bij M/M/M is het ongeveer 69%, en bij L/L/L slechts 5%.
+De auditor heeft vaak al zekerheid uit andere werkzaamheden. In het HARo wordt die uitgedrukt in drie risico's, elk hoog (H), midden (M) of laag (L): het inherent risico (IHR), het interne-beheersingsrisico (IBR) en het cijferanalyserisico (CAR). Samen bepalen ze de zekerheid die de gegevensgerichte steekproef nog moet opleveren. In het HARo zijn voor de meest gebruikte combinatiewaarden voor IHR, IBR en CAR de nog op te leveren zekerheid weergegeven. In deze programmatuur zijn aan deze combinatiewaarden de ontbrekende toegevoegd zodat alle combinaties worden gedekt.
 
 **Vertaling naar foutloze posten.** We vertalen die lagere benodigde zekerheid naar een aantal *extra foutloze posten* dat we bij de steekproef optellen. Dat gaat zo: we bepalen hoeveel foutloze posten nodig zijn om bij de gegeven materialiteit $m$ 95% zekerheid te krijgen (zonder fouten, vlakke prior), en hoeveel er nodig zijn voor de lagere benodigde zekerheid. Het verschil is het aantal extra foutloze posten. In formule, met $d(c)$ voor het aantal foutloze posten dat nodig is voor zekerheid $c$:
 
@@ -604,7 +604,7 @@ Bij een materialiteit van 5% is het aantal posten kleiner: L/L/L geeft dan 57 ex
 
 **De materialiteit** wordt hier opgevat als fractie van de massa; een bedrag in euro's wordt omgerekend door te delen door de massa. Ze bepaalt alleen hoe groot de correctie is, en dus niet de grens zelf.
 
-**Voorbehoud.** De correctie is een afspraak uit de HARo en geen afleiding uit het knikkermodel van 5.1. Ze telt foutloze posten bij zonder dat daar werkelijk posten voor zijn gecontroleerd. Dat is alleen verdedigbaar voor zover het risico-oordeel zelf klopt.
+**Voorbehoud.** De correctie is een afspraak uit het HARo en geen afleiding uit het knikkermodel van 5.1. Ze telt foutloze posten bij zonder dat daar werkelijk posten voor zijn gecontroleerd. Dat is alleen verdedigbaar voor zover het risico-oordeel zelf klopt.
 
 ### 5.7 Van klant naar totaal: "Klanten samen" en "Hele SSO"
 
