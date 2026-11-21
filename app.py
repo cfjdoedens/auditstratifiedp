@@ -3914,7 +3914,8 @@ with tab_theorie:
                                 exec(_blok.code, {"__name__": "theorie_rekenblok"})
                         except Exception as _fout:
                             _uitvoer.write(f"Fout bij uitvoeren: {_fout}")
-                        st.code(_blok.code, language="python")
+                        if _blok.echo:
+                            st.code(_blok.code, language="python")
                         if _uitvoer.getvalue().strip():
                             st.code(_uitvoer.getvalue().rstrip(), language="text")
                         plt.close("all")

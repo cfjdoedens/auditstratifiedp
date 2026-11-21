@@ -9,7 +9,8 @@ een kleine, bewust beperkte lezer (geen Quarto nodig op de server):
 * een ``{python}``-codeblok met ``#| label: fig-...`` is een figuur; het
   bijschrift staat in ``#| fig-cap: "..."`` (op één regel);
 * een ``{python}``-codeblok met een ander label is een rekenvoorbeeld: de app
-  voert de code uit en toont de code met de afgedrukte uitvoer;
+  voert de code uit en toont de code (tenzij ``#| echo: false``) met de
+  afgedrukte uitvoer;
 * HTML-commentaar wordt genegeerd;
 * alle overige tekst is gewone markdown (met ``$...$`` en ``$$...$$``).
 """
@@ -31,6 +32,7 @@ class Rekenblok:
 
     label: str
     code: str
+    echo: bool = True  # False bij '#| echo: false': code niet tonen, uitvoer wel
 
 
 @dataclass
@@ -122,7 +124,10 @@ def parseer_theorie_qmd(tekst: str) -> Theorie:
                 if sectie is None:
                     raise ValueError("Een rekenblok staat vóór de eerste '## '-kop.")
                 sluit_tekstblok()
-                sectie.blokken.append(Rekenblok(label, "\n".join(code_regels).strip()))
+                echo = opties.get("echo", "true").lower() != "false"
+                sectie.blokken.append(
+                    Rekenblok(label, "\n".join(code_regels).strip(), echo=echo)
+                )
                 i += 1
                 continue
             if sectie is None:

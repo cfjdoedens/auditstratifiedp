@@ -92,3 +92,13 @@ def test_klad_wordt_overgeslagen_maar_literatuur_blijft():
 def test_zonder_klad_ongewijzigd():
     t = parseer_theorie_qmd("## A\n\nx\n\n## B\n\ny\n")
     assert [s.titel for s in t.secties] == ["A", "B"]
+
+
+def test_echo_false_verbergt_code_van_rekenblok():
+    tekst = (
+        "## Sectie\n\n"
+        "```{python}\n#| label: a\n#| echo: false\nprint(1)\n```\n\n"
+        "```{python}\n#| label: b\nprint(2)\n```\n"
+    )
+    blokken = parseer_theorie_qmd(tekst).secties[0].blokken
+    assert [b.echo for b in blokken] == [False, True]
