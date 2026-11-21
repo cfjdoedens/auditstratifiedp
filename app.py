@@ -3,6 +3,7 @@ import inspect
 import io
 import math
 import sys
+import threading
 import time
 import warnings
 from pathlib import Path
@@ -11,115 +12,157 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
+
+# Alle sessies draaien als threads in hetzelfde proces en delen sys.modules.
+# Zonder slot kan de ene sessie een module uit sys.modules halen terwijl een
+# andere hem laadt (KeyError: 'auditstat...'). Het slot staat in
+# st.cache_resource, omdat dit script per sessie opnieuw wordt uitgevoerd.
+@st.cache_resource(show_spinner=False)
+def _import_slot() -> threading.Lock:
+    return threading.Lock()
+
+
+# De mathtext-parser van matplotlib heeft interne toestand en is niet
+# thread-veilig. Sessies draaien als threads in één proces; tekenen twee
+# sessies tegelijk een figuur met mathtext (ook tick-labels als 10^3 op een
+# log-as), dan geeft dat "ParseException: exception raised in parse action" of
+# "pop from empty list". Een slot rond Parser.parse voorkomt dat; het wordt één
+# keer per proces aangebracht.
+@st.cache_resource(show_spinner=False)
+def _maak_mathtext_threadveilig() -> bool:
+    try:
+        from matplotlib import _mathtext
+
+        parser = _mathtext.Parser
+        if getattr(parser.parse, "_auditstat_slot", False):
+            return True
+        slot = threading.RLock()
+        oorspronkelijk = parser.parse
+
+        def parse_met_slot(self, *args, **kwargs):
+            with slot:
+                return oorspronkelijk(self, *args, **kwargs)
+
+        parse_met_slot._auditstat_slot = True  # type: ignore[attr-defined]
+        parser.parse = parse_met_slot
+        return True
+    except Exception:
+        return False
+
+
+_maak_mathtext_threadveilig()
+
+
 # Een langlopend proces (bijv. Streamlit Cloud na een nieuwe push) kan oudere
 # versies van de auditstat-modules in het geheugen houden dan deze app
 # verwacht, wat een ImportError geeft. Bij een eerste mislukking worden de
 # auditstat-modules uit het geheugen gehaald en opnieuw geladen; lukt het dan
 # nog niet, dan volgt een duidelijke herstartmelding.
-for _poging in (1, 2):
-    try:
-        from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
-            evalueer_geldsteek_gestratificeerd,
-        )
-        from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
-            plan_geldsteek_gestratificeerd_basis,
-            vind_beste_strata_groep,
-        )
-        from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
-            plot_kanskromme,
-        )
-        from auditstat.geldsteek_gestratificeerd.utils import (  # pyrefly: ignore[missing-import]
-            foutloze_posten_equivalent,
-            haro_nog_nodige_zekerheid,
-        )
-        from auditstat.lokaal_bestanden import (  # pyrefly: ignore[missing-import]
-            dialoog_beschikbaar,
-            is_lokaal_verzoek,
-            kies_bestand_dialoog,
-            kies_opslaan_dialoog,
-            lees_lokaal_bestand,
-            schrijf_lokaal_bestand,
-        )
-        from auditstat.postensteek.evalueer_postensteek import (  # pyrefly: ignore[missing-import]
-            evalueer_postensteek,
-            plot_evalueer_postensteek,
-        )
-        from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
-            evalueer_SSO_klant_exact,
-            schat_rekentijd_exact,
-        )
-        from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
-            evalueer_SSO_klant_gestratificeerd,
-        )
-        from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
-            HELE_SSO_NAAM,
-            KLANTEN_SAMEN_NAAM,
-            evalueer_SSO_totaal,
-            is_gereserveerde_klantnaam,
-            klanten_samen,
-        )
-        from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
-            lees_sso_invoer_csv,
-            maak_sso_invoer_csv,
-        )
-        from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
-            kenmerken_empirisch,
-            kenmerken_gamma,
-            plot_histogram_postgroottes,
-            simuleer_gamma_posten,
-        )
-        from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
-            MAX_BYTES,
-            MAX_BYTES_LOKAAL,
-            MAX_BYTES_SSO,
-            MAX_POSTEN,
-            MAX_POSTEN_LOKAAL,
-            MAX_POSTEN_SSO,
-            POSTEN_KOLOMMEN,
-            lees_postenbestand,
-            maak_voorbeeld_postenbestand,
-            maak_voorbeeld_sso_postenbestand,
-            postenbestand_csv,
-            postgroottes_per_type_post,
-            totalen_per_type_post,
-            variatiecoefficient,
-        )
-        from auditstat.sso.schema_figuren import (  # pyrefly: ignore[missing-import]
-            THEORIE_FIGUREN,
-        )
-        from auditstat.sso.theorie_qmd import (  # pyrefly: ignore[missing-import]
-            Rekenblok,
-            lees_theorie_qmd,
-        )
-
+with _import_slot():
+    for _poging in (1, 2):
         try:
-            from auditstat.sso.rapport_pdf import (  # pyrefly: ignore[missing-import]
-                maak_sso_rapport_pdf,
+            from auditstat.geldsteek_gestratificeerd.evalueer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+                evalueer_geldsteek_gestratificeerd,
             )
+            from auditstat.geldsteek_gestratificeerd.plan_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+                plan_geldsteek_gestratificeerd_basis,
+                vind_beste_strata_groep,
+            )
+            from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
+                plot_kanskromme,
+            )
+            from auditstat.geldsteek_gestratificeerd.utils import (  # pyrefly: ignore[missing-import]
+                foutloze_posten_equivalent,
+                haro_nog_nodige_zekerheid,
+            )
+            from auditstat.lokaal_bestanden import (  # pyrefly: ignore[missing-import]
+                dialoog_beschikbaar,
+                is_lokaal_verzoek,
+                kies_bestand_dialoog,
+                kies_opslaan_dialoog,
+                lees_lokaal_bestand,
+                schrijf_lokaal_bestand,
+            )
+            from auditstat.postensteek.evalueer_postensteek import (  # pyrefly: ignore[missing-import]
+                evalueer_postensteek,
+                plot_evalueer_postensteek,
+            )
+            from auditstat.sso.evalueer_SSO_klant_exact import (  # pyrefly: ignore[missing-import]
+                evalueer_SSO_klant_exact,
+                schat_rekentijd_exact,
+            )
+            from auditstat.sso.evalueer_SSO_klant_gestratificeerd import (  # pyrefly: ignore[missing-import]
+                evalueer_SSO_klant_gestratificeerd,
+            )
+            from auditstat.sso.evalueer_SSO_totaal import (  # pyrefly: ignore[missing-import]
+                HELE_SSO_NAAM,
+                KLANTEN_SAMEN_NAAM,
+                evalueer_SSO_totaal,
+                is_gereserveerde_klantnaam,
+                klanten_samen,
+            )
+            from auditstat.sso.invoer_csv import (  # pyrefly: ignore[missing-import]
+                lees_sso_invoer_csv,
+                maak_sso_invoer_csv,
+            )
+            from auditstat.sso.plot_postgroottes import (  # pyrefly: ignore[missing-import]
+                kenmerken_empirisch,
+                kenmerken_gamma,
+                plot_histogram_postgroottes,
+                simuleer_gamma_posten,
+            )
+            from auditstat.sso.postenbestand import (  # pyrefly: ignore[missing-import]
+                MAX_BYTES,
+                MAX_BYTES_LOKAAL,
+                MAX_BYTES_SSO,
+                MAX_POSTEN,
+                MAX_POSTEN_LOKAAL,
+                MAX_POSTEN_SSO,
+                POSTEN_KOLOMMEN,
+                lees_postenbestand,
+                maak_voorbeeld_postenbestand,
+                maak_voorbeeld_sso_postenbestand,
+                postenbestand_csv,
+                postgroottes_per_type_post,
+                totalen_per_type_post,
+                variatiecoefficient,
+            )
+            from auditstat.sso.schema_figuren import (  # pyrefly: ignore[missing-import]
+                THEORIE_FIGUREN,
+            )
+            from auditstat.sso.theorie_qmd import (  # pyrefly: ignore[missing-import]
+                Rekenblok,
+                lees_theorie_qmd,
+            )
+
+            try:
+                from auditstat.sso.rapport_pdf import (  # pyrefly: ignore[missing-import]
+                    maak_sso_rapport_pdf,
+                )
+            except ImportError as _fout:
+                # reportlab is optioneel: pip install auditstat[pdf]. Een andere
+                # ImportError (bijv. een verouderde module) mag niet worden
+                # verborgen en gaat naar de herstartlogica hieronder.
+                if (_fout.name or "").split(".")[0] != "reportlab":
+                    raise
+                maak_sso_rapport_pdf = None
+            break
         except ImportError as _fout:
-            # reportlab is optioneel: pip install auditstat[pdf]. Een andere
-            # ImportError (bijv. een verouderde module) mag niet worden
-            # verborgen en gaat naar de herstartlogica hieronder.
-            if (_fout.name or "").split(".")[0] != "reportlab":
-                raise
-            maak_sso_rapport_pdf = None
-        break
-    except ImportError as _fout:
-        if _poging == 2:
-            st.set_page_config(page_title="auditstat", layout="wide")
-            st.error(
-                "De app kan een deel van het auditstat-pakket niet laden, "
-                "waarschijnlijk omdat het draaiende proces nog een oudere "
-                "versie van het pakket in het geheugen heeft. Herstart de "
-                "app (lokaal: stop en start Streamlit opnieuw; op Streamlit "
-                "Cloud: Manage app \u2192 Reboot app) en probeer het opnieuw."
-            )
-            st.caption(f"Technische melding: {_fout}")
-            st.stop()
-        for _naam in [
-            m for m in sys.modules if m == "auditstat" or m.startswith("auditstat.")
-        ]:
-            del sys.modules[_naam]
+            if _poging == 2:
+                st.set_page_config(page_title="auditstat", layout="wide")
+                st.error(
+                    "De app kan een deel van het auditstat-pakket niet laden, "
+                    "waarschijnlijk omdat het draaiende proces nog een oudere "
+                    "versie van het pakket in het geheugen heeft. Herstart de "
+                    "app (lokaal: stop en start Streamlit opnieuw; op Streamlit "
+                    "Cloud: Manage app \u2192 Reboot app) en probeer het opnieuw."
+                )
+                st.caption(f"Technische melding: {_fout}")
+                st.stop()
+            for _naam in [
+                m for m in sys.modules if m == "auditstat" or m.startswith("auditstat.")
+            ]:
+                del sys.modules[_naam]
 
 # Configureer de pagina lay-out en titel van de Streamlit webapplicatie.
 st.set_page_config(page_title="auditstat", layout="wide")
