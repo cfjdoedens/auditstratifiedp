@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
+from matplotlib.figure import Figure
 
 
 # Alle sessies draaien als threads in hetzelfde proces en delen sys.modules.
@@ -3921,7 +3922,11 @@ with tab_theorie:
                             st.code(_blok.code, language="python")
                         if _uitvoer.getvalue().strip():
                             st.code(_uitvoer.getvalue().rstrip(), language="text")
-                        plt.close("all")
+                        # Alleen figuren sluiten die dit blok zelf heeft gemaakt: plt.close("all")
+                        # zou ook figuren van andere gelijktijdige sessies sluiten.
+                        for _w in list(_omgeving.values()):
+                            if isinstance(_w, Figure):
+                                plt.close(_w)
                     elif _blok.label in THEORIE_FIGUREN:
                         _fig_theorie = THEORIE_FIGUREN[_blok.label]()
                         st.pyplot(_fig_theorie)
