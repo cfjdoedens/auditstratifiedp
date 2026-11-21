@@ -1,5 +1,6 @@
 ---
 title: "Theoretische achtergrond"
+lang: nl
 format:
   html:
     embed-resources: true
@@ -213,72 +214,74 @@ $$
   prior verschuift $\alpha$ en $\beta$, maar de structuur blijft
   beta-binomiaal.
 - Bij vaste $N$ en $n \to \infty$ convergeert de verdeling naar een gewone binomiaal met
-  $\hat{p} = k/n$.
+  $p = k/n$, de waargenomen fractie zwarte knikkers.
 
-**Voorbeeld in Python**
+**Voorbeeld**
 
-We nemen een eerste steekproef van $n = 50$ posten, waarvan $k = 4$ fout (zwart), en bekijken
-de verdeling van het aantal fouten in een tweede steekproef van $N = 100$ posten.
+We nemen een eerste steekproef van $n = 400$ posten uit de gehele SSO, waarvan $k = 4$ fout (zwart), en we schatten aan de hand daarvan
+het aantal foute posten voor een klant, met $N = 1.000$ posten. Hierbij nemen we aan dat de 1.000 posten een steekproef vormen op de gehele SSO.
 
 ```{python}
 #| label: voorbeeld-knikkers
+#| echo: false
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-# Eerste steekproef
-n, k = 50, 4
-N = 100
+# Eerste steekproef: de SSO-steekproef met n posten, waarvan k fout
+n, k = 400, 4
+
+# Tweede steekproef: de N posten van de klant
+N = 1000
 
 # Posterior over de fractie zwarte knikkers p
 alpha, beta = k + 1, n - k + 1
 p_post = stats.beta(alpha, beta)
-print(f"Verwachting van p:                     {p_post.mean():.4f}")
-print(
-    f"95%-interval links en rechts voor p:    ({p_post.ppf(0.05):.4f}, {p_post.ppf(0.95):.4f})"
-)
 
-# Voorspellende verdeling van K: aantal zwarten in de tweede steekproef
-X = stats.betabinom(N, alpha, beta)
-print(f"\nVerwachting van K:      {X.mean():.2f}")
-print(f"Variantie van K:        {X.var():.2f}")
-for x in range(0, 11):
-    print(f"P(K = {x:2d}) = {X.pmf(x):.4f}")
+# print(f"Verwachting van p:                     {p_post.mean():.4f}")
+# print(
+#    f"95%-interval links en rechts voor p:    ({p_post.ppf(0.05):.4f}, {p_post.ppf(0.95):.4f})"
+# )
+
+# Voorspellende verdeling van K: aantal zwarte knikkers in de tweede steekproef
+K = stats.betabinom(N, alpha, beta)
+# print(f"\nVerwachting van K:      {K.mean():.2f}")
+# print(f"Variantie van K:        {K.var():.2f}")
+# for x in range(0, 201, 20):
+#     print(f"P(K = {x:3d}) = {K.pmf(x):.4f}")
 ```
 
 
-Ter vergelijking: een gewone binomiaal met de puntschatting $\hat{p} = k/n$
-onderschat de onzekerheid, omdat die de spreiding van $p$ zelf negeert.
-
 ```{python}
 #| label: fig-verdeling
-#| fig-cap: "Voorspellende verdeling (beta-binomiaal) vs. binomiaal met puntschatting."
+#| echo: false
+#| fig-cap: "Blauwe lijn: Kanskromme van de foutfractie van de SSO-posten uit de n en k van de SSO-steekproef. Oranje lijn: De verdeling van de foutfractie bij de klant (N posten) als die posten een steekproef zijn uit de gehele SSO. De oranje lijn is getrapt omdat er betrekkelijk weinig posten van de klant zijn, en zo'n post helemaal goed of helemaal fout is."
 
-x_waarden = np.arange(0, 30)
-binom_punt = stats.binom(N, k / n)
+# Beide verdelingen op de schaal van de foutfractie, als dichtheid per
+# eenheid fractie. De klantverdeling is discreet (stappen van 1/N).
+x_p = np.linspace(0, 0.04, 400)
+x_klant = np.arange(0, 41)
 
 fig, ax = plt.subplots(figsize=(7, 4))
-ax.bar(
-    x_waarden - 0.2,
-    X.pmf(x_waarden),
-    width=0.4,
-    label=f"Beta-binomiaal (alpha={alpha}, beta={beta})",
+ax.plot(
+    x_p,
+    p_post.pdf(x_p),
+    label="SSO: wat we weten over p (uit n en k)",
 )
-ax.bar(
-    x_waarden + 0.2,
-    binom_punt.pmf(x_waarden),
-    width=0.4,
-    label=f"Binomiaal (p = k/n = {k / n})",
+ax.step(
+    x_klant / N,
+    K.pmf(x_klant) * N,
+    where="mid",
+    label="klant: foutfractie bij N posten",
 )
-ax.set_xlabel("Aantal zwarte knikkers X in tweede steekproef")
-ax.set_ylabel("Kans")
+ax.set_xlabel("Foutfractie")
+ax.set_ylabel("Kansdichtheid")
+ax.set_xlim(0, 0.04)
 ax.legend()
 plt.show()
 ```
 
-De figuur laat zien dat de beta-binomiale verdeling bredere staarten heeft:
-dat is precies de extra onzekerheid die voortkomt uit het feit dat $p$
-slechts via de eerste steekproef geschat is.
+De blauwe lijn is de posterior van $p$: alles wat de SSO-steekproef ons zegt over de foutfractie (gemiddelde 0,0124, standaardafwijking 0,0055). De oranje lijn is de verdeling van de foutfractie $K/N$ bij de klant, onder de aanname dat de klantposten een steekproef zijn uit de gehele SSO. Het gemiddelde is hetzelfde (0,0124), maar de verdeling is breder (standaardafwijking 0,0065). Die extra breedte komt doordat de klant zelf een eindige steekproef van $N$ posten is: bovenop de onzekerheid over $p$ komt de toevallige variatie in welke posten fout zijn.
 
 
 ### 5.2. We breiden het model uit zodat ook partiële fouten in de SSO-steekproef kunnen voorkomen
@@ -349,7 +352,7 @@ In paragraaf 5.2 hebben we Aanname 2 vervangen door Aanname 5 (partiële fouten 
 
 Let op: Aanname 3 blijft gelden. Voor de foutfractie bij de klant blijven we in de afleiding hieronder rekenen met posten die helemaal goed of helemaal fout zijn. Dat is, zoals aan het eind van 5.2 gezegd, een bewust conservatieve keuze: bij partiële fouten is de spreiding kleiner of gelijk, dus de uitkomst hieronder is dan een bovengrens voor de spreiding.
 
-We houden ons uitgangspunt vast: de posten van de klant zijn een steekproef uit de totale massa aan SSO-posten. Zijn alle posten even groot, dan telt elke post even zwaar en vertegenwoordigt de klant $N$ gelijkwaardige posten. Varieert de postgrootte, dan beslissen enkele grote posten over een groot deel van het geld. De geldelijke foutfractie van de klant schommelt daardoor sterker, en de klant levert minder informatie over $p$ dan $N$ gelijkwaardige posten. Aan de hand van de variatiecoëfficiënt ($CV$) van de postbedragen bepalen we met welke factor we $N$ vermenigvuldigen om een effectieve omvang $N_\text{eff}$ te krijgen. Hieronder leiden we die factor af.
+We houden ons uitgangspunt vast: de posten van de klant zijn een steekproef uit de totale massa aan SSO-posten. Zijn alle posten even groot, dan telt elke post even zwaar en vertegenwoordigt de klant $N$ gelijkwaardige posten. Varieert de postgrootte, dan beslissen enkele grote posten over een groot deel van het geld. De geldelijke foutfractie van de klant schommelt daardoor sterker rond $p$ dan bij $N$ gelijkwaardige posten. Aan de hand van de variatiecoëfficiënt ($CV$) van de postbedragen bepalen we met welke factor we $N$ vermenigvuldigen om een effectieve omvang $N_\text{eff}$ te krijgen. Hieronder leiden we die factor af.
 
 **Opzet.** Neem één klant met $N$ posten met vaste, bekende waarden $y_1, \ldots, y_N$. Noteer de totale waarde $Y = \sum_i y_i$, het gemiddelde $\mu = Y/N$, de populatievariantie $\sigma^2 = \frac{1}{N}\sum_i (y_i - \mu)^2$ en de variatiecoëfficiënt
 
@@ -642,7 +645,7 @@ $$
 n_{klant} = \frac{n\, N_{klant}}{N_{klant} + n\,(1+CV^2)}, \qquad k_{klant} = k\cdot\frac{n_{klant}}{n}.
 $$
 
-De tweede formule behoudt de geschatte foutfractie $k/n$. Bij $CV = 0$ is $n_{klant} = nN_{klant}/(n+N_{klant})$. Twee randgevallen controleren de formule: bij $N_{klant} \gg n$ is $n_{klant} \approx n$ (de SSO-steekproef is dan de beperkende factor), en bij $N_{klant} \ll n$ is $n_{klant} \approx N_{klant}$ (de kleine klantpopulatie is dan de beperking). Voor het Poisson-model (varianties $p/n$ en $p/N_{klant}$) komt in eerste orde dezelfde formule uit.
+De tweede formule behoudt de waargenomen foutfractie $k/n$. Bij $CV = 0$ is $n_{klant} = nN_{klant}/(n+N_{klant})$. Twee randgevallen controleren de formule: bij $N_{klant} \gg n$ is $n_{klant} \approx n$ (de SSO-steekproef is dan de beperkende factor), en bij $N_{klant} \ll n$ is $n_{klant} \approx N_{klant}$ (de kleine klantpopulatie is dan de beperking). Voor het Poisson-model (varianties $p/n$ en $p/N_{klant}$) komt in eerste orde dezelfde formule uit.
 
 Dit blijft een eerste-orde-benadering. We hebben $p(1-p)/n$ genomen voor de variantie van $p$, zonder correcties zoals de $+2$ in de variantie van de Beta-verdeling. En de formule heeft geen terugvaloptie voor een zeer kleine $N_{klant}$: ze geeft altijd een uitkomst.
 
