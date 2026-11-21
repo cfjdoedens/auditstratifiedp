@@ -130,9 +130,9 @@ def teken_sso_schema(met_centen: bool):
     ax.text(
         0,
         straal + 0.55,
-        "Totale massa posten SSO (N totaal); elke post bestaat uit eurocenten"
+        "Totale massa posten SSO ($N$ totaal); elke post bestaat uit eurocenten"
         if met_centen
-        else "Totale massa posten SSO (N totaal)",
+        else "Totale massa posten SSO ($N$ totaal)",
         ha="center",
         fontsize=10,
         color="#3b6ea5",
@@ -188,7 +188,7 @@ def teken_sso_schema(met_centen: bool):
         ax.text(
             bx_c,
             by_c + h / 2 + 0.25,
-            f"{naam} (steek_{naam[-1]})",
+            f"{naam} ($steek_{naam[-1]}$)",
             ha="center",
             fontsize=8.5,
             color=kleur,
@@ -214,9 +214,9 @@ def teken_sso_schema(met_centen: bool):
     ax.text(
         sx_c,
         sy_c + sh / 2 + 0.25,
-        "SSO-steekproef (steek_0, eurocenten)"
+        "SSO-steekproef ($steek_0$, eurocenten)"
         if met_centen
-        else "SSO-steekproef (steek_0)",
+        else "SSO-steekproef ($steek_0$)",
         ha="center",
         fontsize=8.5,
         color=kleur_s,
