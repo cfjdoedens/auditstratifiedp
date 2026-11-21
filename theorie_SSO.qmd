@@ -554,7 +554,7 @@ Ten tweede: wat gebeurt er met een concrete verzameling bedragen die uit een gam
 
 Tot nu toe telden we fouten met het binomiale model: elke gecontroleerde post of klantpost is met kans $p$ fout. Een veelgebruikt alternatief, vooral als fouten zeldzaam zijn, is het Poisson-model. Het aantal fouten in een steekproef van omvang $n$ is dan Poisson-verdeeld met verwachting $n p$. Het verschil is dat $p$ geen bovengrens van 1 meer heeft: de fractie is een intensiteit, en geen kans.
 
-De opbouw van 5.1 tot en met 5.4 blijft hetzelfde. Alleen de twee verdelingen veranderen.
+In 5.1 tot en met 5.4 hebben we het binomiale model toegepast. We kunnen in plaats daarvan het Poisson-model gebruiken. De volgende twee verdelingen veranderen dan.
 
 - **Posterior van $p$ na de SSO-steekproef** met $k$ fouten in $n$ posten (vlakke prior): niet Beta$(k+1,\, n-k+1)$ maar Gamma met vorm $k+1$ en schaal $1/n$.
 - **Aantal foute klantposten $K$** gegeven $p$: niet Binomiaal$(N, p)$ maar Poisson$(N p)$. Marginaal over de posterior van $p$ is $K$ dan negatief-binomiaal met parameters $k+1$ en $n/(n+N)$, in plaats van beta-binomiaal.
