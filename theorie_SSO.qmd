@@ -447,7 +447,7 @@ print(f"Var(X)  simulatie {X.var():.3e}   formule {var_formule:.3e}")
 - de fouten zijn conditioneel op $p$ onafhankelijk, de foutkans hangt niet af van de postgrootte, en voor de klant geldt Aanname 3: elke post is volledig goed of volledig fout (conservatief: bij partiële fouten is de spreiding kleiner of gelijk);
 - de klantposten zijn niet dezelfde posten als de in de SSO-steekproef gecontroleerde posten. Overlap tussen beide steekproeven is hier buiten beschouwing gelaten.
 
-Met deze variantie kan de klant weer als een steekproef met een effectieve omvang worden uitgedrukt, zoals in 5.8. Een hogere $CV$ geeft een grotere variantie en dus een hogere maximale foutgrens bij gelijke $n$, $k$ en $N$.
+Met deze variantie kan de klant weer als een steekproef met een effectieve omvang worden uitgedrukt, zoals in 5.7. Een hogere $CV$ geeft een grotere variantie en dus een hogere maximale foutgrens bij gelijke $n$, $k$ en $N$.
 
 ### 5.4 We gebruiken de grootte van elk van de individuele klantposten
 
@@ -615,27 +615,9 @@ Bij een materialiteit van 5% is het aantal posten kleiner: L/L/L geeft dan 57 ex
 
 **Voorbehoud.** De correctie is een afspraak uit het HARo en geen afleiding uit het knikkermodel van 5.1. Ze telt foutloze posten bij zonder dat daar werkelijk posten voor zijn gecontroleerd. Dat is alleen verdedigbaar voor zover het risico-oordeel zelf klopt.
 
-### 5.7 Van klant naar totaal: "Klanten samen" en "Hele SSO"
+### 5.7 Eenvoudiger alternatieven voor de exacte methode: afgeleide $n_{klant}$ en $k_{klant}$
 
-De app geeft naast de grens per klant twee totaalgetallen. Ze beantwoorden verschillende vragen.
-
-**Hele SSO.** Dit is een aparte berekening over de populatie van de hele SSO. Er is geen tweede trap: de SSO-steekproef met $n$ posten en $k$ fouten is hier direct een steekproef uit de populatie waarover we oordelen. Daardoor is er ook geen omrekening naar $n_{klant}$ en $k_{klant}$. Elk type post vormt een eigen stratum met als massa de totale waarde van dat type post bij de hele SSO, en de strata worden gecombineerd zoals in de gestratificeerde evaluatie. Worden er geen typen posten onderscheiden, dan is er één stratum met de totale massa van de hele SSO. Het resultaat staat in het tabblad evaluatie SSO en in het pdf-rapport onder "Resultaat", op de regel "Hele SSO". De risicocorrectie van 5.6 geldt hier op de gewone manier. Voor de eerste trap is $n$ een geheel aantal posten; $k$ mag niet-geheel zijn (gewogen foutaantal).
-
-**Klanten samen.** Dit telt de maximale fouten in euro's van de afzonderlijke klanten bij elkaar op. De fractie is die som gedeeld door de som van de massa van alle klanten, dus gewogen naar de massa van elke klant.
-
-Die som is *geen* gezamenlijke grens met dezelfde zekerheid. Elke klantgrens heeft op zichzelf 95% zekerheid. Dat de som van alle grenzen samen dezelfde zekerheid heeft, volgt niet uit de berekening. We verwachten wel dat de som meestal voorzichtiger is dan de werkelijke gezamenlijke grens, omdat de fouten van klanten niet allemaal tegelijk hun grens halen. Dat is een verwachting en geen bewijs.
-
-Er is ook een verband tussen de twee
-getallen dat als controle dient. Beide gaan uit van dezelfde SSO-steekproef, dus de som van de klantgrenzen hoort niet onder de grens voor de hele SSO te liggen. In een doorgerekend voorbeeld (n = 108, k = 2, klanten met 84.000 tot 147.000 posten) was dat zo: klanten samen 0,044283 (momentmatching) en 0,044292 (naïef), tegen 0,044280 voor de hele SSO. Het verschil is klein, omdat bij zulke grote klanten de onzekerheid over $p$ de grens domineert, en die onzekerheid delen alle klanten. Bij kleinere klanten verwachten we een groter verschil. Dit is één voorbeeld.
-
-In dit voorbeeld bleek de controle ook nuttig: een eerdere versie die $n_{klant}$ afrondde op een geheel getal gaf een som onder de grens voor de hele SSO (0,044248 tegenover 0,044280). Dat wees op een rekenfout en niet op een eigenschap van het model.
-
-Welke van de twee is relevant? "Hele SSO" beantwoordt de vraag of de SSO als geheel binnen de materialiteit blijft. "Klanten samen" beantwoordt, voorzichtig, wat alle klanten gezamenlijk kunnen bevatten. Wie een uitspraak over één klant wil, gebruikt de grens van die klant.
-
-
-### 5.8 Eenvoudiger alternatieven voor de exacte methode: afgeleide $n_{klant}$ en $k_{klant}$
-
-#### 5.8.1 Inleiding
+#### 5.7.1 Inleiding
 
 De exacte methode van 5.4 rekent per type post de volledige verdeling van de euro-fout uit en voegt de typen posten samen met een FFT.
 
@@ -647,7 +629,7 @@ $$
 
 Die verdeling gaat als gewone steekproefuitkomst, per type post één stratum, naar de gestratificeerde evaluatie. Het voordeel is dat dit snel is en werkt voor elk aantal posten. Het nadeel is dat een Beta of Gamma slechts twee getallen heeft om de verdeling te beschrijven. De twee methoden verschillen in hoe ze $n_{klant}$ en $k_{klant}$ kiezen.
 
-#### 5.8.2 Alternatief 1: de naïeve poolingformule
+#### 5.7.2 Alternatief 1: de naïeve poolingformule
 
 Dit is de eerste eenvoudige methode. We beginnen bij de twee onzekerheden uit 5.3: de onzekerheid over de foutkans $p$ na de SSO-steekproef, en de spreiding van de klant rond die $p$. In eerste orde is de variantie van de foutfractie
 
@@ -665,7 +647,7 @@ De tweede formule behoudt de waargenomen foutfractie $k/n$. Bij $CV = 0$ is $n_{
 
 Dit blijft een eerste-orde-benadering. We hebben $p(1-p)/n$ genomen voor de variantie van $p$, zonder correcties zoals de $+2$ in de variantie van de Beta-verdeling. En de formule heeft geen terugvaloptie voor een zeer kleine $N_{klant}$: ze geeft altijd een uitkomst.
 
-#### 5.8.3 Alternatief 2: momentmatching
+#### 5.7.3 Alternatief 2: momentmatching
 
 Hier kiezen we $n_{klant}$ en $k_{klant}$ zo dat de Beta-verdeling dezelfde verwachting en variantie heeft als de werkelijke samengestelde verdeling van 5.3, de beta-binomiale. Met $\alpha = k+1$, $\beta = n-k+1$ en $s = \alpha + \beta$ hebben we
 
@@ -704,7 +686,7 @@ Het spiegelbeeld doet zich voor bij een zeer hoge foutfractie in de SSO-steekpro
 
 **Blinde vlek.** Is de exacte grens zelf al 0, dan kan geen Beta of Gamma dat weergeven: ze hebben een strikt positieve drager en kennen dus altijd een positieve kans op fouten. Dat gebeurt als de kans op nul fouten bij de klant al minstens gelijk is aan de gekozen zekerheid $c$, bij een zeer kleine $N_{klant}$ en weinig fouten in de SSO-steekproef. Een rekenresultaat zou hier ten onrechte geruststellen. We weigeren de berekening daarom, met een foutmelding die aanraadt de posten van dit type bij deze klant rechtstreeks (100%) te controleren. Hetzelfde geldt als de exacte grens zelf al 1 is. De blinde vlek hangt af van het zekerheidsniveau: bij $n=120$, $k=0$ en $N_{klant}=5$ is de berekening bij 95% al geweigerd. Bij $n=120$, $k=1$ en $N_{klant}=5$ is dat bij 90% zo, maar bij 95% niet.
 
-#### 5.8.4 Vergelijking
+#### 5.7.4 Vergelijking
 
 De risicocorrectie van 5.6 wordt bij alle drie op dezelfde manier toegepast: eerst op $n$ van de SSO-steekproef, dan pas de omrekening naar de klant.
 
@@ -729,6 +711,24 @@ In een eerdere reeks van 60 doorgerekende combinaties van $(n, k, N_{klant})$ en
 
 <!-- Concept: 5.9 en 5.10 zijn nog niet door de gebruiker nagelopen. -->
 
+### 5.8 Van klant naar totaal: "Klanten samen" en "Hele SSO"
+
+De app geeft naast de grens per klant twee totaalgetallen. Ze beantwoorden verschillende vragen.
+
+**Hele SSO.** Dit is een aparte berekening over de populatie van de hele SSO. Er is geen tweede trap: de SSO-steekproef met $n$ posten en $k$ fouten is hier direct een steekproef uit de populatie waarover we oordelen. Daardoor is er ook geen omrekening naar $n_{klant}$ en $k_{klant}$. Elk type post vormt een eigen stratum met als massa de totale waarde van dat type post bij de hele SSO, en de strata worden gecombineerd zoals in de gestratificeerde evaluatie. Worden er geen typen posten onderscheiden, dan is er één stratum met de totale massa van de hele SSO. Het resultaat staat in het tabblad evaluatie SSO en in het pdf-rapport onder "Resultaat", op de regel "Hele SSO". De risicocorrectie van 5.6 geldt hier op de gewone manier. Voor de eerste trap is $n$ een geheel aantal posten; $k$ mag niet-geheel zijn (gewogen foutaantal).
+
+**Klanten samen.** Dit telt de maximale fouten in euro's van de afzonderlijke klanten bij elkaar op. De fractie is die som gedeeld door de som van de massa van alle klanten, dus gewogen naar de massa van elke klant.
+
+Die som is *geen* gezamenlijke grens met dezelfde zekerheid. Elke klantgrens heeft op zichzelf 95% zekerheid. Dat de som van alle grenzen samen dezelfde zekerheid heeft, volgt niet uit de berekening. We verwachten wel dat de som meestal voorzichtiger is dan de werkelijke gezamenlijke grens, omdat de fouten van klanten niet allemaal tegelijk hun grens halen. Dat is een verwachting en geen bewijs.
+
+Er is ook een verband tussen de twee
+getallen dat als controle dient. Beide gaan uit van dezelfde SSO-steekproef, dus de som van de klantgrenzen hoort niet onder de grens voor de hele SSO te liggen. In een doorgerekend voorbeeld (n = 108, k = 2, klanten met 84.000 tot 147.000 posten) was dat zo: klanten samen 0,044283 (momentmatching) en 0,044292 (naïef), tegen 0,044280 voor de hele SSO. Het verschil is klein, omdat bij zulke grote klanten de onzekerheid over $p$ de grens domineert, en die onzekerheid delen alle klanten. Bij kleinere klanten verwachten we een groter verschil. Dit is één voorbeeld.
+
+In dit voorbeeld bleek de controle ook nuttig: een eerdere versie die $n_{klant}$ afrondde op een geheel getal gaf een som onder de grens voor de hele SSO (0,044248 tegenover 0,044280). Dat wees op een rekenfout en niet op een eigenschap van het model.
+
+Welke van de twee is relevant? "Hele SSO" beantwoordt de vraag of de SSO als geheel binnen de materialiteit blijft. "Klanten samen" beantwoordt, voorzichtig, wat alle klanten gezamenlijk kunnen bevatten. Wie een uitspraak over één klant wil, gebruikt de grens van die klant.
+
+
 ### 5.9 Beperkingen en interpretatie
 
 De SSO-steekproef is een *daadwerkelijk getrokken* steekproef met geldgewogen selectie. De posten van één klant zijn een *gegeven deelpopulatie* van de SSO, die we voor het model als uitwisselbaar met de overige SSO-posten behandelen. Dat zijn verschillende objecten. Ze met elkaar vergelijken via één gemeenschappelijke foutkans $p$ is een modelaanname (Aanname 1 en Aanname 3); de uitwisselbaarheid van klanten alleen volstaat daarvoor niet. De formules in 5.1 t/m 5.8 zijn daarom conditionele modelbenaderingen en geen ontwerpgebaseerde garanties voor elke opzet van een geldsteekproef. Drie punten verdienen aandacht.
@@ -745,7 +745,7 @@ De SSO-steekproef is een *daadwerkelijk getrokken* steekproef met geldgewogen se
 
 De tabel zet de drie evaluatiemethoden naast de drie niveaus van informatie over de postgroottes (zie 5.3). Aanname 4 (gelijke postgrootte) geldt alleen op niveau 1. Op niveau 2 en 3 is die losgelaten, zoals in 5.3 en 5.4.
 
-| Niveau | Beschikbare informatie | Eenvoudige methode (5.8) | Momentmatching (5.8) | Exacte methode (5.4) |
+| Niveau | Beschikbare informatie | Eenvoudige methode (5.7) | Momentmatching (5.7) | Exacte methode (5.4) |
 |---|---|---|---|---|
 | 1 | Gelijke posten ($CV = 0$) | $n_{klant} = \frac{nN}{n+N}$ | Beta (binomiaal) of Gamma (Poisson) met dezelfde verwachting en variantie als het beta-binomiale model | Beta-binomiaal (binomiaal) of negatief-binomiaal (Poisson) per type post |
 | 2 | Variatiecoëfficiënt $CV$ | $n_{klant} = \frac{nN}{N + n(1+CV^2)}$ | Variantie met factor $(1+CV^2)$, zie 5.3 | Samengestelde verdeling met gammaverdeelde postbedragen, via FFT |
@@ -753,7 +753,7 @@ De tabel zet de drie evaluatiemethoden naast de drie niveaus van informatie over
 
 Op niveau 3 gebruiken de eenvoudige methode en momentmatching dus alleen de $CV$ van het postenbestand en niet de verdere vorm van de verdeling. Alleen de exacte methode benut de volledige postverdeling.
 
-Voor alle drie de methoden geldt de risicocorrectie van 5.6 op $n$ van de SSO-steekproef, en bij Poisson (5.5) een gammaverdeelde in plaats van een betaverdeelde foutfractie. Klemming en blinde vlek (5.8) komen alleen voor bij momentmatching: de eenvoudige methode kent geen terugval en de exacte methode levert ook bij een kleine $N_{klant}$ gewoon de exacte grens. Hoe nauwkeurig de FFT-berekening is op niveau 2 en 3, staat in 5.4.
+Voor alle drie de methoden geldt de risicocorrectie van 5.6 op $n$ van de SSO-steekproef, en bij Poisson (5.5) een gammaverdeelde in plaats van een betaverdeelde foutfractie. Klemming en blinde vlek (5.7) komen alleen voor bij momentmatching: de eenvoudige methode kent geen terugval en de exacte methode levert ook bij een kleine $N_{klant}$ gewoon de exacte grens. Hoe nauwkeurig de FFT-berekening is op niveau 2 en 3, staat in 5.4.
 
 ## Literatuur
 
