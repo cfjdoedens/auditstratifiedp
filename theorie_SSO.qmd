@@ -82,17 +82,17 @@ _ = teken_sso_geldsteekproefschema()
 
 We trekken een geldsteekproef over de SSO-posten en we beschouwen de posten van een klant als een postensteekproef over de SSO-posten. Hoe kunnen we dan de foutfractie per klant schatten?
 
-We gaan stapsgewijs op zoek naar een steeds betere modellering van de SSO-situatie. Daarbij gaan we van een eenvoudig model naar een steeds complexer, maar ook nauwkeuriger, model.
+We gaan stapsgewijs op zoek naar een steeds betere modellering van de SSO-situatie. Daarbij gaan we in elke stap het model nauwkeuriger maken. Maar het zal daarbij ook complexer worden.
 
 ### 5.1. Eerste model: de dubbele binaire steekproef
 
 #### 5.1.1 Inleiding
 
-Om de berekening te vereenvoudigen, passen we de volgende versimpeling toe.
+Om de berekening eenvoudig te maken, passen we de volgende versimpeling toe.
 
 - **Aanname 2 (hele fouten in de SSO-steekproef).** Elke post in de SSO-steekproef is helemaal goed of helemaal fout.
 - **Aanname 3 (hele fouten bij de klant).** Elke post van de klant is helemaal goed of helemaal fout.
-- **Aanname 4 (gelijke postgrootte).** Alle posten van de klant zijn even groot.
+- **Aanname 4 (gelijke postgrootte).** Alle posten (dus van alle klanten samen) zijn even groot.
 
 We kunnen de SSO-posten nu zien als een zeer grote verzameling witte knikkers (de juist afgehandelde posten), met een paar zwarte (de onjuist afgehandelde posten) erin. En zowel $\text{steek}_0$ als $\text{steek}_\text{klant}$ is een steekproef op die verzameling knikkers.
 
@@ -574,8 +574,6 @@ Voor grote $n$ en kleine $k/n$ zijn de twee modellen praktisch gelijk. Bij klein
 
 Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de correctie voor trekken zonder teruglegging in 5.4 geldt alleen voor het binomiale model. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is precies de variantie uit 5.3, zonder correctie. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
 
-<!-- Concept: 5.6 t/m 5.8 zijn nog niet door de gebruiker nagelopen. -->
-
 ### 5.6 Risicocorrectie op de SSO-steekproef: IHR, IBR, CAR en materialiteit
 
 De auditor heeft vaak al zekerheid uit andere werkzaamheden. In het HARo wordt die uitgedrukt in drie risico's, elk hoog (H), midden (M) of laag (L): het inherent risico (IHR), het interne-beheersingsrisico (IBR) en het cijferanalyserisico (CAR). Samen bepalen ze de zekerheid die de gegevensgerichte steekproef nog moet opleveren. In het HARo zijn voor de meest gebruikte combinatiewaarden voor IHR, IBR en CAR de nog op te leveren zekerheid weergegeven. In deze programmatuur zijn aan deze combinatiewaarden de ontbrekende toegevoegd zodat alle combinaties worden gedekt.
@@ -616,7 +614,8 @@ De app geeft naast de grens per klant twee totaalgetallen. Ze beantwoorden versc
 
 Die som is *geen* gezamenlijke grens met dezelfde zekerheid. Elke klantgrens heeft op zichzelf 95% zekerheid. Dat de som van alle grenzen samen dezelfde zekerheid heeft, volgt niet uit de berekening. We verwachten wel dat de som meestal voorzichtiger is dan de werkelijke gezamenlijke grens, omdat de fouten van klanten niet allemaal tegelijk hun grens halen. Dat is een verwachting en geen bewijs.
 
-Er is ook een verband tussen de twee getallen dat als controle dient. Beide gaan uit van dezelfde SSO-steekproef, dus de som van de klantgrenzen hoort niet onder de grens voor de hele SSO te liggen. In een doorgerekend voorbeeld (n = 108, k = 2, klanten met 84.000 tot 147.000 posten) was dat zo: klanten samen 0,044283 (momentmatching) en 0,044292 (naïef), tegen 0,044280 voor de hele SSO. Het verschil is klein, omdat bij zulke grote klanten de onzekerheid over $p$ de grens domineert, en die onzekerheid delen alle klanten. Bij kleinere klanten verwachten we een groter verschil. Dit is één voorbeeld.
+Er is ook een verband tussen de twee
+getallen dat als controle dient. Beide gaan uit van dezelfde SSO-steekproef, dus de som van de klantgrenzen hoort niet onder de grens voor de hele SSO te liggen. In een doorgerekend voorbeeld (n = 108, k = 2, klanten met 84.000 tot 147.000 posten) was dat zo: klanten samen 0,044283 (momentmatching) en 0,044292 (naïef), tegen 0,044280 voor de hele SSO. Het verschil is klein, omdat bij zulke grote klanten de onzekerheid over $p$ de grens domineert, en die onzekerheid delen alle klanten. Bij kleinere klanten verwachten we een groter verschil. Dit is één voorbeeld.
 
 In dit voorbeeld bleek de controle ook nuttig: een eerdere versie die $n_{klant}$ afrondde op een geheel getal gaf een som onder de grens voor de hele SSO (0,044248 tegenover 0,044280). Dat wees op een rekenfout en niet op een eigenschap van het model.
 
@@ -625,7 +624,11 @@ Welke van de twee is relevant? "Hele SSO" beantwoordt de vraag of de SSO als geh
 
 ### 5.8 Eenvoudiger alternatieven voor de exacte methode: afgeleide $n_{klant}$ en $k_{klant}$
 
-De exacte methode van 5.4 rekent per type post de volledige verdeling van de euro-fout uit en voegt de typen posten samen met een FFT. De app biedt daarnaast twee eenvoudiger methoden. Ze vervangen de klant door één *effectieve steekproef* met $n_{klant}$ posten en $k_{klant}$ fouten. De foutfractie van de klant krijgt dan een Beta-verdeling (binomiaal) of Gamma-verdeling (Poisson) met die parameters:
+#### 5.8.1 Inleiding
+
+De exacte methode van 5.4 rekent per type post de volledige verdeling van de euro-fout uit en voegt de typen posten samen met een FFT.
+
+De app biedt daarnaast twee eenvoudiger methoden. Beide methoden drukken de kennis over de foutfractie per klant uit als equivalent aan het resultaat van een *fictieve steekproef* met $n_{klant}$ posten en $k_{klant}$ fouten. De foutfractie, $X$, van de klant krijgt dan een Beta-verdeling (binomiaal) of Gamma-verdeling (Poisson) met die parameters:
 
 $$
 X \sim \mathrm{Beta}\bigl(k_{klant}+1,\; n_{klant}-k_{klant}+1\bigr).
@@ -633,7 +636,9 @@ $$
 
 Die verdeling gaat als gewone steekproefuitkomst, per type post één stratum, naar de gestratificeerde evaluatie. Het voordeel is dat dit snel is en werkt voor elk aantal posten. Het nadeel is dat een Beta of Gamma slechts twee getallen heeft om de verdeling te beschrijven. De twee methoden verschillen in hoe ze $n_{klant}$ en $k_{klant}$ kiezen.
 
-**Naïeve poolingformule.** We beginnen bij de twee onzekerheden uit 5.3: de onzekerheid over de foutkans $p$ na de SSO-steekproef, en de spreiding van de klant rond die $p$. In eerste orde is de variantie van de foutfractie
+#### 5.8.2 Alternatief 1: de naïeve poolingformule
+
+Dit is de eerste eenvoudige methode. We beginnen bij de twee onzekerheden uit 5.3: de onzekerheid over de foutkans $p$ na de SSO-steekproef, en de spreiding van de klant rond die $p$. In eerste orde is de variantie van de foutfractie
 
 $$
 \mathrm{Var}(X) \approx p(1-p)\left(\frac{1}{n} + \frac{1+CV^2}{N_{klant}}\right).
@@ -649,7 +654,9 @@ De tweede formule behoudt de waargenomen foutfractie $k/n$. Bij $CV = 0$ is $n_{
 
 Dit blijft een eerste-orde-benadering. We hebben $p(1-p)/n$ genomen voor de variantie van $p$, zonder correcties zoals de $+2$ in de variantie van de Beta-verdeling. En de formule heeft geen terugvaloptie voor een zeer kleine $N_{klant}$: ze geeft altijd een uitkomst.
 
-**Momentmatching.** Hier kiezen we $n_{klant}$ en $k_{klant}$ zo dat de Beta-verdeling dezelfde verwachting en variantie heeft als de werkelijke samengestelde verdeling van 5.3, de beta-binomiale. Met $\alpha = k+1$, $\beta = n-k+1$ en $s = \alpha + \beta$ hebben we
+#### 5.8.3 Alternatief 2: momentmatching
+
+Hier kiezen we $n_{klant}$ en $k_{klant}$ zo dat de Beta-verdeling dezelfde verwachting en variantie heeft als de werkelijke samengestelde verdeling van 5.3, de beta-binomiale. Met $\alpha = k+1$, $\beta = n-k+1$ en $s = \alpha + \beta$ hebben we
 
 $$
 m = E[X \mid D_0] = \frac{\alpha}{s}, \qquad V = \mathrm{Var}(X \mid D_0) = \frac{\alpha\beta}{s(s+1)}\left(\frac{1}{s} + \frac{1+CV^2}{N_{klant}}\right).
@@ -675,7 +682,13 @@ Het spiegelbeeld doet zich voor bij een zeer hoge foutfractie in de SSO-steekpro
 
 **Blinde vlek.** Is de exacte grens zelf al 0, dan kan geen Beta of Gamma dat weergeven: ze hebben een strikt positieve drager en kennen dus altijd een positieve kans op fouten. Dat gebeurt als bij de gekozen zekerheid zelfs bij de klant nog nul fouten verwacht worden, bij een zeer kleine $N_{klant}$ en weinig fouten in de SSO-steekproef. Een rekenresultaat zou hier ten onrechte geruststellen. We weigeren de berekening daarom, met een foutmelding die aanraadt de posten van dit type bij deze klant rechtstreeks (100%) te controleren. Hetzelfde geldt als de exacte grens zelf al 1 is. De blinde vlek hangt af van het zekerheidsniveau: bij $n=120$, $k=0$ en $N_{klant}=5$ is de berekening bij 95% al geweigerd. Bij $n=120$, $k=1$ en $N_{klant}=5$ is dat bij 90% zo, maar bij 95% niet.
 
-**Vergelijking.** Onderstaande tabel geeft de 95%-grens voor de foutfractie bij $n = 120$, $k = 1$ en gelijke posten ($CV = 0$), binomiaal. De exacte kolom is de grens van het beta-binomiale model. De momentmatchingwaarden voor $N_{klant} \le 100$ zijn geklemd en vallen dus per constructie samen met de exacte grens.
+#### 5.8.4 Vergelijking
+
+De risicocorrectie van 5.6 wordt bij alle drie op dezelfde manier toegepast: eerst op $n$ van de SSO-steekproef, dan pas de omrekening naar de klant.
+
+De exacte methode rekent met de volledige verdeling per type post en heeft geen Beta- of Gamma-tussenstap. Ze kent dus geen klemming; bij een kleine $N_{klant}$ levert ze gewoon de exacte, soms zeer hoge grens. Ze is wel zwaarder om te rekenen.
+
+Onderstaande tabel geeft de 95%-grens voor de foutfractie bij $n = 120$, $k = 1$ en gelijke posten ($CV = 0$), binomiaal. De exacte kolom is de grens van het beta-binomiale model. De momentmatchingwaarden voor $N_{klant} \le 100$ zijn geklemd en vallen dus per constructie samen met de exacte grens.
 
 | $N_{klant}$ | naïef | momentmatching | exact |
 |---|---|---|---|
@@ -689,8 +702,6 @@ Het spiegelbeeld doet zich voor bij een zeer hoge foutfractie in de SSO-steekpro
 Voor een grote $N_{klant}$ liggen de drie praktisch gelijk. De naïeve formule wordt ruimer naarmate $N_{klant}$ kleiner wordt; bij $N_{klant} = 100$ is ze ongeveer een derde hoger dan de exacte grens. Momentmatching volgt de exacte grens dicht, en ligt bij $N_{klant} = 300$ iets onder die grens (0,0432 tegenover 0,0433): ook hier is geen sprake van een garantie.
 
 In een eerdere reeks van 60 doorgerekende combinaties van $(n, k, N_{klant})$ en model lag de naïeve grens altijd op of boven die van momentmatching. Dat is een waarneming en geen bewijs. Bij een zeer kleine $N_{klant}$ (bijvoorbeeld 1) kan de naïeve grens te laag uitvallen, omdat ze geen klem- of blindevlekafhandeling kent.
-
-**Wat is het verschil met de exacte methode van 5.4?** De exacte methode rekent met de volledige verdeling per type post en heeft geen Beta- of Gamma-tussenstap. Ze kent dus geen klemming; bij een kleine $N_{klant}$ levert ze gewoon de exacte, soms zeer hoge grens. Ze is wel zwaarder om te rekenen. De risicocorrectie van 5.6 wordt bij alle drie op dezelfde manier toegepast: eerst op $n$ van de SSO-steekproef, dan pas de omrekening naar de klant.
 
 **Voorbehoud.** De "exacte grens" in deze paragraaf is exact voor het binaire model van Aanname 3: elke klantpost is helemaal goed of helemaal fout. Dat is bewust het meest conservatieve model, want daarbij is de spreiding $p(1-p)$ maximaal. Bij partiële fouten is de werkelijke spreiding kleiner. In een illustratieve, niet op echte data gekalibreerde verkenning was de grens bij $N_{klant}$ van 5 tot 20 met een realistischer model ongeveer een factor 2 à 3 lager, en bij $N_{klant} = 100$ slechts 10 tot 20% lager. Het is dus geen uitspraak over de werkelijke fout, maar over de grens onder een voorzichtige aanname.
 
