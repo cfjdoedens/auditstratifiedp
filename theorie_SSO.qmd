@@ -94,6 +94,8 @@ Om de berekening eenvoudig te maken, passen we de volgende versimpeling toe.
 - **Aanname 3 (hele fouten bij de klant).** Elke post van de klant is helemaal goed of helemaal fout.
 - **Aanname 4 (gelijke postgrootte).** Alle posten (dus van alle klanten samen) zijn even groot.
 
+Aanname 4 neemt de complicatie uit sectie 4 weg: bij gelijke postgrootte is een geldsteekproef op eurocenten gelijkwaardig aan een postensteekproef.
+
 We kunnen de SSO-posten nu zien als een zeer grote verzameling witte knikkers (de juist afgehandelde posten), met een paar zwarte (de onjuist afgehandelde posten) erin. En zowel $\text{steek}_0$ als $\text{steek}_\text{klant}$ is een steekproef op die verzameling knikkers.
 
 
