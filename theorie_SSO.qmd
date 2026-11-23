@@ -34,7 +34,7 @@ We gebruiken de volgende aannames.
 
 Er wordt niet geëist dat elke klant evenveel posten heeft.
 
-Maar, het zou kunnen dat er meerdere typen posten zijn, waarbij een post op een eigen manier wordt verwerkt afhankelijk van het type, waardoor de foutfracties per type zouden kunnen verschillen. Als dan de proportie van een type post verschilt tussen klanten wordt de gelijkheid van de totale foutfracties tussen klanten bedreigd.
+Het zou kunnen dat er meerdere typen posten zijn, waarbij een post op een eigen manier wordt verwerkt afhankelijk van het type, waardoor de foutfracties per type zouden kunnen verschillen. Als dan de proportie van een type post verschilt tussen klanten, wordt de gelijkheid van de totale foutfracties tussen klanten bedreigd.
 Zoals we later zullen zien, kan de verdeling in postgrootte voor een groep posten ook belangrijk zijn, daarvoor willen we ook de mogelijkheid hebben om posten op die manier te onderscheiden als typen. Al met al hebben we met het onderscheid tussen meerdere typen posten een krachtiger model om de foutfracties van de klanten van een SSO te schatten. Daarom verfijnen we aanname 1 tot aanname 1b.
 
 **Aanname 1b (klantonafhankelijke verwerking *per type post*).** Alle posten van de SSO, van een bepaald type, worden op dezelfde manier behandeld, ze gaan door hetzelfde proces, ongeacht de klant voor wie de post wordt behandeld.
@@ -56,7 +56,7 @@ Dit wordt uitgebeeld in onderstaand plaatje.
 ```{python}
 #| label: fig-sso-steekproefschema
 #| echo: false
-#| fig-cap: "Schematische weergave van de situatie rond de SSO-steekproef. De grote cirkel bevat de totale massa posten van de SSO. Zowel de klantposten als de steekproefposten zijn te beschouwen als steekproeven op de massa posten van de SSO. Dit is aangegeven door de klant-ovalen (rechts) en de steekproefovaal (links) buiten de massa te tekenen, en pijlen van de klantovalen en de steekproefovaal naar de bijbehorende posten in de SSO-massa te trekken. We zien één situatie getekend waarin een pijl vanuit de SSO-steekproef en een pijl vanuit een klant dezelfde post treffen (zwart omcirkeld). In werkelijkheid geldt voor elke post getrokken uit de SSO dat die post een post van een klant van de SSO is."
+#| fig-cap: "Schematische weergave van de situatie rond de SSO-steekproef. De grote cirkel bevat de totale massa posten van de SSO. Zowel de klantposten als de steekproefposten zijn te beschouwen als steekproeven op de massa posten van de SSO. Dit is aangegeven door de klant-ovalen (rechts) en de steekproefovaal (links) buiten de massa te tekenen, en pijlen van de klantovalen en de steekproefovaal naar de bijbehorende posten in de SSO-massa te trekken. We zien één situatie getekend waarin een pijl vanuit de SSO-steekproef en een pijl vanuit een klant dezelfde post treffen (zwart omcirkeld). In werkelijkheid geldt voor elke post getrokken uit de SSO dat die post een post van een klant van de SSO is. De puntjes onder klant C geven aan dat er nog meer klanten kunnen zijn."
 from auditstat.sso.schema_figuren import teken_sso_steekproefschema  # pyrefly: ignore[missing-import]
 
 _ = teken_sso_steekproefschema()
@@ -72,7 +72,7 @@ Dit wordt uitgebeeld in het volgende plaatje.
 ```{python}
 #| label: fig-sso-geldsteekproefschema
 #| echo: false
-#| fig-cap: "Schematische weergave: dezelfde massa posten als hierboven, maar nu is te zien dat elke post uit eurocenten bestaat (de kleine stippen). De $SSO_0$ steekproef (rood) steekt op eurocenten: elke pijl wijst naar één eurocent, die in een post ligt. De klanten steken juist op posten: hun pijlen wijzen naar een hele post, die, om dat aan te duiden, volledig gekleurd is. Eén steekproefeurocent valt in een post die ook al bij een klant is gestoken (zwart omcirkeld)."
+#| fig-cap: "Schematische weergave: dezelfde massa posten als hierboven, maar nu is te zien dat elke post uit eurocenten bestaat (de kleine stippen). De $SSO_0$ steekproef (rood) steekt op eurocenten: elke pijl wijst naar één eurocent, die in een post van een klant ligt. De klanten steken juist op posten: hun pijlen wijzen naar een hele post, die, om dat aan te duiden, volledig gekleurd is. In de figuur is één steekproefeurocent getekend die valt in een post die ook al bij één van de getekende klant is gestoken (zwart omcirkeld). De puntjes onder klant C geven aan dat er nog meer klanten kunnen zijn."
 from auditstat.sso.schema_figuren import teken_sso_geldsteekproefschema  # pyrefly: ignore[missing-import]
 
 _ = teken_sso_geldsteekproefschema()

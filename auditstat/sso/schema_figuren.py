@@ -197,6 +197,19 @@ def teken_sso_schema(met_centen: bool):
         doelen = [posten[i] for i in klant_posten[naam]]
         _pijlen(bx_c, by_c, w, h, kleur, doelen, rad=-0.1)
 
+    # Aanduiding dat er nog meer klanten kunnen zijn.
+    ax.text(6.6, -4.3, "\u22ee", ha="center", va="center", fontsize=18, color="#6e6e6e")
+    ax.text(
+        6.6,
+        -4.85,
+        "(nog meer klanten)",
+        ha="center",
+        va="center",
+        fontsize=8,
+        color="#6e6e6e",
+        style="italic",
+    )
+
     # SSO-steekproef (links): pijlen naar één eurocent in een post.
     sx_c, sy_c, sw, sh = -6.6, 0.0, 2.0, 2.0
     ax.add_patch(
@@ -265,7 +278,7 @@ def teken_sso_schema(met_centen: bool):
         )
 
     ax.set_xlim(-9.0, 9.0)
-    ax.set_ylim(-5.6 if met_centen else -4.8, 5.6)
+    ax.set_ylim(-6.2 if met_centen else -5.3, 5.6)
     ax.set_aspect("equal")
     ax.axis("off")
     fig.tight_layout()
