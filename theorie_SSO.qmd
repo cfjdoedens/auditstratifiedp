@@ -542,11 +542,18 @@ Ten tweede: wat gebeurt er met een concrete verzameling bedragen die uit een gam
 
 **Vergelijking met 5.3.** Bij gelijke $CV$ geeft het gammamodel van 5.3 een grens die bij bescheiden $CV$ (tot ongeveer 1) praktisch gelijk is aan die met de werkelijke bedragen. Bij een grote $CV$ ligt de gammagrens hoger: in een indicatieve vergelijking (één klant, lognormale bedragen) 1 tot 4% bij $CV \approx 3$ en 11 tot 18% bij $CV \approx 6$. Het gammamodel is dan voorzichtiger. Dat zijn waarnemingen bij één verdelingsfamilie, geen algemene regel.
 
+**Begrensde postgrootte.** Bij een geldsteekproef met een vast steekproefinterval $J = M/n$ (massa gedeeld door het aantal gestoken eurocenten) worden posten groter dan $J$ vooraf uitgesloten: ze zitten in het hoogstratum en worden niet in de eigenlijke steekproef betrokken. Alle posten in de populatie waaruit de steekproef komt, zijn dan kleiner dan of gelijk aan $J$, dus ook alle klantposten. Dat beperkt de scheefheid waar het om gaat. De postbedragen liggen in $[0, J]$, en voor zulke bedragen geldt $\sigma^2 \le \mu\,(J-\mu)$ (Bhatia en Davis), dus $CV^2 \le J/\mu - 1$. Voor de SSO als geheel is $J/\mu = N_\text{totaal}/n$, met $N_\text{totaal}$ het aantal posten van de SSO. Verdelingsfamilies met een onbegrensde staart, zoals de gamma- en de lognormale verdeling, kennen die bovengrens niet en kunnen de staart daardoor overschatten.
+
+Hoe sterk dit bijt, hangt af van de verhouding $J/\mu$. We hebben dat indicatief gemeten (één klant van $N = 200$ posten, lognormale bedragen, $(n, k) = (50, 2)$, 95% zekerheid, binomiaal, per regel het gemiddelde van 30 klanten) door de bedragen boven $J$ weg te laten. De grens daalde bij $CV \approx 1{,}8$ met 9,5% bij $J/\mu = 5$, 6% bij 10 en 2% bij 25, en bij $J/\mu = 100$ nog met minder dan 1%. Bij $CV \approx 3{,}2$ was de daling 17% tot 21% voor $J/\mu$ van 5 tot 25. Vanaf $J/\mu$ van ongeveer 100 verdween het effect in de steekproefruis, die bij deze $CV$ ruwweg 7% bedraagt. De verhouding $N_\text{totaal}/n$ is bij een grote SSO meestal veel groter dan 25. In die gevallen is de begrenzing dus waar, maar levert ze weinig op. Alleen bij een kleine SSO met veel steekproefposten, of bij klanten met posten die groot zijn ten opzichte van het gemiddelde, maakt ze merkbaar verschil.
+
+Wat het wel vraagt, is dat het postenbestand van niveau 3 geen posten boven $J$ bevat, omdat het model die niet kent. De app waarschuwt als dat wel zo is. De berekening past ze niet automatisch aan. Een bovengrens met bewijs, op basis van alleen $\mu$, $CV$ en $J$ (Bennett of Bernstein), is denkbaar voor niveau 2, maar is in dezelfde gevallen waarin $J$ groot is ook ruim; die is niet uitgewerkt.
+
 **Voorwaarden.**
 
 - de bedragen van de klantposten zijn bekend en betrouwbaar (bij een SSO-breed bestand: de bedragen van het type post van deze klant);
 - de fouten zijn conditioneel op $p$ onafhankelijk, de foutkans hangt niet af van de postgrootte, en voor de klant geldt Aanname 3;
 - de klantposten zijn niet dezelfde posten als de in de SSO-steekproef gecontroleerde posten;
+- alle postbedragen zijn kleiner dan of gelijk aan het steekproefinterval $J$ (posten daarboven horen in het hoogstratum);
 - het aantal posten dat fout kan zijn, is niet extreem groot. Bij een zeer grote $N$ gedeeld door $n$ wordt het rekenwerk te zwaar en weigert de methode de berekening.
 
 

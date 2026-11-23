@@ -6,6 +6,7 @@ from auditstat.sso.postenbestand import (
     lees_postenbestand,
     maak_voorbeeld_postenbestand,
     maak_voorbeeld_sso_postenbestand,
+    posten_boven_interval,
     postenbestand_csv,
     postgroottes_per_type_post,
     totalen_per_type_post,
@@ -201,3 +202,45 @@ def test_limieten_zijn_te_overschrijven():
     with pytest.raises(ValueError, match="maximaal 1 posten"):
         lees_postenbestand(data, max_posten=1)
     assert len(lees_postenbestand(data, max_posten=2)) == 2
+
+
+def test_posten_boven_interval_geen_overschrijding():
+    # J = 1000 / 10 = 100; een post precies gelijk aan J is toegestaan
+    assert posten_boven_interval([10.0, 50.0, 100.0], 1000, 10) is None
+
+
+def test_posten_boven_interval_telt_en_meldt_grootste():
+    res = posten_boven_interval([10.0, 150.0, 400.0], 1000, 10)
+    assert res == {"interval": 100.0, "aantal": 2, "grootste": 400.0}
+
+
+@pytest.mark.parametrize(
+    "massa, n", [(0, 10), (-5, 10), (1000, 0), (float("nan"), 10), (1000, float("inf"))]
+)
+def test_posten_boven_interval_ongeldige_invoer_geeft_none(massa, n):
+    assert posten_boven_interval([1e9], massa, n) is None
+
+
+def test_voorbeeld_postenbestand_respecteert_maximum():
+    df = maak_voorbeeld_postenbestand("A", 5000, ["t"], cv=3.0, maximum=2000.0)
+    bedragen = pd.to_numeric(df["bedrag"].str.replace(",", "."))
+    assert bedragen.max() <= 2000.0
+    # zonder maximum komen bij deze CV wel grotere posten voor
+    zonder = maak_voorbeeld_postenbestand("A", 5000, ["t"], cv=3.0)
+    assert pd.to_numeric(zonder["bedrag"].str.replace(",", ".")).max() > 2000.0
+
+
+def test_voorbeeld_sso_postenbestand_respecteert_maximum():
+    df = maak_voorbeeld_sso_postenbestand([("A", "t", 3000, 500.0)], sigma=1.5, maximum=1500.0)
+    assert pd.to_numeric(df["bedrag"].str.replace(",", ".")).max() <= 1500.0
+
+
+@pytest.mark.parametrize("maximum", [0, -1, float("nan"), float("inf")])
+def test_voorbeeld_postenbestand_weigert_ongeldig_maximum(maximum):
+    with pytest.raises(ValueError, match="maximum"):
+        maak_voorbeeld_postenbestand("A", 10, ["t"], maximum=maximum)
+
+
+def test_voorbeeld_postenbestand_te_klein_maximum_geeft_value_error():
+    with pytest.raises(ValueError, match="te klein"):
+        maak_voorbeeld_postenbestand("A", 10, ["t"], cv=0.5, maximum=0.5)

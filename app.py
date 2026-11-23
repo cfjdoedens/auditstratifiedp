@@ -123,6 +123,7 @@ with _import_slot():
                 lees_postenbestand,
                 maak_voorbeeld_postenbestand,
                 maak_voorbeeld_sso_postenbestand,
+                posten_boven_interval,
                 postenbestand_csv,
                 postgroottes_per_type_post,
                 totalen_per_type_post,
@@ -304,6 +305,7 @@ for key, standaard in {
     "sso_klanten_res": {},
     "sso_klanten_waarschuwingen": {},
     "sso_totaal_res": None,
+    "sso_interval_waarschuwingen": [],
     "sso_error": None,
 }.items():
     if key not in st.session_state:
@@ -360,6 +362,30 @@ def _lees_cv(ruw, label: str, fouten: list) -> float:
         )
         return 0.0
     return waarde
+
+
+def _voorbeeld_interval():
+    """Steekproefinterval J = massa / n uit de SSO-totalen (None als onbekend).
+
+    Voorbeeldposten blijven hieronder, zoals in een geldsteekproef waarin
+    grotere posten in het hoogstratum zitten.
+    """
+    massa = _parse_nl(st.session_state.sso_totaal_massa_text)
+    n = _parse_nl(st.session_state.sso_totaal_n_text)
+    if massa is None or n is None or massa <= 0 or n <= 0:
+        return None
+    return massa / n
+
+
+def _met_interval(maak, *args, **kwargs):
+    """Roept een generator van voorbeeldposten aan met maximum J = massa / n.
+
+    Is J zo klein dat dit niet lukt (``ValueError``), dan vervalt het maximum.
+    """
+    try:
+        return maak(*args, maximum=_voorbeeld_interval(), **kwargs)
+    except ValueError:
+        return maak(*args, **kwargs)
 
 
 def _toon_postgroottes_weergaven(waarden, gesimuleerd: bool) -> None:
@@ -1347,6 +1373,7 @@ def on_sso_csv_upload(lokaal_bestand=None):
     # Oude resultaten horen niet meer bij de nieuwe invoer.
     st.session_state.sso_klanten_res = {}
     st.session_state.sso_klanten_waarschuwingen = {}
+    st.session_state.sso_interval_waarschuwingen = []
     st.session_state.sso_totaal_res = None
     st.session_state.sso_error = None
     st.session_state.sso_csv_melding = (
@@ -1381,6 +1408,7 @@ def on_sso_niveau3_upload(lokaal_bestand=None):
     st.session_state.sso_niveau3_fout = None
     st.session_state.sso_klanten_res = {}
     st.session_state.sso_klanten_waarschuwingen = {}
+    st.session_state.sso_interval_waarschuwingen = []
     st.session_state.sso_totaal_res = None
 
 
@@ -2581,7 +2609,9 @@ with tab_sso:
                 "lok_niveau3", on_sso_niveau3_upload, _meld_niveau3_fout
             )
             _niveau3_voorbeeld_csv = postenbestand_csv(
-                maak_voorbeeld_sso_postenbestand([
+                _met_interval(
+                    maak_voorbeeld_sso_postenbestand,
+                    [
                     (
                         r["klant"],
                         r["type_post"],
@@ -2589,7 +2619,8 @@ with tab_sso:
                         _parse_nl(r["waarde_laag"]) / _parse_nl(r["N_klant"]),
                     )
                     for r in LEGE_SSO_KLANTEN_DF.to_dict("records")
-                ])
+                    ],
+                )
             )
             st.download_button(
                 "Voorbeeld-postenbestand downloaden (CSV)",
@@ -2600,7 +2631,8 @@ with tab_sso:
                 help=(
                     "Fictieve posten van de hele SSO (5.000 posten, twee "
                     "klanten, typen Emolumenten en Inkoopfacturen), passend "
-                    "bij de voorbeeldinvoer. De bedragen zijn verzonnen."
+                    "bij de voorbeeldinvoer. De bedragen zijn verzonnen en "
+                    "nooit groter dan het steekproefinterval J = massa / n."
                 ),
             )
             _toon_lokaal_opslaan(
@@ -3367,11 +3399,13 @@ with tab_sso:
             )
             st.session_state.sso_klanten_res = {}
             st.session_state.sso_klanten_waarschuwingen = {}
+            st.session_state.sso_interval_waarschuwingen = []
             st.session_state.sso_totaal_res = None
         elif klanten_fouten:
             st.session_state.sso_error = "\n".join(klanten_fouten)
             st.session_state.sso_klanten_res = {}
             st.session_state.sso_klanten_waarschuwingen = {}
+            st.session_state.sso_interval_waarschuwingen = []
             st.session_state.sso_totaal_res = None
         else:
             sso_klanten_res = {}
@@ -3493,6 +3527,35 @@ with tab_sso:
                     | {"waarde_laag": massa}
                     for naam, massa in sso_massa_per_type.items()
                 ]
+            # Niveau 3: posten boven het steekproefinterval J = massa / n
+            # horen in het hoogstratum en dus niet in het postenbestand.
+            interval_waarschuwingen = []
+            if sso_postgroottes == "postenbestand":
+                for post in sso_totaal_posten:
+                    sleutel = _ALLE_POSTEN if sso_onderscheid == "nee" else post["naam"]
+                    waarden = niveau3_waarden.get(sleutel)
+                    n_post = post.get("n")
+                    if waarden is None or n_post is None:
+                        continue
+                    boven = posten_boven_interval(
+                        waarden, post["waarde_laag"], n_post
+                    )
+                    if boven is not None:
+                        label = (
+                            "SSO-totalen"
+                            if sso_onderscheid == "nee"
+                            else f"Type post '{post['naam']}'"
+                        )
+                        interval_waarschuwingen.append(
+                            f"{label}: {boven['aantal']} post(en) in het postenbestand "
+                            f"zijn groter dan het steekproefinterval "
+                            f"J = massa / n = \u20ac {_nl(boven['interval'], 2)} "
+                            f"(grootste post \u20ac {_nl(boven['grootste'], 2)}). "
+                            "Posten groter dan J horen in het hoogstratum en niet in "
+                            "de populatie van de steekproef. Controleer of het "
+                            "postenbestand ze bevat; de berekening is niet aangepast."
+                        )
+            st.session_state.sso_interval_waarschuwingen = interval_waarschuwingen
             sso_totaal_res = None
             if sso_totaal_posten:
                 try:
@@ -3589,6 +3652,8 @@ with tab_sso:
 
     if st.session_state.sso_error:
         st.error(st.session_state.sso_error)
+    if st.session_state.sso_interval_waarschuwingen:
+        st.warning("\n\n".join(st.session_state.sso_interval_waarschuwingen))
 
     # Los postenbestand van één klant: genereren, inlezen en verkennen.
     # Geen automatische aanpassing van SSO-steekproefgegevens of foutgrenzen.
@@ -3645,11 +3710,14 @@ with tab_sso:
                 help=(
                     "Variatiecoëfficiënt (standaardafwijking / gemiddelde) "
                     "van de verzonnen bedragen; het gemiddelde is 500 euro. "
-                    "0 geeft gelijke posten."
+                    "0 geeft gelijke posten. Posten zijn nooit groter dan het "
+                    "steekproefinterval J = massa / n van de SSO-totalen; "
+                    "daardoor zijn gemiddelde en CV iets lager."
                 ),
             )
         if typen_voorbeeld:
-            voorbeeld_df = maak_voorbeeld_postenbestand(
+            voorbeeld_df = _met_interval(
+                maak_voorbeeld_postenbestand,
                 klant_voorbeeld,
                 int(aantal_voorbeeld),
                 typen_voorbeeld,

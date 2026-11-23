@@ -25,12 +25,39 @@ MAX_POSTEN = 100_000
 _BEDRAG = re.compile(r"\d+(?:[,.]\d{1,2})?")
 
 
+def _trek_lognormaal(rng, mu, sigma, aantal, maximum=None):
+    """Lognormale trekkingen; met ``maximum`` worden grotere waarden opnieuw getrokken.
+
+    Opnieuw trekken (afkappen van de verdeling) in plaats van afknippen voorkomt
+    een opeenhoping op het maximum. Het gemiddelde en de CV worden daardoor iets
+    kleiner dan de ingestelde waarden.
+    """
+    waarden = rng.lognormal(mu, sigma, aantal)
+    if maximum is None:
+        return waarden
+    for _ in range(200):
+        te_groot = waarden > maximum
+        if not te_groot.any():
+            return waarden
+        waarden[te_groot] = rng.lognormal(mu, sigma, int(te_groot.sum()))
+    raise ValueError(
+        "Het maximum voor een post is te klein ten opzichte van de gewenste "
+        "bedragen om voorbeeldposten te genereren."
+    )
+
+
+def _controleer_maximum(maximum):
+    if maximum is not None and (not np.isfinite(maximum) or maximum <= 0):
+        raise ValueError("maximum moet een positief, eindig getal zijn.")
+
+
 def maak_voorbeeld_postenbestand(
     klant: str,
     aantal: int,
     typen: list[str],
     seed: int = 2026,
     cv: float | None = None,
+    maximum: float | None = None,
 ) -> pd.DataFrame:
     """Reproduceerbare fictieve posten met bedragen op twee decimalen.
 
@@ -41,11 +68,16 @@ def maak_voorbeeld_postenbestand(
     ``sigma = sqrt(ln(1 + cv²))``; ``cv = 0`` geeft gelijke posten van 500
     euro. De CV van een eindige steekproef wijkt hiervan af, vooral bij een
     grote CV en weinig posten.
+
+    Met ``maximum`` (euro's, bijvoorbeeld het steekproefinterval ``J``) is geen
+    post groter dan dat bedrag: grotere bedragen worden opnieuw getrokken, wat
+    gemiddelde en CV iets verlaagt.
     """
     if not klant.strip() or not typen or aantal < 1:
         raise ValueError("Geef een klant, posttype en positief aantal op.")
     if cv is not None and (not np.isfinite(cv) or cv < 0):
         raise ValueError("cv moet een eindig getal van minstens 0 zijn.")
+    _controleer_maximum(maximum)
     rng = np.random.default_rng(seed)
     type_idx = rng.integers(0, len(typen), size=aantal)
     if cv is None:
@@ -54,7 +86,7 @@ def maak_voorbeeld_postenbestand(
         sigma = float(np.sqrt(np.log1p(cv**2)))
         mu = np.log(500) - sigma**2 / 2
     centen = np.maximum(
-        1, np.rint(rng.lognormal(mu, sigma, aantal) * 100)
+        1, np.rint(_trek_lognormaal(rng, mu, sigma, aantal, maximum) * 100)
     ).astype("int64")
     return pd.DataFrame({
         "klant": klant.strip(),
@@ -68,6 +100,7 @@ def maak_voorbeeld_sso_postenbestand(
     regels: list[tuple[str, str, int, float]],
     sigma: float = 0.9,
     seed: int = 2026,
+    maximum: float | None = None,
 ) -> pd.DataFrame:
     """Reproduceerbaar fictief postenbestand van de hele SSO (meerdere klanten).
 
@@ -75,9 +108,12 @@ def maak_voorbeeld_sso_postenbestand(
     gewenste gemiddelde bedrag; de bedragen zijn lognormaal met
     log-standaardafwijking ``sigma`` en verwachting gelijk aan dat
     gemiddelde. Alleen bedoeld als voorbeeld, geen statistische aanname.
+    Met ``maximum`` (euro's) is geen post groter dan dat bedrag (zie
+    ``maak_voorbeeld_postenbestand``).
     """
     if not regels or sigma <= 0:
         raise ValueError("Geef minstens één regel en een positieve sigma op.")
+    _controleer_maximum(maximum)
     rng = np.random.default_rng(seed)
     delen = []
     for klant, type_post, aantal, gemiddelde in regels:
@@ -87,7 +123,8 @@ def maak_voorbeeld_sso_postenbestand(
             )
         mu = np.log(gemiddelde) - sigma**2 / 2
         centen = np.maximum(
-            1, np.rint(rng.lognormal(mu, sigma, int(aantal)) * 100)
+            1,
+            np.rint(_trek_lognormaal(rng, mu, sigma, int(aantal), maximum) * 100),
         ).astype("int64")
         delen.append(
             pd.DataFrame({
@@ -224,3 +261,29 @@ def variatiecoefficient(waarden) -> float:
             "Postbedragen moeten een niet-lege rij positieve getallen zijn."
         )
     return float(waarden.std() / waarden.mean())
+
+
+def posten_boven_interval(waarden, massa: float, n: float) -> dict | None:
+    """Posten die groter zijn dan het steekproefinterval ``J = massa / n``.
+
+    Bij een geldsteekproef met een vast interval worden posten groter dan
+    ``J`` vooraf uitgesloten (hoogstratum), dus de posten in de populatie van
+    de steekproef zijn kleiner dan of gelijk aan ``J``. Een postenbestand dat
+    posten boven ``J`` bevat, past daar niet bij.
+
+    Geeft ``None`` als er geen post boven ``J`` ligt (of als ``massa`` of ``n``
+    niet positief en eindig is), anders een dict met ``interval``, ``aantal``
+    en ``grootste``.
+    """
+    if not (np.isfinite(massa) and np.isfinite(n)) or massa <= 0 or n <= 0:
+        return None
+    waarden = np.asarray(waarden, dtype=float)
+    interval = massa / n
+    boven = waarden[waarden > interval]
+    if boven.size == 0:
+        return None
+    return {
+        "interval": float(interval),
+        "aantal": int(boven.size),
+        "grootste": float(boven.max()),
+    }
