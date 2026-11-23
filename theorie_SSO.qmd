@@ -22,7 +22,7 @@ Een shared service organisatie (SSO) verwerkt financiële posten voor meerdere k
 
 De auditor wil een uitspraak doen over de kwaliteit van die verwerking per klant door vooral te steunen op een steekproef over alle posten van de SSO. Dit zonder een steekproef over de individuele klanten te doen. Doel van de auditor hierbij is om de controle efficiënter uit te voeren.
 
-Uitgangspunt is de gedachte dat de posten voor elke klant een steekproef vormt op de posten van de SSO. We krijgen zo per klant gezien een dubbele steekproef: die over de hele SSO en die van elke klant naar de SSO.
+Uitgangspunt is de gedachte dat de posten voor elke klant een steekproef vormen op de posten van de SSO. We krijgen zo per klant gezien een dubbele steekproef: die over de hele SSO en die van elke klant naar de SSO.
 
 Vervolgens moeten we de fouten gevonden in de steekproef over de gehele SSO vertalen naar schattingen van de foutfracties per klant.
 
@@ -72,7 +72,7 @@ Dit wordt uitgebeeld in het volgende plaatje.
 ```{python}
 #| label: fig-sso-geldsteekproefschema
 #| echo: false
-#| fig-cap: "Schematische weergave: dezelfde massa posten als hierboven, maar nu is te zien dat elke post uit eurocenten bestaat (de kleine stippen). De $SSO_0$ steekproef (rood) steekt op eurocenten: elke pijl wijst naar één eurocent, die in een post van een klant ligt. De klanten steken juist op posten: hun pijlen wijzen naar een hele post, die, om dat aan te duiden, volledig gekleurd is. In de figuur is één steekproefeurocent getekend die valt in een post die ook al bij één van de getekende klant is gestoken (zwart omcirkeld). De puntjes onder klant C geven aan dat er nog meer klanten kunnen zijn."
+#| fig-cap: "Schematische weergave: dezelfde massa posten als hierboven, maar nu is te zien dat elke post uit eurocenten bestaat (de kleine stippen). De $SSO_0$ steekproef (rood) steekt op eurocenten: elke pijl wijst naar één eurocent, die in een post van een klant ligt. De klanten steken juist op posten: hun pijlen wijzen naar een hele post, die, om dat aan te duiden, volledig gekleurd is. In de figuur is één steekproefeurocent getekend die valt in een post die ook al bij één van de getekende klanten is gestoken (zwart omcirkeld). De puntjes onder klant C geven aan dat er nog meer klanten kunnen zijn."
 from auditstat.sso.schema_figuren import teken_sso_geldsteekproefschema  # pyrefly: ignore[missing-import]
 
 _ = teken_sso_geldsteekproefschema()
@@ -207,7 +207,7 @@ $$
   terugleggen* is de strikte verdeling een hypergeometrische verdeling
   geïntegreerd over de posterior van het aantal zwarte knikkers. Voor
   $M \gg n, N$ (een "hele grote massa") is de beta-binomiale benadering
-  uitstekend. Dat de klantposten zelf deel uitmaken van de SSO-massa (overlap met $\text{steek}_0$) is hier buiten beschouwing gelaten; zie de sectie over samenhang en overlap.
+  uitstekend. Dat de klantposten zelf deel uitmaken van de SSO-massa (overlap met $\text{steek}_0$) is hier buiten beschouwing gelaten; zie paragraaf 5.9.
 - De uniforme prior is een aanname. Daaruit volgt
   $E[p \mid k,n] = (k+1)/(n+2)$, ook bekend als de regel van Laplace
   (*rule of succession*). Een andere
@@ -350,6 +350,8 @@ In 5.1 hadden we drie aannames over de fouten en de postgrootte: Aanname 2 (hele
 
 In paragraaf 5.2 hebben we Aanname 2 vervangen door Aanname 5 (partiële fouten in de SSO-steekproef, niet-gehele $k$). In deze paragraaf laten we ook Aanname 4 los. De posten mogen dus verschillend van grootte zijn.
 
+We onderscheiden drie niveaus van informatie over de postgroottes van de klant. Niveau 1: alle posten zijn even groot (Aanname 4, de paragrafen 5.1 en 5.2). Niveau 2: alleen het gemiddelde en de variatiecoëfficiënt $CV$ van de postbedragen zijn bekend (deze paragraaf). Niveau 3: alle postbedragen $y_i$ zijn bekend (5.4). De afleiding hieronder gebruikt alleen gemiddelde en $CV$ en neemt geen verdelingsfamilie aan. De exacte methode in 5.4 heeft voor niveau 2 wel een verdeling nodig: daar kiezen we een gammaverdeling voor de postbedragen met die $CV$. Dat is een aanvullende modelkeuze, die in deze paragraaf zelf niet nodig is; ook het simulatieblok hieronder gebruikt gamma alleen om testbedragen te maken.
+
 Let op: Aanname 3 blijft gelden. Voor de foutfractie bij de klant blijven we in de afleiding hieronder rekenen met posten die helemaal goed of helemaal fout zijn. Dat is, zoals aan het eind van 5.2 gezegd, een bewust conservatieve keuze: bij partiële fouten is de spreiding kleiner of gelijk, dus de uitkomst hieronder is dan een bovengrens voor de spreiding.
 
 We houden ons uitgangspunt vast: de posten van de klant zijn een steekproef uit de totale massa aan SSO-posten. Zijn alle posten even groot, dan telt elke post even zwaar en vertegenwoordigt de klant $N$ gelijkwaardige posten. Varieert de postgrootte, dan beslissen enkele grote posten over een groot deel van het geld. De geldelijke foutfractie van de klant schommelt daardoor sterker rond $p$ dan bij $N$ gelijkwaardige posten. Aan de hand van de variatiecoëfficiënt ($CV$) van de postbedragen bepalen we met welke factor we $N$ vermenigvuldigen om een effectieve omvang $N_\text{eff}$ te krijgen. Hieronder leiden we die factor af.
@@ -443,7 +445,7 @@ print(f"Var(X)  simulatie {X.var():.3e}   formule {var_formule:.3e}")
 - de fouten zijn conditioneel op $p$ onafhankelijk, de foutkans hangt niet af van de postgrootte, en voor de klant geldt Aanname 3: elke post is volledig goed of volledig fout (conservatief: bij partiële fouten is de spreiding kleiner of gelijk);
 - de klantposten zijn niet dezelfde posten als de in de SSO-steekproef gecontroleerde posten. Overlap tussen beide steekproeven is hier buiten beschouwing gelaten.
 
-Met deze variantie kan de klant weer als een steekproef met een effectieve omvang worden uitgedrukt, zoals in het volgende onderdeel. Een hogere $CV$ geeft een grotere variantie en dus een hogere maximale foutgrens bij gelijke $n$, $k$ en $N$.
+Met deze variantie kan de klant weer als een steekproef met een effectieve omvang worden uitgedrukt, zoals in 5.8. Een hogere $CV$ geeft een grotere variantie en dus een hogere maximale foutgrens bij gelijke $n$, $k$ en $N$.
 
 ### 5.4 We gebruiken de grootte van elk van de individuele klantposten
 
@@ -532,15 +534,15 @@ Wat we hieruit afleiden:
 - Bij meer foute posten, zoals $(400, 5)$, is de afwijking kleiner (tot ongeveer 1%). Dat geldt ook bij een grotere $N$: bij $N = 1.000$ lagen de verschillen binnen ongeveer 1%, ook bij $CV \approx 4{,}5$, en vaak binnen de onzekerheid van de simulatie.
 - Een betere correctie van de variantie voor het trekken zonder teruglegging verhelpt dit niet. De afwijking zit in de vorm van de verdeling, vooral in de staart, en niet in de variantie. Rekenen met de som van onafhankelijke, met kans $p$ aanwezige bedragen (dus zonder het aantal foute posten $K$ als tussenstap) komt wel binnen ongeveer 0,5% van de simulatie, maar is te rekenintensief voor klanten met veel posten.
 
-Voor de praktijk betekent dit: gebruik de FFT-grens met postbedragen met voorzichtigheid als $CV$ boven ongeveer 2 ligt en er weinig fouten worden verwacht bij een kleine $N$. Het gammamodel van 5.3 is daar vaak voorzichtiger (zie hieronder). We claimen geen dekkingsgarantie. Het onderzoek met lognormale bedragen beperkt zich tot 95% zekerheid, het binomiale model en één trekking van de bedragen per geval; het is dus indicatief.
+Voor de praktijk betekent dit: gebruik de FFT-grens met postbedragen met voorzichtigheid als $CV$ boven ongeveer 2 ligt en er weinig fouten worden verwacht bij een kleine $N$. Het gammamodel van niveau 2 is daar vaak voorzichtiger (zie hieronder). We claimen geen dekkingsgarantie. Het onderzoek met lognormale bedragen beperkt zich tot 95% zekerheid, het binomiale model en één trekking van de bedragen per geval; het is dus indicatief.
 
-**Gammaverdeelde bedragen.** We hebben dezelfde vergelijking ook gedaan voor gammaverdeelde bedragen, de verdeling die het model van 5.3 aanneemt. Daarbij zijn twee vragen te onderscheiden.
+**Gammaverdeelde bedragen.** We hebben dezelfde vergelijking ook gedaan voor gammaverdeelde bedragen, de verdeling die het model van niveau 2 aanneemt. Daarbij zijn twee vragen te onderscheiden.
 
 Ten eerste: klopt de FFT-berekening met het model zelf? Daarvoor simuleerden we het model met bedragen die bij elke herhaling opnieuw uit de gamma met de gegeven $CV$ worden getrokken. We deden dat voor $N = 200$ en $N = 1.000$, $CV$ van 0,5 tot 4 en $(n, k) = (50, 2)$ en $(400, 5)$ (20 gevallen, 95% zekerheid, binomiaal). De FFT-grens ligt in 19 van de 20 gevallen binnen 0,8% van de simulatie, en meestal binnen enkele standaardfouten van de simulatie (0,1 tot 0,5%). Het grootste verschil is −1,5% ($N = 200$, $CV = 4$, $(400, 5)$). Als de bedragen werkelijk gammaverdeeld zijn, is de benadering dus goed.
 
 Ten tweede: wat gebeurt er met een concrete verzameling bedragen die uit een gamma is getrokken? Dan vergelijken we de FFT-grens, met de $CV$ van die verzameling, met een simulatie op precies die bedragen. Bij $N = 1.000$ lagen de verschillen binnen ongeveer 0,6% voor $CV$ tot ongeveer 3,5 (één uitschieter van −3% bij $CV \approx 3{,}9$). Bij $N = 200$ waren ze klein voor $CV$ tot ongeveer 1, maar bij $CV$ boven ongeveer 1,8 liepen ze op tot enkele procenten in **beide richtingen**: van −5% tot +13%, en in één geval −17%, vooral bij $(400, 5)$. Dat komt doordat een verzameling van 200 bedragen uit een scheve gamma sterk kan afwijken van de gamma zelf. De som en de vorm van de staart zijn dan niet meer die van het model. Dit zegt dus vooral iets over hoe goed een concrete, kleine verzameling bedragen bij het gammamodel past, en niet over een fout in de berekening. Het is wel een reden om bij een kleine $N$ en een grote $CV$ voorzichtig te zijn met de uitkomst, ook voor niveau 2.
 
-**Vergelijking met 5.3.** Bij gelijke $CV$ geeft het gammamodel van 5.3 een grens die bij bescheiden $CV$ (tot ongeveer 1) praktisch gelijk is aan die met de werkelijke bedragen. Bij een grote $CV$ ligt de gammagrens hoger: in een indicatieve vergelijking (één klant, lognormale bedragen) 1 tot 4% bij $CV \approx 3$ en 11 tot 18% bij $CV \approx 6$. Het gammamodel is dan voorzichtiger. Dat zijn waarnemingen bij één verdelingsfamilie, geen algemene regel.
+**Vergelijking met niveau 2.** Bij gelijke $CV$ geeft het gammamodel van niveau 2 een grens die bij bescheiden $CV$ (tot ongeveer 1) praktisch gelijk is aan die met de werkelijke bedragen. Bij een grote $CV$ ligt de gammagrens hoger: in een indicatieve vergelijking (één klant, lognormale bedragen) 1 tot 4% bij $CV \approx 3$ en 11 tot 18% bij $CV \approx 6$. Het gammamodel is dan voorzichtiger. Dat zijn waarnemingen bij één verdelingsfamilie, geen algemene regel.
 
 **Begrensde postgrootte.** Bij een geldsteekproef met een vast steekproefinterval $J = M/n$ (massa gedeeld door het aantal gestoken eurocenten) worden posten groter dan $J$ vooraf uitgesloten: ze zitten in het hoogstratum en worden niet in de eigenlijke steekproef betrokken. Alle posten in de populatie waaruit de steekproef komt, zijn dan kleiner dan of gelijk aan $J$, dus ook alle klantposten. Dat beperkt de scheefheid waar het om gaat. De postbedragen liggen in $[0, J]$, en voor zulke bedragen geldt $\sigma^2 \le \mu\,(J-\mu)$ (Bhatia en Davis), dus $CV^2 \le J/\mu - 1$. Voor de SSO als geheel is $J/\mu = N_\text{totaal}/n$, met $N_\text{totaal}$ het aantal posten van de SSO. Verdelingsfamilies met een onbegrensde staart, zoals de gamma- en de lognormale verdeling, kennen die bovengrens niet en kunnen de staart daardoor overschatten.
 
@@ -579,11 +581,11 @@ Hoe groot is het verschil? Bij vergelijkbare $n$ en $k$ ligt de 95%-grens voor d
 
 Voor grote $n$ en kleine $k/n$ zijn de twee modellen praktisch gelijk. Bij kleine $n$ is het Poisson-model voorzichtiger. Kies het Poisson-model als je fouten als zeldzame, onafhankelijke gebeurtenissen wilt modelleren; kies het binomiale model als je elke post als helemaal goed of helemaal fout ziet (Aanname 3).
 
-Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de correctie voor trekken zonder teruglegging in 5.4 geldt alleen voor het binomiale model. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is precies de variantie uit 5.3, zonder correctie. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
+Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de correctie voor trekken zonder teruglegging in 5.4 geldt alleen voor het binomiale model. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is het Poisson-equivalent van de variantie uit 5.3, die $p(1-p)(1+CV^2)/N$ is: dezelfde uitdrukking zonder de factor $1-p$. Een correctie voor trekken zonder teruglegging is hier niet nodig: gegeven $\sum_j C_j = x$ is de verdeling van $(C_1, \dots, C_N)$ multinomiaal met gelijke kansen, en dat is precies trekken met teruglegging. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
 
 ### 5.6 Risicocorrectie op de SSO-steekproef: IHR, IBR, CAR en materialiteit
 
-De auditor heeft vaak al zekerheid uit andere werkzaamheden. In het HARo wordt die uitgedrukt in drie risico's, elk hoog (H), midden (M) of laag (L): het inherent risico (IHR), het interne-beheersingsrisico (IBR) en het cijferanalyserisico (CAR). Samen bepalen ze de zekerheid die de gegevensgerichte steekproef nog moet opleveren. In het HARo zijn voor de meest gebruikte combinatiewaarden voor IHR, IBR en CAR de nog op te leveren zekerheid weergegeven. In deze programmatuur zijn aan deze combinatiewaarden de ontbrekende toegevoegd zodat alle combinaties worden gedekt.
+De auditor heeft vaak al zekerheid uit andere werkzaamheden. In het Handboek Auditing Rijksoverheid (HARo) wordt die uitgedrukt in drie risico's, elk hoog (H), midden (M) of laag (L): het inherent risico (IHR), het interne-beheersingsrisico (IBR) en het cijferanalyserisico (CAR). Samen bepalen ze de zekerheid die de gegevensgerichte steekproef nog moet opleveren. In het HARo zijn voor de meest gebruikte combinatiewaarden voor IHR, IBR en CAR de nog op te leveren zekerheid weergegeven. In deze programmatuur zijn aan deze combinatiewaarden de ontbrekende toegevoegd zodat alle combinaties worden gedekt.
 
 **Vertaling naar foutloze posten.** We vertalen die lagere benodigde zekerheid naar een aantal *extra foutloze posten* dat we bij de steekproef optellen. Dat gaat zo: we bepalen hoeveel foutloze posten nodig zijn om bij de gegeven materialiteit $m$ 95% zekerheid te krijgen (zonder fouten, vlakke prior), en hoeveel er nodig zijn voor de lagere benodigde zekerheid. Het verschil is het aantal extra foutloze posten. In formule, met $d(c)$ voor het aantal foutloze posten dat nodig is voor zekerheid $c$:
 
@@ -677,7 +679,18 @@ $$
 
 Voor het Poisson-model matchen we een Gamma-verdeling met dezelfde verwachting en variantie van de negatief-binomiale fractie: $n_{klant} = m/V$ en $k_{klant} = m^2/V - 1$. Het is een tweemomentenbenadering: de staart van de werkelijke verdeling wordt niet apart gematcht. Een niet-geheel $n_{klant}$ en $k_{klant}$ is daarbij toegestaan en wordt ook zonder afronding doorgegeven.
 
-**Klemming.** Een Beta-verdeling kan bij een gegeven verwachting niet elke spreiding hebben. Als $N_{klant}$ in absolute zin klein is, is de spreiding van de klant rond $p$ (die schaalt met $1/N_{klant}$) zo groot dat $k_{klant}$ negatief zou worden. Dat hangt dus niet af van de verhouding tussen $N_{klant}$ en $n$: bij $n = 50$, $k = 0$, $N_{klant} = 2.000$ treedt klemming op, bij $n = 50.000$, $k = 500$, $N_{klant} = 200$ niet. In dat geval houden we niet langer vast aan het gemiddelde. We zetten $k_{klant} = 0$ en kiezen $n_{klant}$ zo dat het kwantiel van de Beta$(1, n_{klant}+1)$ bij de gekozen zekerheid $c$ precies gelijk is aan de exacte grens $b$ van het beta-binomiale model uit 5.1. Die grens volgt uit
+**Klemming.** Een Beta-verdeling kan bij een gegeven verwachting niet elke spreiding hebben. Dat gebeurt als de spreiding van de klant rond $p$ (die schaalt met $(1+CV^2)/N_{klant}$) zo groot is dat $k_{klant}$ negatief zou worden. Schrijf je de momentmatching uit, dan is $k_{klant} < 0$ precies gelijk aan
+
+$$
+k < \frac{(n+k+3)(1+CV^2)}{N_{klant}}.
+$$
+
+Dit is een voorwaarde op het verwachte aantal foute klantposten: ruwweg treedt klemming op als dat aantal, gecorrigeerd met de factor $1+CV^2$, onder 1 zakt. Twee gevolgen:
+
+- Bij $k = 0$ treedt klemming altijd op, voor elke eindige $N_{klant}$. De posterior van de SSO heeft dan al vorm 1, en om bij hetzelfde gemiddelde een grotere spreiding te krijgen zou die onder 1 moeten komen. Bij $n = 50$, $k = 0$, $N_{klant} = 2.000$ klemt het dus.
+- Bij $k > 0$ hangt klemming wel af van de verhouding tussen $N_{klant}$ en $n$: het gebeurt als $N_{klant} < (n+k+3)(1+CV^2)/k$. Bij $n = 120$, $k = 1$ en $CV = 0$ is dat $N_{klant}$ rond 124 of kleiner, bij $n = 50.000$, $k = 500$ rond 101 of kleiner; $N_{klant} = 200$ klemt daar dus niet.
+
+De voorwaarde is voor $CV = 0$ en voor $CV = 1$ en $2{,}5$ numeriek nagelopen met de code voor een aantal combinaties van $n$, $k$ en $N_{klant}$ rond de grens, en wijkt niet af. In dat geval houden we niet langer vast aan het gemiddelde. We zetten $k_{klant} = 0$ en kiezen $n_{klant}$ zo dat het kwantiel van de Beta$(1, n_{klant}+1)$ bij de gekozen zekerheid $c$ precies gelijk is aan de exacte grens $b$ van het beta-binomiale model uit 5.1. Die grens volgt uit
 
 $$
 1-(1-c)^{1/(n_{klant}+1)} = b \quad\Longrightarrow\quad n_{klant}+1 = \frac{\ln(1-c)}{\ln(1-b)}.
@@ -687,7 +700,7 @@ De uitkomst is dus op het gekozen zekerheidsniveau exact de grens van het beta-b
 
 Het spiegelbeeld doet zich voor bij een zeer hoge foutfractie in de SSO-steekproef (het binomiale model, $k$ dicht bij $n$) in combinatie met een kleine $N_{klant}$. Dan zou $n_{klant} < k_{klant}$ worden. We zetten dan $n_{klant} = k_{klant}$ en kiezen die zo dat het kwantiel van de Beta$(n_{klant}+1, 1)$ gelijk is aan de exacte grens. Bij Poisson komt dit niet voor.
 
-**Blinde vlek.** Is de exacte grens zelf al 0, dan kan geen Beta of Gamma dat weergeven: ze hebben een strikt positieve drager en kennen dus altijd een positieve kans op fouten. Dat gebeurt als bij de gekozen zekerheid zelfs bij de klant nog nul fouten verwacht worden, bij een zeer kleine $N_{klant}$ en weinig fouten in de SSO-steekproef. Een rekenresultaat zou hier ten onrechte geruststellen. We weigeren de berekening daarom, met een foutmelding die aanraadt de posten van dit type bij deze klant rechtstreeks (100%) te controleren. Hetzelfde geldt als de exacte grens zelf al 1 is. De blinde vlek hangt af van het zekerheidsniveau: bij $n=120$, $k=0$ en $N_{klant}=5$ is de berekening bij 95% al geweigerd. Bij $n=120$, $k=1$ en $N_{klant}=5$ is dat bij 90% zo, maar bij 95% niet.
+**Blinde vlek.** Is de exacte grens zelf al 0, dan kan geen Beta of Gamma dat weergeven: ze hebben een strikt positieve drager en kennen dus altijd een positieve kans op fouten. Dat gebeurt als de kans op nul fouten bij de klant al minstens gelijk is aan de gekozen zekerheid $c$, bij een zeer kleine $N_{klant}$ en weinig fouten in de SSO-steekproef. Een rekenresultaat zou hier ten onrechte geruststellen. We weigeren de berekening daarom, met een foutmelding die aanraadt de posten van dit type bij deze klant rechtstreeks (100%) te controleren. Hetzelfde geldt als de exacte grens zelf al 1 is. De blinde vlek hangt af van het zekerheidsniveau: bij $n=120$, $k=0$ en $N_{klant}=5$ is de berekening bij 95% al geweigerd. Bij $n=120$, $k=1$ en $N_{klant}=5$ is dat bij 90% zo, maar bij 95% niet.
 
 #### 5.8.4 Vergelijking
 
@@ -728,7 +741,7 @@ De SSO-steekproef is een *daadwerkelijk getrokken* steekproef met geldgewogen se
 
 ### 5.10 Overzicht: methoden en niveaus van informatie over postgroottes
 
-De tabel zet de drie evaluatiemethoden naast de drie niveaus van informatie over de postgroottes uit sectie 2. Aanname 4 (gelijke postgrootte) geldt alleen op niveau 1. Op niveau 2 en 3 is die losgelaten, zoals in 5.3 en 5.4.
+De tabel zet de drie evaluatiemethoden naast de drie niveaus van informatie over de postgroottes (zie 5.3). Aanname 4 (gelijke postgrootte) geldt alleen op niveau 1. Op niveau 2 en 3 is die losgelaten, zoals in 5.3 en 5.4.
 
 | Niveau | Beschikbare informatie | Eenvoudige methode (5.8) | Momentmatching (5.8) | Exacte methode (5.4) |
 |---|---|---|---|---|
