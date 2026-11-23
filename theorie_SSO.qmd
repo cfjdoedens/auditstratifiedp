@@ -18,9 +18,9 @@ Dit document onderbouwt het gebruik van een steekproef over alle posten van de S
 
 ## 1. Inleiding: efficiënt controleren van de klanten van een SSO
 
-Een shared service organisatie (SSO) verwerkt posten voor meerdere klanten.
+Een shared service organisatie (SSO) verwerkt financiële posten voor meerdere klanten.
 
-De auditor wil een uitspraak doen over de kwaliteit van die verwerking per klant door vooral te steunen op een steekproef over alle posten van de SSO. Dit zonder een steekproef over de individuele klanten te doen. Doel van de auditor hierbij is om de controle efficienter uit te voeren.
+De auditor wil een uitspraak doen over de kwaliteit van die verwerking per klant door vooral te steunen op een steekproef over alle posten van de SSO. Dit zonder een steekproef over de individuele klanten te doen. Doel van de auditor hierbij is om de controle efficiënter uit te voeren.
 
 Uitgangspunt is de gedachte dat de posten voor elke klant een steekproef vormt op de posten van de SSO. We krijgen zo per klant gezien een dubbele steekproef: die over de hele SSO en die van elke klant naar de SSO.
 
@@ -32,9 +32,9 @@ We gebruiken de volgende aannames.
 
 **Aanname 1 (klantonafhankelijke verwerking).** Alle posten van de SSO worden op dezelfde manier behandeld, ze gaan door hetzelfde proces, ongeacht de klant voor wie de post wordt behandeld.
 
-Er wordt niet geeist dat elke klant evenveel posten heeft.
+Er wordt niet geëist dat elke klant evenveel posten heeft.
 
-Maar, het zou kunnen dat er meerdere typen posten zijn, waarbij een post op een eigen manier wordt verwerkt afhankelijk van het type, waardoor de foutfracties per type zouden kunnen verschillen. Als dan de proportie van een type post verschilt tussen klanten wordt de gelijkheid van de totale foutfracties tussen klanten bedreigt.
+Maar, het zou kunnen dat er meerdere typen posten zijn, waarbij een post op een eigen manier wordt verwerkt afhankelijk van het type, waardoor de foutfracties per type zouden kunnen verschillen. Als dan de proportie van een type post verschilt tussen klanten wordt de gelijkheid van de totale foutfracties tussen klanten bedreigd.
 Zoals we later zullen zien, kan de verdeling in postgrootte voor een groep posten ook belangrijk zijn, daarvoor willen we ook de mogelijkheid hebben om posten op die manier te onderscheiden als typen. Al met al hebben we met het onderscheid tussen meerdere typen posten een krachtiger model om de foutfracties van de klanten van een SSO te schatten. Daarom verfijnen we aanname 1 tot aanname 1b.
 
 **Aanname 1b (klantonafhankelijke verwerking *per type post*).** Alle posten van de SSO, van een bepaald type, worden op dezelfde manier behandeld, ze gaan door hetzelfde proces, ongeacht de klant voor wie de post wordt behandeld.
