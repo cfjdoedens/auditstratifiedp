@@ -1996,6 +1996,7 @@ def _toon_proj_resultaat(res: dict) -> None:
         "kanskromme voor scenario",
         list(_PROJ_SCENARIO_LABELS),
         format_func=lambda x: _PROJ_SCENARIO_LABELS[x],
+        index=list(_PROJ_SCENARIO_LABELS).index("verwacht"),
         horizontal=True,
         key="proj_scenario",
     )
