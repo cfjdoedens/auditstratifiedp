@@ -182,6 +182,9 @@ def projecteer_geldsteek_gestratificeerd(
     # Foutfractie in de rest per stratum: kolom `p_rest` (niet leeg), anders de
     # waargenomen fractie.
     if "p_rest" in basis.columns:
+        # Een kolom met alleen None heeft dtype object; die telt als leeg.
+        if basis["p_rest"].isna().all():
+            basis["p_rest"] = basis["p_rest"].astype(float)
         if not pd.api.types.is_numeric_dtype(basis["p_rest"]):
             raise ValueError("Kolom `p_rest` moet numeriek zijn (of leeg).")
         p_kolom = basis["p_rest"].astype(float)

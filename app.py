@@ -1912,7 +1912,7 @@ def _bereken_projectie(zekerheid, model, granulariteit, kwantiel, totaal_mat) ->
     """Lees de projectietabel, rekent door en zet het resultaat in de sessiestatus."""
     num = st.session_state.proj_df_saved.copy()
     for kol in _PROJ_GETALKOLOMMEN:
-        num[kol] = _parse_nl_kolom(num[kol])
+        num[kol] = pd.to_numeric(_parse_nl_kolom(num[kol]), errors="coerce").astype(float)
     df_naam = num.dropna(subset=["naam"]).loc[lambda d: d["naam"].str.strip() != ""]
     verplicht = ["waarde_laag", "n_laag", "n_tot_nu", "k_tot_nu"]
     if df_naam.empty:

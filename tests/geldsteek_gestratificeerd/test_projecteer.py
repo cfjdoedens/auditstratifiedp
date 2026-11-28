@@ -108,6 +108,12 @@ def test_p_rest_kolom_ongeldig(df):
         _project(df.assign(p_rest=["a", "b", "c"]))
 
 
+def test_p_rest_kolom_met_alleen_none_telt_als_leeg(df):
+    met_none = _project(df.assign(p_rest=[None, None, None]))["strata"]
+    zonder = _project(df)["strata"]
+    assert list(met_none["p_rest"]) == list(zonder["p_rest"])
+
+
 def test_pessimistisch_kwantiel_hoger_geeft_meer_fouten(df):
     laag = _project(df, pessimistisch_kwantiel=0.5)["strata"]["k_pessimistisch"]
     hoog = _project(df, pessimistisch_kwantiel=0.95)["strata"]["k_pessimistisch"]
