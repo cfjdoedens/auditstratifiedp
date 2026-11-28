@@ -23,6 +23,7 @@ auditstat/
     evalueer_geldsteek_gestratificeerd.py      # Convolutie-evaluatie (FFT, Monte Carlo, direct)
     plan_geldsteek_gestratificeerd.py      # Heuvelklimalgoritme voor steekproefplanning
     plot_kanskromme.py      # Visualisatie
+    rapport_plan_pdf.py     # PDF-rapport van een planning (reportlab): maak_plan_rapport_pdf
     projecteer_geldsteek_gestratificeerd.py  # Projectie van een onafgeronde steekproef (scenario's, binair zoeken naar max extra k)
     utils.py                # HARo-helpers: haro_nog_nodige_zekerheid, drawsneeded, foutloze_posten_equivalent
     valideer_granulariteit.py
@@ -52,6 +53,7 @@ tests/
     test_convolutie_analytisch.py
     test_hypothesis_properties.py
     test_projecteer.py
+    test_rapport_plan_pdf.py
   postensteek/             # Spiegelt auditstat/postensteek/
     __init__.py
     test_evalueer_postensteek.py
@@ -649,3 +651,9 @@ App: `_is_lokaal`, `_toon_lokaal_inlezen(sleutel, verwerk, meld_fout)` en `_toon
 **Stand 2026-11-28:** alles gecommit en gepusht (modus "geprojecteerde eindevaluatie" in `app.py` inbegrepen); volledige suite 540 tests groen, ruff schoon.
 
 **J/μ-meting opnieuw (2026-11-28, los script, niet in de repo):** per lognormale σ (1,0/1,2/1,4/1,6; steekproef-CV 1,2/1,7/2,1/2,6) 200 verzamelingen van N = 200, (n,k) = (50,2), 95%, binomiaal, FFT-compound (20.000 cellen), grens met alle posten tegenover alleen posten ≤ J = (J/μ)·gemiddelde. Gemiddelde daling bij J/μ 5/10/25/50/100: CV 1,2: 3,8/1,9/0,4/0/0%; CV 1,7: 8,0/5,3/1,7/0,5/0%; CV 2,1: 13,7/10,7/5,4/2,3/0%; CV 2,6: 18,9/15,5/9,0/2,6/0% (standaardfout 0,3-1,0 procentpunt, spreiding tussen verzamelingen 5-14%). Bij J/μ = 100 viel geen post boven J. Theorie 5.4 ("Begrensde postgrootte") bijgewerkt met deze tabel; de oude cijfers zijn vervallen.
+
+## PDF-rapport van de planning (2026-11-28)
+
+`auditstat/geldsteek_gestratificeerd/rapport_plan_pdf.py` (tests: `tests/geldsteek_gestratificeerd/test_rapport_plan_pdf.py`, 5) bevat `maak_plan_rapport_pdf(strata, instellingen, status=None, tijdstip=None) -> bytes`. Opmaak en helpers (`_tabel`, `_stijlen`, `_figuur_als_afbeelding`, `_auditstat_versie`) komen uit `auditstat/sso/rapport_pdf.py` (privé-importen over pakketgrenzen heen; bij een refactor van die helpers moet deze module mee). Invoer: het planningsresultaat (`plan_strata` uit de app, met `n_basis`, `n_laag`, `k_laag`) en `instellingen` (`materialiteit` als fractie, `zekerheid`, `model`, `granulariteit`). De functie evalueert het eindplan zelf met `evalueer_geldsteek_gestratificeerd` ("FFT samen", `k_laag` = n x verwachte foutfractie) voor het resultaat en de kanskromme. Inhoud: instellingen, resultaat (n, kosten, maximale fout tegenover het doel, doel bereikt ja/nee), invoer laag- en hoogstratum, n basis/extra/totaal per stratum, kanskromme. Niet geexporteerd in `__init__.py` (reportlab is optioneel).
+
+**App:** `_bewaar_plan_rapport()` maakt een momentopname (`st.session_state.plan_rapport`) bij het einde of afbreken van de planning en wist die bij een nieuwe berekening; onder de planningstabel verschijnen "PDF-rapport maken" (`plan_rapport_maken`) en "PDF-rapport downloaden" (+ lokaal opslaan). De import staat in de importlus met dezelfde reportlab-afvang als `maak_sso_rapport_pdf`. Met `AppTest` gecontroleerd (planning met klimoptimalisatie, rapport, tekst in de PDF), niet in de pytest-suite; de PDF is visueel bekeken (pagina 1 en 2). Bij een afgebroken planning toont het rapport het tussentijdse plan met de statusregel.

@@ -151,6 +151,14 @@ with _import_slot():
                 if (_fout.name or "").split(".")[0] != "reportlab":
                     raise
                 maak_sso_rapport_pdf = None
+            try:
+                from auditstat.geldsteek_gestratificeerd.rapport_plan_pdf import (  # pyrefly: ignore[missing-import]
+                    maak_plan_rapport_pdf,
+                )
+            except ImportError as _fout:
+                if (_fout.name or "").split(".")[0] != "reportlab":
+                    raise
+                maak_plan_rapport_pdf = None
             break
         except ImportError as _fout:
             if _poging == 2:
@@ -299,6 +307,8 @@ for key, standaard in {
     "proj_tabel_key": 0,
     "plan_error": None,
     "plan_tabel_key": 0,
+    "plan_rapport": None,
+    "plan_rapport_pdf": None,
     "sso_typen_posten_tabel": LEGE_SSO_TYPEN_POSTEN_DF.copy(),
     "sso_typen_posten_tabel_key": 0,
     "sso_voorbeeld_status": {
@@ -2444,6 +2454,21 @@ with tab_eval:
             st.rerun()
 
 # Configureer het vierde tabblad voor het plannen en live optimaliseren van gestratificeerde steekproeven.
+def _bewaar_plan_rapport() -> None:
+    """Bewaar een momentopname van het planningsresultaat voor het PDF-rapport."""
+    st.session_state.plan_rapport = {
+        "strata": st.session_state.plan_strata.copy(),
+        "instellingen": {
+            "materialiteit": st.session_state.plan_reken_mat,
+            "zekerheid": st.session_state.plan_conf,
+            "model": st.session_state.plan_model,
+            "granulariteit": st.session_state.plan_granulariteit,
+        },
+        "status": " ".join(st.session_state.plan_status.split()),
+    }
+    st.session_state.plan_rapport_pdf = None
+
+
 with tab_plan:
     col_inst, col_hoofd = st.columns([1, 3])
 
@@ -2616,6 +2641,46 @@ with tab_plan:
                 ),
             },
         )
+
+    with col_hoofd:
+        if (
+            st.session_state.plan_rapport is not None
+            and not st.session_state.plan_berekening_actief
+        ):
+            if maak_plan_rapport_pdf is None:
+                st.caption(
+                    "Voor een PDF-rapport is het pakket \u2018reportlab\u2019 "
+                    "nodig (`pip install auditstat[pdf]`)."
+                )
+            else:
+                if st.button("PDF-rapport maken", key="plan_rapport_maken"):
+                    try:
+                        with st.spinner("Rapport wordt opgebouwd\u2026"):
+                            st.session_state.plan_rapport_pdf = maak_plan_rapport_pdf(
+                                st.session_state.plan_rapport["strata"],
+                                st.session_state.plan_rapport["instellingen"],
+                                status=st.session_state.plan_rapport["status"],
+                            )
+                    except Exception as e:  # noqa: BLE001 - toon elke fout aan de gebruiker
+                        st.session_state.plan_rapport_pdf = None
+                        st.error(f"Het rapport kon niet worden gemaakt: {e}")
+                if st.session_state.plan_rapport_pdf is not None:
+                    st.download_button(
+                        "PDF-rapport downloaden",
+                        data=st.session_state.plan_rapport_pdf,
+                        file_name="planning_rapport.pdf",
+                        mime="application/pdf",
+                        key="plan_rapport_download",
+                        help=(
+                            "Bevat de instellingen, de invoer, de geplande "
+                            "steekproefomvang per stratum en de kanskromme."
+                        ),
+                    )
+                    _toon_lokaal_opslaan(
+                        "lok_dl_plan_pdf",
+                        st.session_state.plan_rapport_pdf,
+                        "planning_rapport.pdf",
+                    )
 
     # Initialiseer de live-optimalisatie wanneer de gebruiker op de startknop klikt.
     if start_knop:
@@ -2811,6 +2876,8 @@ with tab_plan:
                 tabel_update.loc[idx, "n_laag_extra"] = 0
                 tabel_update.loc[idx, "n_laag_tot"] = int(rij["n_basis"])
 
+        st.session_state.plan_rapport = None
+        st.session_state.plan_rapport_pdf = None
         st.session_state.plan_tabel = tabel_update
         st.session_state.plan_strata = strata_init
         st.session_state.plan_iteratie = 0
@@ -2831,6 +2898,7 @@ with tab_plan:
     if stop_knop:
         st.session_state.plan_berekening_actief = False
         st.session_state.plan_status += " \u2014 Afgebroken door gebruiker."
+        _bewaar_plan_rapport()
         st.rerun()
 
     # Voer de live-optimalisatiestappen uit zolang de berekening actief is.
@@ -2914,6 +2982,7 @@ with tab_plan:
                 st.session_state.plan_status = (
                     f"Optimalisatie voltooid! Eindfout: {fmt_fout} <= materialiteit."
                 )
+            _bewaar_plan_rapport()
             st.rerun()
 
 # Configureer het vijfde tabblad voor de maximale foutfractie bij een SSO-klant.
