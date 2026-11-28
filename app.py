@@ -1887,6 +1887,12 @@ def _proj_samenvatting_tabel(res: dict) -> pd.DataFrame:
 def _proj_strata_tabel(res: dict) -> pd.DataFrame:
     """Tabel per stratum met de scenario's en de marge, in NL-notatie."""
     st_ = res["strata"]
+    optimistisch = res["samenvatting"].set_index("scenario").loc["optimistisch"]
+    tekst_overschreden = (
+        "al overschreden, ook zonder extra fouten"
+        if optimistisch["overschreden"]
+        else "overschreden door verwachte fouten in andere strata"
+    )
     return pd.DataFrame({
         "naam": st_["naam"],
         "n gepland": [_nl(x, 0) for x in st_["n_laag"]],
@@ -1900,7 +1906,8 @@ def _proj_strata_tabel(res: dict) -> pd.DataFrame:
             _nl(x, 0) for x in st_["extra_foutloze_posten"]
         ],
         "max extra fouten in de rest": [
-            "al overschreden" if pd.isna(x) else _nl(x, 0) for x in st_["max_extra_k"]
+            _nl(x, 0) if not pd.isna(x) else tekst_overschreden
+            for x in st_["max_extra_k"]
         ],
         "marge t.o.v. verwacht": [
             "" if pd.isna(x) else _nl(x, 1) for x in st_["marge_boven_verwacht"]
