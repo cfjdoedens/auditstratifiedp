@@ -7,6 +7,7 @@ gestratificeerde steekproeven, conform de methodiek van de Rijksoverheid (HARo).
 from .evalueer_geldsteek_gestratificeerd import evalueer_geldsteek_gestratificeerd
 from .plan_geldsteek_gestratificeerd import plan_geldsteek_gestratificeerd
 from .plot_kanskromme import plot_kanskromme
+from .projecteer_geldsteek_gestratificeerd import projecteer_geldsteek_gestratificeerd
 from .utils import foutloze_posten_equivalent, haro_nog_nodige_zekerheid
 
 # Definieer wat er geëxporteerd wordt als iemand 'from auditstat.geldsteek_gestratificeerd import *' gebruikt.
@@ -16,4 +17,5 @@ __all__ = [
     "haro_nog_nodige_zekerheid",
     "plan_geldsteek_gestratificeerd",
     "plot_kanskromme",
+    "projecteer_geldsteek_gestratificeerd",
 ]
