@@ -72,6 +72,9 @@ with _import_slot():
             from auditstat.geldsteek_gestratificeerd.plot_kanskromme import (  # pyrefly: ignore[missing-import]
                 plot_kanskromme,
             )
+            from auditstat.geldsteek_gestratificeerd.projecteer_geldsteek_gestratificeerd import (  # pyrefly: ignore[missing-import]
+                projecteer_geldsteek_gestratificeerd,
+            )
             from auditstat.geldsteek_gestratificeerd.utils import (  # pyrefly: ignore[missing-import]
                 foutloze_posten_equivalent,
                 haro_nog_nodige_zekerheid,
@@ -190,6 +193,22 @@ LEGE_EVAL_DF = pd.DataFrame({
     "materialiteit": ["0,01"] * 8,
 })
 
+# Leeg sjabloon voor de invoertabel van de geprojecteerde eindevaluatie.
+LEGE_PROJ_DF = pd.DataFrame({
+    "naam": [""] * 8,
+    "waarde_laag": [""] * 8,
+    "n_laag": [""] * 8,
+    "n_tot_nu": [""] * 8,
+    "k_tot_nu": [""] * 8,
+    "p_rest": [""] * 8,
+    "ihr": ["H"] * 8,
+    "ibr": ["H"] * 8,
+    "car": ["H"] * 8,
+    "waarde_hoog": ["0"] * 8,
+    "fout_hoog": ["0"] * 8,
+    "materialiteit": ["0,01"] * 8,
+})
+
 # Bereid een leeg sjabloon-dataframe voor om de invoertabel voor de planning te initialiseren.
 LEGE_PLAN_DF = pd.DataFrame({
     "naam": [""] * 8,
@@ -273,6 +292,11 @@ for key, standaard in {
     "eval_res": None,
     "eval_error": None,
     "eval_tabel_key": 0,
+    "proj_df_saved": LEGE_PROJ_DF.copy(),
+    "proj_subtab_index": 0,
+    "proj_res": None,
+    "proj_error": None,
+    "proj_tabel_key": 0,
     "plan_error": None,
     "plan_tabel_key": 0,
     "sso_typen_posten_tabel": LEGE_SSO_TYPEN_POSTEN_DF.copy(),
@@ -585,6 +609,119 @@ def on_eval_tabel_change():
         st.session_state.eval_error = None
 
     st.session_state.eval_df_saved = df
+
+
+_PROJ_GETALKOLOMMEN = [
+    "waarde_laag",
+    "n_laag",
+    "n_tot_nu",
+    "k_tot_nu",
+    "p_rest",
+    "waarde_hoog",
+    "fout_hoog",
+    "materialiteit",
+]
+_PROJ_STANDAARD_RIJ = {
+    "ihr": "H",
+    "ibr": "H",
+    "car": "H",
+    "waarde_hoog": "0",
+    "fout_hoog": "0",
+    "materialiteit": "0,01",
+}
+
+
+def on_proj_tabel_change():
+    """Verwerk wijzigingen in de projectietabel, met harde rollback bij foute invoer."""
+    state = st.session_state[f"proj_tabel_{st.session_state.proj_tabel_key}"]
+    df = st.session_state.proj_df_saved.copy()
+    oude_df = df.copy()
+    weggepoetste_fouten = []
+
+    for row_idx_raw, changes in state.get("edited_rows", {}).items():
+        row_idx = int(row_idx_raw)
+        if row_idx < len(df):
+            for col, val in changes.items():
+                df.at[row_idx, col] = "" if val is None else str(val).strip()
+
+    for row in state.get("added_rows", []):
+        basis_rij = {col: "" for col in df.columns} | _PROJ_STANDAARD_RIJ
+        nieuwe_rij = dict(basis_rij)
+        for col, val in row.items():
+            if val is not None:
+                nieuwe_rij[col] = str(val).strip()
+        df = pd.concat([df, pd.DataFrame([nieuwe_rij])], ignore_index=True)
+        oude_df = pd.concat([oude_df, pd.DataFrame([basis_rij])], ignore_index=True)
+
+    def revert_cel(kolom, foutmelding, idx, rij_naam):
+        weggepoetste_fouten.append(f"{foutmelding} bij {rij_naam}.")
+        st.session_state.proj_tabel_key += 1
+        df.at[idx, kolom] = oude_df.at[idx, kolom]
+
+    for idx in range(len(df)):
+        naam_cel = str(df.at[idx, "naam"]).strip()
+        rij_naam = naam_cel if naam_cel else f"Stratum {idx + 1}"
+
+        for col in _PROJ_GETALKOLOMMEN:
+            val_str = str(df.at[idx, col]).strip()
+            if val_str == "":
+                continue
+            val_num = _parse_nl(val_str)
+            if val_num is None:
+                revert_cel(
+                    col, f'"{val_str}" is geen geldig getal voor {col}', idx, rij_naam
+                )
+            elif col == "materialiteit":
+                if val_num <= 0:
+                    revert_cel(col, "materialiteit moet groter zijn dan 0", idx, rij_naam)
+                elif val_num > 1:
+                    df.at[idx, col] = "\u20ac " + _format_nl_auto(val_str, 2)
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 2)
+            elif col == "p_rest":
+                if not 0 <= val_num <= 1:
+                    revert_cel(col, "p_rest moet tussen 0 en 1 liggen", idx, rij_naam)
+                else:
+                    df.at[idx, col] = _format_nl_auto(val_str, 0)
+            elif val_num < 0:
+                revert_cel(col, f"{col} mag niet negatief zijn", idx, rij_naam)
+            elif col in ("n_laag", "n_tot_nu") and not float(val_num).is_integer():
+                revert_cel(col, f"{col} moet een geheel getal zijn", idx, rij_naam)
+            else:
+                df.at[idx, col] = _format_nl_auto(
+                    val_str, 0 if col in ("n_laag", "n_tot_nu") else 2
+                )
+
+        bewerkt = state.get("edited_rows", {}).get(
+            idx, state.get("edited_rows", {}).get(str(idx), {})
+        )
+        n_laag = _parse_nl(df.at[idx, "n_laag"])
+        n_nu = _parse_nl(df.at[idx, "n_tot_nu"])
+        k_nu = _parse_nl(df.at[idx, "k_tot_nu"])
+        if n_laag is not None and n_nu is not None and n_nu > n_laag:
+            col_weg = "n_tot_nu" if "n_tot_nu" in bewerkt else "n_laag"
+            revert_cel(col_weg, "n_tot_nu mag niet groter zijn dan n_laag", idx, rij_naam)
+        n_nu = _parse_nl(df.at[idx, "n_tot_nu"])
+        if n_nu is not None and k_nu is not None and k_nu > n_nu:
+            col_weg = "k_tot_nu" if "k_tot_nu" in bewerkt else "n_tot_nu"
+            revert_cel(col_weg, "k_tot_nu mag niet groter zijn dan n_tot_nu", idx, rij_naam)
+
+        wh_val = _parse_nl(df.at[idx, "waarde_hoog"])
+        fh_val = _parse_nl(df.at[idx, "fout_hoog"])
+        if wh_val is not None and fh_val is not None and fh_val > wh_val:
+            col_weg = "fout_hoog" if "fout_hoog" in bewerkt else "waarde_hoog"
+            revert_cel(
+                col_weg, "fout_hoog mag niet groter zijn dan waarde_hoog", idx, rij_naam
+            )
+
+    deleted_indices = state.get("deleted_rows", [])
+    if deleted_indices:
+        df = df.drop(index=deleted_indices).reset_index(drop=True)
+
+    st.session_state.proj_error = (
+        "Invoerfout: " + " ".join(weggepoetste_fouten) if weggepoetste_fouten else None
+    )
+    st.session_state.proj_df_saved = df
 
 
 def on_plan_tabel_change():
@@ -1693,92 +1830,280 @@ with tab_enkel:
                 plt.close(_fig_enkel)
 
 # Configureer het tredje tabblad voor de evaluatie van getrokken gestratificeerde steekproeven.
-with tab_eval:
+def _toon_kanskromme_eval(res: dict) -> None:
+    """Toon de kanskromme van een evaluatieresultaat met gecentreerde titel."""
+    fig = plot_kanskromme(res)
+
+    # Haal de weergavetitel op uit de figuur als deze bestaat, en wis deze daarna uit de figuur om overlapping te voorkomen.
+    plot_titel = "Kanskromme van de geprojecteerde fout"
+    if fig._suptitle is not None and fig._suptitle.get_text():
+        plot_titel = fig._suptitle.get_text()
+        fig.suptitle("")
+
+    for ax in fig.axes:
+        if ax.get_title():
+            plot_titel = ax.get_title()
+            ax.set_title("")
+
+        # Zorg dat de legenda netjes binnen de grafiekranden valt zonder de curves te snijden.
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.set_bbox_to_anchor((1.0, 1.0))
+
+        # Geef de y-as iets meer ruimte aan de bovenkant zodat interne annotatieteksten niet buiten de grafiek vallen.
+        y_min, y_max = ax.get_ylim()
+        ax.set_ylim(y_min, y_max * 1.15)
+
+    # Pas de lay-out van de overgebleven elementen in de figuur aan.
+    fig.tight_layout()
+
+    # Toon de titel keurig gecentreerd boven de grafiek via Streamlit.
+    st.markdown(
+        f"<h3 style='text-align: center; margin-bottom: 15px;'>{plot_titel}</h3>",
+        unsafe_allow_html=True,
+    )
+    st.pyplot(fig)
+    plt.close(fig)
+
+
+_PROJ_SCENARIO_LABELS = {
+    "optimistisch": "optimistisch (geen fouten meer in de rest)",
+    "verwacht": "verwacht (waargenomen foutfractie of p_rest)",
+    "pessimistisch": "pessimistisch (hoog kwantiel van de fouten in de rest)",
+}
+
+
+def _proj_samenvatting_tabel(res: dict) -> pd.DataFrame:
+    """Samenvatting per scenario, in NL-notatie."""
+    sam = res["samenvatting"]
+    return pd.DataFrame({
+        "scenario": [_PROJ_SCENARIO_LABELS[s] for s in sam["scenario"]],
+        "max fout (\u20ac)": [_nl(x, 2) for x in sam["max_fout_geld"]],
+        "materialiteit (\u20ac)": [_nl(x, 2) for x in sam["materialiteit_geld"]],
+        "boven materialiteit": ["ja" if x else "nee" for x in sam["overschreden"]],
+    })
+
+
+def _proj_strata_tabel(res: dict) -> pd.DataFrame:
+    """Tabel per stratum met de scenario's en de marge, in NL-notatie."""
+    st_ = res["strata"]
+    return pd.DataFrame({
+        "naam": st_["naam"],
+        "n gepland": [_nl(x, 0) for x in st_["n_laag"]],
+        "n tot nu": [_nl(x, 0) for x in st_["n_tot_nu"]],
+        "k tot nu": [_nl(x, 2) for x in st_["k_tot_nu"]],
+        "p rest": [_nl(x, 4) for x in st_["p_rest"]],
+        "k optimistisch": [_nl(x, 2) for x in st_["k_optimistisch"]],
+        "k verwacht": [_nl(x, 2) for x in st_["k_verwacht"]],
+        "k pessimistisch": [_nl(x, 2) for x in st_["k_pessimistisch"]],
+        "extra foutloze posten (HARo)": [
+            _nl(x, 0) for x in st_["extra_foutloze_posten"]
+        ],
+        "max extra fouten in de rest": [
+            "al overschreden" if pd.isna(x) else _nl(x, 0) for x in st_["max_extra_k"]
+        ],
+        "marge t.o.v. verwacht": [
+            "" if pd.isna(x) else _nl(x, 1) for x in st_["marge_boven_verwacht"]
+        ],
+    })
+
+
+def _bereken_projectie(zekerheid, model, granulariteit, kwantiel, totaal_mat) -> None:
+    """Lees de projectietabel, rekent door en zet het resultaat in de sessiestatus."""
+    num = st.session_state.proj_df_saved.copy()
+    for kol in _PROJ_GETALKOLOMMEN:
+        num[kol] = _parse_nl_kolom(num[kol])
+    df_naam = num.dropna(subset=["naam"]).loc[lambda d: d["naam"].str.strip() != ""]
+    verplicht = ["waarde_laag", "n_laag", "n_tot_nu", "k_tot_nu"]
+    if df_naam.empty:
+        st.session_state.proj_error = (
+            "Vul minimaal \u00e9\u00e9n stratum in met een naam en de bijbehorende waarden."
+        )
+        return
+    ontbreekt = df_naam[verplicht].isna().any(axis=1)
+    if ontbreekt.any():
+        namen = ", ".join(df_naam.loc[ontbreekt, "naam"])
+        st.session_state.proj_error = (
+            "Ontbrekende waarden (waarde laag, n_laag, n_tot_nu of k_tot_nu) "
+            f"bij stratum: {namen}."
+        )
+        return
+    schoon = df_naam.reset_index(drop=True).assign(
+        waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
+        fout_hoog=lambda d: d["fout_hoog"].fillna(0),
+        ihr=lambda d: d["ihr"].str.upper(),
+        ibr=lambda d: d["ibr"].str.upper(),
+        car=lambda d: d["car"].str.upper(),
+    )
+    populatie = schoon["waarde_laag"] + schoon["waarde_hoog"]
+    schoon["materialiteit"] = [
+        0.01
+        if pd.isna(m)
+        else (m / pop if m > 1 and pop > 0 else m)
+        for m, pop in zip(schoon["materialiteit"], populatie, strict=True)
+    ]
+    if totaal_mat is None:
+        materialiteit_geld = None
+    elif totaal_mat > 1:
+        materialiteit_geld = totaal_mat
+    else:
+        materialiteit_geld = totaal_mat * float(populatie.sum())
+    try:
+        with st.spinner("Projectie wordt berekend..."):
+            res = projecteer_geldsteek_gestratificeerd(
+                schoon,
+                model=model,
+                zekerheid=zekerheid,
+                granulariteit=granulariteit,
+                pessimistisch_kwantiel=kwantiel,
+                materialiteit_geld=materialiteit_geld,
+            )
+    except ValueError as e:
+        st.session_state.proj_error = f"Fout bij de berekening: {e}"
+        return
+    st.session_state.proj_res = res
+    st.session_state.proj_error = None
+    st.session_state.proj_subtab_index = 1
+
+
+def _toon_proj_resultaat(res: dict) -> None:
+    """Toon de samenvatting, de tabel per stratum en de kanskromme van een projectie."""
+    kwantiel = res["invoer"]["pessimistisch_kwantiel"]
+    st.caption(
+        "Dit is een projectie, geen evaluatie van de afgeronde steekproef. De "
+        "scenario's zeggen hoe de uitkomst eruit kan zien, niet hoe waarschijnlijk "
+        "die is. Het verwachte scenario neemt aan dat de rest van de posten "
+        "dezelfde foutfractie heeft als het al beoordeelde deel; bij een "
+        "steekproef per tranche (bijvoorbeeld per maand) is dat een zware aanname."
+    )
+    st.table(_proj_samenvatting_tabel(res))
+    st.caption(
+        f"Pessimistisch: per stratum het {_nl(kwantiel * 100, 0)}%-kwantiel van het "
+        "aantal fouten in de rest, onder het kansmodel met een vlakke prior. Dat "
+        "geldt per stratum; voor alle strata samen is het extremer. De extra "
+        "foutloze posten van het HARo tellen mee in de berekening."
+    )
+    st.markdown("#### per stratum")
+    st.dataframe(_proj_strata_tabel(res), hide_index=True, width="stretch")
+    st.caption(
+        "Max extra fouten in de rest: het grootste aantal extra fouten in de nog te "
+        "beoordelen posten van dit stratum waarbij de maximale fout niet boven de "
+        "materialiteit komt, terwijl de andere strata hun verwachte aantal fouten "
+        "houden. De marges van de strata zijn niet tegelijk beschikbaar: gebruikt "
+        "het ene stratum zijn marge, dan krimpt die van de andere."
+    )
+    scenario = st.radio(
+        "kanskromme voor scenario",
+        list(_PROJ_SCENARIO_LABELS),
+        format_func=lambda x: _PROJ_SCENARIO_LABELS[x],
+        horizontal=True,
+        key="proj_scenario",
+    )
+    try:
+        _toon_kanskromme_eval(res["evaluaties"][scenario])
+    except Exception as e:
+        st.error(f"Fout bij het weergeven van de resultaten: {e}")
+
+
+def _toon_eval_projectie() -> None:
+    """Modus 'geprojecteerde eindevaluatie' van het evaluatietabblad."""
     col_inst, col_hoofd = st.columns([1, 3])
 
     with col_inst:
         st.subheader("instellingen")
-
-        # Gebruik een tekstveld om de statistische zekerheid in Europese notatie op te vragen.
-        strat_conf_text = st.text_input(
+        conf_text = st.text_input(
             "zekerheid",
             value="0,95",
             help="De gewenste statistische zekerheid (bijv. 0,95 = 95%).",
-            key="strat_conf_text",
+            key="proj_conf_text",
         )
-        strat_conf = _parse_nl(strat_conf_text)
-
-        strat_model = st.radio(
-            "model", ["binomiaal", "poisson"], horizontal=True, key="strat_model"
+        model = st.radio(
+            "model", ["binomiaal", "poisson"], horizontal=True, key="proj_model"
         )
-
-        # Gebruik een tekstveld om de granulariteit in Europese notatie op te vragen.
-        strat_gran_text = st.text_input(
+        gran_text = st.text_input(
             "granulariteit",
             value="10.000",
             help="Aantal stappen voor de FFT-berekening. Meer is nauwkeuriger maar trager.",
-            key="strat_gran_text",
+            key="proj_gran_text",
         )
-        strat_gran_raw = _parse_nl(strat_gran_text)
-        strat_gran = int(strat_gran_raw) if strat_gran_raw is not None else 10000
-
-        strat_knop = st.button("bereken evaluatie", type="primary", key="run_strat")
+        kwantiel_text = st.text_input(
+            "kwantiel pessimistisch scenario",
+            value="0,80",
+            help="Het pessimistische scenario neemt per stratum dit kwantiel van het "
+            "aantal fouten in de nog te beoordelen posten (tussen 0 en 1).",
+            key="proj_kwantiel_text",
+        )
+        mat_text = st.text_input(
+            "totale materialiteit (optioneel)",
+            value="",
+            help="Fractie als <= 1 (van de totale populatie), anders een bedrag in "
+            "euro's. Leeg: de som van de materialiteit per stratum uit de tabel.",
+            key="proj_mat_text",
+        )
+        knop = st.button("bereken projectie", type="primary", key="run_proj")
 
     with col_hoofd:
-        # Gebruik een horizontale keuzerondjes-widget om subtabs te simuleren die we programmatisch kunnen aansturen.
-        eval_subtab = st.radio(
-            "Subtab",
+        subtab = st.radio(
+            "Subtab projectie",
             ["1. invoertabel", "2. resultaten"],
-            index=st.session_state.eval_subtab_index,
+            index=st.session_state.proj_subtab_index,
             horizontal=True,
             label_visibility="collapsed",
         )
+        st.session_state.proj_subtab_index = 0 if subtab == "1. invoertabel" else 1
 
-        # Synchroniseer de subtab-index wanneer de gebruiker handmatig een keuze maakt.
-        if eval_subtab == "1. invoertabel":
-            st.session_state.eval_subtab_index = 0
-        else:
-            st.session_state.eval_subtab_index = 1
-
-        if st.session_state.eval_subtab_index == 0:
-            # Toon een foutmelding direct boven de tabel zodra een invoerfout is opgetreden in de callback.
-            if st.session_state.eval_error:
-                st.error(st.session_state.eval_error)
-
+        if st.session_state.proj_subtab_index == 0:
+            if st.session_state.proj_error:
+                st.error(st.session_state.proj_error)
             st.caption(
-                "Vul de strata in. Rijen zonder naam worden genegeerd. "
-                "Kolommen ihr, ibr, car: H = hoog, M = midden, L = laag."
+                "Vul per stratum in hoeveel posten gepland zijn (n_laag), hoeveel er tot "
+                "nu toe zijn beoordeeld (n_tot_nu) en hoeveel fouten daarbij zijn "
+                "gevonden (k_tot_nu, som van de foutfracties). p_rest is optioneel: de "
+                "foutfractie die je aanneemt voor de rest van dat stratum; leeg betekent "
+                "de waargenomen fractie k_tot_nu / n_tot_nu. Rijen zonder naam worden "
+                "genegeerd."
             )
-
-            # Toon de invoertabel gekoppeld aan de stabiele gespaarde sessiestructuur en de callback.
             st.data_editor(
-                st.session_state.eval_df_saved,
+                st.session_state.proj_df_saved,
                 width="stretch",
                 num_rows="dynamic",
-                key=f"eval_tabel_{st.session_state.eval_tabel_key}",
-                on_change=on_eval_tabel_change,
+                key=f"proj_tabel_{st.session_state.proj_tabel_key}",
+                on_change=on_proj_tabel_change,
                 column_config={
                     "naam": st.column_config.TextColumn(
                         "naam", help="Unieke naam van het stratum."
                     ),
                     "waarde_laag": st.column_config.TextColumn(
-                        "waarde laag (€)",
+                        "waarde laag (\u20ac)",
                         help="Totale geldswaarde van het laagstratum.",
                     ),
                     "n_laag": st.column_config.TextColumn(
                         "n_laag",
-                        help="Aantal posten getrokken uit het laagstratum; met andere woorden aantal gedane waarnemingen per toeval getrokken uit het laagstratum.",
+                        help="Geplande totale aantal posten uit het laagstratum (geheel).",
                     ),
-                    "k_laag": st.column_config.TextColumn(
-                        "k_laag",
-                        help="Som van de geconstateerde foutfracties (fracties: dus >= 0 en <= 1) van de getrokken posten.",
+                    "n_tot_nu": st.column_config.TextColumn(
+                        "n_tot_nu",
+                        help="Aantal posten dat tot nu toe is beoordeeld (geheel; niet "
+                        "meer dan n_laag). Tel alleen beoordeelde posten, niet "
+                        "alleen getrokken posten.",
+                    ),
+                    "k_tot_nu": st.column_config.TextColumn(
+                        "k_tot_nu",
+                        help="Som van de geconstateerde foutfracties van de tot nu toe "
+                        "beoordeelde posten (niet meer dan n_tot_nu).",
+                    ),
+                    "p_rest": st.column_config.TextColumn(
+                        "p_rest (optioneel)",
+                        help="Foutfractie die je aanneemt voor de nog te beoordelen "
+                        "posten van dit stratum, tussen 0 en 1. Leeg: de waargenomen "
+                        "fractie k_tot_nu / n_tot_nu. Verplicht als n_tot_nu 0 is.",
                     ),
                     "waarde_hoog": st.column_config.TextColumn(
-                        "waarde hoog (€)",
-                        help="Totale boekwaarde van het hoogstratum (= foutbedrag + goedbedrag, beide van het hoogstratum).",
+                        "waarde hoog (\u20ac)",
+                        help="Totale boekwaarde van het hoogstratum.",
                     ),
                     "fout_hoog": st.column_config.TextColumn(
-                        "fout hoog (€)", help="Totaal foutbedrag van het hoogstratum."
+                        "fout hoog (\u20ac)", help="Totaal foutbedrag van het hoogstratum."
                     ),
                     "ihr": st.column_config.SelectboxColumn(
                         "ihr",
@@ -1800,186 +2125,315 @@ with tab_eval:
                     ),
                     "materialiteit": st.column_config.TextColumn(
                         "materialiteit totaal",
-                        help="Totale materialiteit voor dit hele stratum (dus laagstratum en hoogstratum samen). Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000).",
+                        help="Totale materialiteit voor dit hele stratum (laag- en "
+                        "hoogstratum samen). Fractie als <= 1 (bijv. 0,01), anders een "
+                        "bedrag in euro's. De som over de strata is de toelaatbare fout "
+                        "waarmee de projectie vergelijkt, tenzij links een totale "
+                        "materialiteit is ingevuld.",
                     ),
                 },
             )
-
         else:
-            # Presenteer de foutmeldingen of de berekende resultaten op het scherm.
-            if st.session_state.eval_error:
-                st.error(st.session_state.eval_error)
-            elif st.session_state.eval_res is not None:
-                res = st.session_state.eval_res
-                try:
-                    fig = plot_kanskromme(res)
-
-                    # Haal de weergavetitel op uit de figuur als deze bestaat, en wis deze daarna uit de figuur om overlapping te voorkomen.
-                    plot_titel = "Kanskromme van de geprojecteerde fout"
-                    if fig._suptitle is not None and fig._suptitle.get_text():
-                        plot_titel = fig._suptitle.get_text()
-                        fig.suptitle("")
-
-                    for ax in fig.axes:
-                        if ax.get_title():
-                            plot_titel = ax.get_title()
-                            ax.set_title("")
-
-                        # Zorg dat de legenda netjes binnen de grafiekranden valt zonder de curves te snijden.
-                        legend = ax.get_legend()
-                        if legend is not None:
-                            legend.set_bbox_to_anchor((1.0, 1.0))
-
-                        # Geef de y-as iets meer ruimte aan de bovenkant zodat interne annotatieteksten niet buiten de grafiek vallen.
-                        y_min, y_max = ax.get_ylim()
-                        ax.set_ylim(y_min, y_max * 1.15)
-
-                    # Pas de lay-out van de overgebleven elementen in de figuur aan.
-                    fig.tight_layout()
-
-                    # Toon de titel keurig gecentreerd boven de grafiek via Streamlit.
-                    st.markdown(
-                        f"<h3 style='text-align: center; margin-bottom: 15px;'>{plot_titel}</h3>",
-                        unsafe_allow_html=True,
-                    )
-                    st.pyplot(fig)
-                    plt.close(fig)
-
-                    st.table(
-                        pd.DataFrame({
-                            "metriek": ["mw fout", "max fout"],
-                            "waarde": [
-                                f"\u20ac {_nl(res['mw_fout_convolutie_geld'], 2)}",
-                                f"\u20ac {_nl(res['max_fout_convolutie_geld'], 2)}",
-                            ],
-                        })
-                    )
-                except Exception as e:
-                    st.error(f"Fout bij het weergeven van de resultaten: {e}")
+            if st.session_state.proj_error:
+                st.error(st.session_state.proj_error)
+            elif st.session_state.proj_res is not None:
+                _toon_proj_resultaat(st.session_state.proj_res)
             else:
                 st.info(
-                    "Vul de invoertabel in en klik op \u2018bereken evaluatie\u2019."
+                    "Vul de invoertabel in en klik op \u2018bereken projectie\u2019."
                 )
 
-    # Verwerk de berekeningsactie zodra de gebruiker op de knop drukt.
-    if strat_knop:
-        # Controleer de invoervelden in het linkermenu op wiskundige validiteit.
-        if strat_conf is None or strat_conf < 0.5 or strat_conf >= 1.0:
-            st.error("Voer een geldige zekerheid in tussen 0,50 en 0,999 (bijv. 0,95).")
-        elif strat_gran < 100:
-            st.error(
-                "Voer een geldige granulariteit in van minimaal 100 (bijv. 10.000)."
-            )
+    if knop:
+        zekerheid = _parse_nl(conf_text)
+        gran_raw = _parse_nl(gran_text)
+        kwantiel = _parse_nl(kwantiel_text)
+        totaal_mat = _parse_nl(mat_text) if mat_text.strip() else None
+        fout = None
+        if zekerheid is None or zekerheid < 0.5 or zekerheid >= 1.0:
+            fout = "Voer een geldige zekerheid in tussen 0,50 en 0,999 (bijv. 0,95)."
+        elif gran_raw is None or gran_raw < 100:
+            fout = "Voer een geldige granulariteit in van minimaal 100 (bijv. 10.000)."
+        elif kwantiel is None or not 0 < kwantiel < 1:
+            fout = "Voer een kwantiel in tussen 0 en 1 (bijv. 0,80)."
+        elif mat_text.strip() and (totaal_mat is None or totaal_mat <= 0):
+            fout = "De totale materialiteit moet leeg zijn of een positief getal."
+        if fout:
+            st.session_state.proj_error = fout
+            st.session_state.proj_subtab_index = 0
         else:
-            # Filter de lege rijen uit de opgeslagen tabel en bereken de populatiewaarden.
-            # Parseer de Nederlandse tekstkolommen naar numerieke waarden voor de berekening.
-            _EVAL_NL_KOLOMREN = [
-                "waarde_laag",
-                "n_laag",
-                "k_laag",
-                "waarde_hoog",
-                "fout_hoog",
-                "materialiteit",
-            ]
-            eval_num = st.session_state.eval_df_saved.copy()
-            for _kol in _EVAL_NL_KOLOMREN:
-                eval_num[_kol] = _parse_nl_kolom(eval_num[_kol])
+            _bereken_projectie(
+                zekerheid, model, int(gran_raw), kwantiel, totaal_mat
+            )
+        st.rerun()
 
-            # Selecteer eerst alle rijen waar de auditor bewust een naam heeft ingevuld.
-            df_met_naam = eval_num.dropna(subset=["naam"]).loc[
-                lambda d: d["naam"].str.strip() != ""
-            ]
 
-            # Controleer of er bij deze benoemde strata verplichte velden missen.
-            mask_ontbrekend = (
-                df_met_naam[["waarde_laag", "n_laag", "k_laag"]].isna().any(axis=1)
+with tab_eval:
+    eval_modus = st.radio(
+        "modus",
+        ["evaluatie", "geprojecteerde eindevaluatie"],
+        horizontal=True,
+        key="eval_modus",
+        help="Evaluatie: de uitkomst van een afgeronde steekproef. "
+        "Geprojecteerde eindevaluatie: een verwachting voor een steekproef die nog loopt.",
+    )
+    if eval_modus != "evaluatie":
+        _toon_eval_projectie()
+    else:
+        col_inst, col_hoofd = st.columns([1, 3])
+
+        with col_inst:
+            st.subheader("instellingen")
+
+            # Gebruik een tekstveld om de statistische zekerheid in Europese notatie op te vragen.
+            strat_conf_text = st.text_input(
+                "zekerheid",
+                value="0,95",
+                help="De gewenste statistische zekerheid (bijv. 0,95 = 95%).",
+                key="strat_conf_text",
+            )
+            strat_conf = _parse_nl(strat_conf_text)
+
+            strat_model = st.radio(
+                "model", ["binomiaal", "poisson"], horizontal=True, key="strat_model"
             )
 
-            if df_met_naam.empty:
-                st.session_state.eval_error = "Vul minimaal één stratum in met een naam en de bijbehorende waarden."
-            elif mask_ontbrekend.any():
-                namen_fout = ", ".join(df_met_naam.loc[mask_ontbrekend, "naam"])
-                st.session_state.eval_error = f"Ontbrekende waarden (waarde laag, n_laag of k_laag) bij stratum: {namen_fout}."
+            # Gebruik een tekstveld om de granulariteit in Europese notatie op te vragen.
+            strat_gran_text = st.text_input(
+                "granulariteit",
+                value="10.000",
+                help="Aantal stappen voor de FFT-berekening. Meer is nauwkeuriger maar trager.",
+                key="strat_gran_text",
+            )
+            strat_gran_raw = _parse_nl(strat_gran_text)
+            strat_gran = int(strat_gran_raw) if strat_gran_raw is not None else 10000
+
+            strat_knop = st.button("bereken evaluatie", type="primary", key="run_strat")
+
+        with col_hoofd:
+            # Gebruik een horizontale keuzerondjes-widget om subtabs te simuleren die we programmatisch kunnen aansturen.
+            eval_subtab = st.radio(
+                "Subtab",
+                ["1. invoertabel", "2. resultaten"],
+                index=st.session_state.eval_subtab_index,
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+
+            # Synchroniseer de subtab-index wanneer de gebruiker handmatig een keuze maakt.
+            if eval_subtab == "1. invoertabel":
+                st.session_state.eval_subtab_index = 0
             else:
-                # Alles is aanwezig, nu kunnen we veilig de afgeleide kolommen toewijzen.
-                df_clean = df_met_naam.reset_index(drop=True).assign(
-                    waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
-                    waarde_populatie=lambda d: (
-                        d["waarde_laag"] + d["waarde_hoog"].fillna(0)
-                    ),
-                    ihr=lambda d: d["ihr"].str.upper(),
-                    ibr=lambda d: d["ibr"].str.upper(),
-                    car=lambda d: d["car"].str.upper(),
-                    # --- Nieuw in tab_eval: reken absoluut bedrag om naar totale fractie ---
-                    materialiteit=lambda d: d.apply(
-                        lambda row: (
-                            row["materialiteit"] / row["waarde_populatie"]
-                            if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
-                            else row["materialiteit"]
-                        ),
-                        axis=1,
-                    ),
+                st.session_state.eval_subtab_index = 1
+
+            if st.session_state.eval_subtab_index == 0:
+                # Toon een foutmelding direct boven de tabel zodra een invoerfout is opgetreden in de callback.
+                if st.session_state.eval_error:
+                    st.error(st.session_state.eval_error)
+
+                st.caption(
+                    "Vul de strata in. Rijen zonder naam worden genegeerd. "
+                    "Kolommen ihr, ibr, car: H = hoog, M = midden, L = laag."
                 )
 
-                # Valideer kolominvoer: negatieve waarden en andere grenzen.
-                if (df_clean["waarde_laag"] < 0).any():
-                    namen = ", ".join(df_clean.loc[df_clean["waarde_laag"] < 0, "naam"])
-                    st.error(f"waarde_laag is negatief bij: {namen}.")
-                    st.stop()
-                if (df_clean["n_laag"] < 0).any():
-                    namen = ", ".join(df_clean.loc[df_clean["n_laag"] < 0, "naam"])
-                    st.error(f"n_laag is negatief bij: {namen}.")
-                    st.stop()
-                if (df_clean["k_laag"] < 0).any():
-                    namen = ", ".join(df_clean.loc[df_clean["k_laag"] < 0, "naam"])
-                    st.error(f"k_laag is negatief bij: {namen}.")
-                    st.stop()
-                if (df_clean["k_laag"] > df_clean["n_laag"]).any():
-                    mask = df_clean["k_laag"] > df_clean["n_laag"]
-                    namen = ", ".join(df_clean.loc[mask, "naam"])
-                    st.error(f"k_laag mag niet groter zijn dan n_laag bij: {namen}.")
-                    st.stop()
-                _mat = df_clean["materialiteit"].fillna(0)
-                if ((_mat <= 0) | (_mat >= 1)).any():
-                    mask = (_mat <= 0) | (_mat >= 1)
-                    namen = ", ".join(df_clean.loc[mask, "naam"])
-                    st.error(
-                        f"materialiteit moet een fractie in (0, 1) zijn bij: {namen}."
-                    )
-                    st.stop()
-                if (df_clean["waarde_hoog"] < 0).any():
-                    namen = ", ".join(df_clean.loc[df_clean["waarde_hoog"] < 0, "naam"])
-                    st.error(f"waarde_hoog is negatief bij: {namen}.")
-                    st.stop()
-                _fout_hoog = df_clean["fout_hoog"].fillna(0)
-                if (_fout_hoog < 0).any():
-                    namen = ", ".join(df_clean.loc[_fout_hoog < 0, "naam"])
-                    st.error(f"fout_hoog is negatief bij: {namen}.")
-                    st.stop()
-                if (_fout_hoog > df_clean["waarde_hoog"]).any():
-                    mask = _fout_hoog > df_clean["waarde_hoog"]
-                    namen = ", ".join(df_clean.loc[mask, "naam"])
-                    st.error(f"fout_hoog is groter dan waarde_hoog bij: {namen}.")
-                    st.stop()
-                try:
-                    # Bereken de geconvolueerde resultaten via de rekenmotor.
-                    res = evalueer_geldsteek_gestratificeerd(
-                        df_clean,
-                        model=strat_model,
-                        zekerheid=strat_conf,
-                        methode="FFT samen",
-                        granulariteit=strat_gran,
-                    )
-                    st.session_state.eval_res = res
-                    st.session_state.eval_error = None
+                # Toon de invoertabel gekoppeld aan de stabiele gespaarde sessiestructuur en de callback.
+                st.data_editor(
+                    st.session_state.eval_df_saved,
+                    width="stretch",
+                    num_rows="dynamic",
+                    key=f"eval_tabel_{st.session_state.eval_tabel_key}",
+                    on_change=on_eval_tabel_change,
+                    column_config={
+                        "naam": st.column_config.TextColumn(
+                            "naam", help="Unieke naam van het stratum."
+                        ),
+                        "waarde_laag": st.column_config.TextColumn(
+                            "waarde laag (€)",
+                            help="Totale geldswaarde van het laagstratum.",
+                        ),
+                        "n_laag": st.column_config.TextColumn(
+                            "n_laag",
+                            help="Aantal posten getrokken uit het laagstratum; met andere woorden aantal gedane waarnemingen per toeval getrokken uit het laagstratum.",
+                        ),
+                        "k_laag": st.column_config.TextColumn(
+                            "k_laag",
+                            help="Som van de geconstateerde foutfracties (fracties: dus >= 0 en <= 1) van de getrokken posten.",
+                        ),
+                        "waarde_hoog": st.column_config.TextColumn(
+                            "waarde hoog (€)",
+                            help="Totale boekwaarde van het hoogstratum (= foutbedrag + goedbedrag, beide van het hoogstratum).",
+                        ),
+                        "fout_hoog": st.column_config.TextColumn(
+                            "fout hoog (€)", help="Totaal foutbedrag van het hoogstratum."
+                        ),
+                        "ihr": st.column_config.SelectboxColumn(
+                            "ihr",
+                            help="Inherent risico van het laagstratum (H/M/L).",
+                            options=RISK_OPTIES,
+                            required=True,
+                        ),
+                        "ibr": st.column_config.SelectboxColumn(
+                            "ibr",
+                            help="Intern beheersingsrisico van het laagstratum (H/M/L).",
+                            options=RISK_OPTIES,
+                            required=True,
+                        ),
+                        "car": st.column_config.SelectboxColumn(
+                            "car",
+                            help="Cijferanalyserisico van het laagstratum (H/M/L).",
+                            options=RISK_OPTIES,
+                            required=True,
+                        ),
+                        "materialiteit": st.column_config.TextColumn(
+                            "materialiteit totaal",
+                            help="Totale materialiteit voor dit hele stratum (dus laagstratum en hoogstratum samen). Opgevat als fractie als <= 1 (bijv. 0,01) anders als bedrag in euro's (bijv. 75.000).",
+                        ),
+                    },
+                )
 
-                    # Schakel de actieve subtab-index over naar het resultatenvenster.
-                    st.session_state.eval_subtab_index = 1
-                except Exception as e:
-                    st.session_state.eval_error = f"Fout bij de berekening: {e}"
+            else:
+                # Presenteer de foutmeldingen of de berekende resultaten op het scherm.
+                if st.session_state.eval_error:
+                    st.error(st.session_state.eval_error)
+                elif st.session_state.eval_res is not None:
+                    res = st.session_state.eval_res
+                    try:
+                        _toon_kanskromme_eval(res)
 
-        # Herstart de scriptuitvoering om de tab-wissel visueel door te voeren.
-        st.rerun()
+                        st.table(
+                            pd.DataFrame({
+                                "metriek": ["mw fout", "max fout"],
+                                "waarde": [
+                                    f"\u20ac {_nl(res['mw_fout_convolutie_geld'], 2)}",
+                                    f"\u20ac {_nl(res['max_fout_convolutie_geld'], 2)}",
+                                ],
+                            })
+                        )
+                    except Exception as e:
+                        st.error(f"Fout bij het weergeven van de resultaten: {e}")
+                else:
+                    st.info(
+                        "Vul de invoertabel in en klik op \u2018bereken evaluatie\u2019."
+                    )
+
+        # Verwerk de berekeningsactie zodra de gebruiker op de knop drukt.
+        if strat_knop:
+            # Controleer de invoervelden in het linkermenu op wiskundige validiteit.
+            if strat_conf is None or strat_conf < 0.5 or strat_conf >= 1.0:
+                st.error("Voer een geldige zekerheid in tussen 0,50 en 0,999 (bijv. 0,95).")
+            elif strat_gran < 100:
+                st.error(
+                    "Voer een geldige granulariteit in van minimaal 100 (bijv. 10.000)."
+                )
+            else:
+                # Filter de lege rijen uit de opgeslagen tabel en bereken de populatiewaarden.
+                # Parseer de Nederlandse tekstkolommen naar numerieke waarden voor de berekening.
+                _EVAL_NL_KOLOMREN = [
+                    "waarde_laag",
+                    "n_laag",
+                    "k_laag",
+                    "waarde_hoog",
+                    "fout_hoog",
+                    "materialiteit",
+                ]
+                eval_num = st.session_state.eval_df_saved.copy()
+                for _kol in _EVAL_NL_KOLOMREN:
+                    eval_num[_kol] = _parse_nl_kolom(eval_num[_kol])
+
+                # Selecteer eerst alle rijen waar de auditor bewust een naam heeft ingevuld.
+                df_met_naam = eval_num.dropna(subset=["naam"]).loc[
+                    lambda d: d["naam"].str.strip() != ""
+                ]
+
+                # Controleer of er bij deze benoemde strata verplichte velden missen.
+                mask_ontbrekend = (
+                    df_met_naam[["waarde_laag", "n_laag", "k_laag"]].isna().any(axis=1)
+                )
+
+                if df_met_naam.empty:
+                    st.session_state.eval_error = "Vul minimaal één stratum in met een naam en de bijbehorende waarden."
+                elif mask_ontbrekend.any():
+                    namen_fout = ", ".join(df_met_naam.loc[mask_ontbrekend, "naam"])
+                    st.session_state.eval_error = f"Ontbrekende waarden (waarde laag, n_laag of k_laag) bij stratum: {namen_fout}."
+                else:
+                    # Alles is aanwezig, nu kunnen we veilig de afgeleide kolommen toewijzen.
+                    df_clean = df_met_naam.reset_index(drop=True).assign(
+                        waarde_hoog=lambda d: d["waarde_hoog"].fillna(0),
+                        waarde_populatie=lambda d: (
+                            d["waarde_laag"] + d["waarde_hoog"].fillna(0)
+                        ),
+                        ihr=lambda d: d["ihr"].str.upper(),
+                        ibr=lambda d: d["ibr"].str.upper(),
+                        car=lambda d: d["car"].str.upper(),
+                        # --- Nieuw in tab_eval: reken absoluut bedrag om naar totale fractie ---
+                        materialiteit=lambda d: d.apply(
+                            lambda row: (
+                                row["materialiteit"] / row["waarde_populatie"]
+                                if row["materialiteit"] > 1 and row["waarde_populatie"] > 0
+                                else row["materialiteit"]
+                            ),
+                            axis=1,
+                        ),
+                    )
+
+                    # Valideer kolominvoer: negatieve waarden en andere grenzen.
+                    if (df_clean["waarde_laag"] < 0).any():
+                        namen = ", ".join(df_clean.loc[df_clean["waarde_laag"] < 0, "naam"])
+                        st.error(f"waarde_laag is negatief bij: {namen}.")
+                        st.stop()
+                    if (df_clean["n_laag"] < 0).any():
+                        namen = ", ".join(df_clean.loc[df_clean["n_laag"] < 0, "naam"])
+                        st.error(f"n_laag is negatief bij: {namen}.")
+                        st.stop()
+                    if (df_clean["k_laag"] < 0).any():
+                        namen = ", ".join(df_clean.loc[df_clean["k_laag"] < 0, "naam"])
+                        st.error(f"k_laag is negatief bij: {namen}.")
+                        st.stop()
+                    if (df_clean["k_laag"] > df_clean["n_laag"]).any():
+                        mask = df_clean["k_laag"] > df_clean["n_laag"]
+                        namen = ", ".join(df_clean.loc[mask, "naam"])
+                        st.error(f"k_laag mag niet groter zijn dan n_laag bij: {namen}.")
+                        st.stop()
+                    _mat = df_clean["materialiteit"].fillna(0)
+                    if ((_mat <= 0) | (_mat >= 1)).any():
+                        mask = (_mat <= 0) | (_mat >= 1)
+                        namen = ", ".join(df_clean.loc[mask, "naam"])
+                        st.error(
+                            f"materialiteit moet een fractie in (0, 1) zijn bij: {namen}."
+                        )
+                        st.stop()
+                    if (df_clean["waarde_hoog"] < 0).any():
+                        namen = ", ".join(df_clean.loc[df_clean["waarde_hoog"] < 0, "naam"])
+                        st.error(f"waarde_hoog is negatief bij: {namen}.")
+                        st.stop()
+                    _fout_hoog = df_clean["fout_hoog"].fillna(0)
+                    if (_fout_hoog < 0).any():
+                        namen = ", ".join(df_clean.loc[_fout_hoog < 0, "naam"])
+                        st.error(f"fout_hoog is negatief bij: {namen}.")
+                        st.stop()
+                    if (_fout_hoog > df_clean["waarde_hoog"]).any():
+                        mask = _fout_hoog > df_clean["waarde_hoog"]
+                        namen = ", ".join(df_clean.loc[mask, "naam"])
+                        st.error(f"fout_hoog is groter dan waarde_hoog bij: {namen}.")
+                        st.stop()
+                    try:
+                        # Bereken de geconvolueerde resultaten via de rekenmotor.
+                        res = evalueer_geldsteek_gestratificeerd(
+                            df_clean,
+                            model=strat_model,
+                            zekerheid=strat_conf,
+                            methode="FFT samen",
+                            granulariteit=strat_gran,
+                        )
+                        st.session_state.eval_res = res
+                        st.session_state.eval_error = None
+
+                        # Schakel de actieve subtab-index over naar het resultatenvenster.
+                        st.session_state.eval_subtab_index = 1
+                    except Exception as e:
+                        st.session_state.eval_error = f"Fout bij de berekening: {e}"
+
+            # Herstart de scriptuitvoering om de tab-wissel visueel door te voeren.
+            st.rerun()
 
 # Configureer het vierde tabblad voor het plannen en live optimaliseren van gestratificeerde steekproeven.
 with tab_plan:
