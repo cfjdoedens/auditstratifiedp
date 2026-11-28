@@ -469,13 +469,7 @@ $$
 
 De kans op een som van $x$ posten krijgen we door de verdeling van $Z$ $x$ keer met zichzelf te convolueren (een convolutie is het samenvoegen van de kansverdelingen van twee onafhankelijke bedragen tot de kansverdeling van hun som). Daarvoor leggen we een euro-rooster over $[0, Y]$ (standaard 20.000 cellen) en gebruiken we de Fast Fourier Transform (FFT). Met $\varphi_Z$ de karakteristieke functie van $Z$ (de Fouriergetransformeerde van de kansverdeling) is $\varphi_Z(t)^x$ die van de som van $x$ posten. Wegen met $P(K = x)$ en terugtransformeren geeft de kansmassa van $E$ per cel van het rooster. De 95%-grens van $E/Y$ lezen we uit die kansmassa af, zoals eerder uit de kanskromme.
 
-**Trekken zonder teruglegging.** Strikt genomen trekken we de $x$ posten zonder teruglegging uit de $N$ klantposten. De convolutie hierboven is een som van $x$ onafhankelijke trekkingen, dus met teruglegging. Dat geeft een te grote variantie. Daarom verkleinen we de afwijking van elk bedrag ten opzichte van het gemiddelde met een vaste factor, zodat de totale variantie gelijk wordt aan die uit 5.3:
-
-$$
-\mathrm{Var}(X \mid D_0) = \frac{\alpha\beta}{s(s+1)}\left(\frac{1}{s} + \frac{1+CV^2}{N}\right),
-$$
-
-met $CV$ berekend uit de bedragen $y_i$ zelf. De gemiddelde fout en de variantie komen dus overeen met 5.3. Het enige verschil met 5.3 is de vorm van de verdeling. Ook dit is een benadering: de som zonder teruglegging heeft strikt genomen niet precies de vorm die we zo krijgen. Onder "Grens van de methode" hieronder staat hoe groot de afwijking kan worden.
+**Trekken zonder teruglegging.** Strikt genomen trekken we de $x$ posten zonder teruglegging uit de $N$ klantposten. De convolutie hierboven is een som van $x$ onafhankelijke trekkingen, dus met teruglegging. Daardoor is de variantie van de foutfractie iets groter dan die uit 5.3, namelijk met $\frac{CV^2}{N}E[p^2 \mid D_0]$ (voor $p$ klein en $N$ groot verwaarloosbaar). We corrigeren daar bewust niet voor. Een correctie die de afwijking van elk bedrag ten opzichte van het gemiddelde verkleint, zodat de variantie wel precies gelijk wordt aan 5.3, maakte de 95%-grens bij zware staarten en kleine $N$ juist te laag (zie "Grens van de methode"): de krimp verkleint de grootste bedragen, en die bepalen de staart. Een correctie per aantal foute posten $x$ gaf vrijwel hetzelfde resultaat. De methode is dus een benadering met een iets te grote variantie, en dat is de voorzichtige kant op.
 
 **Controle met simulatie.** Onderstaand blok simuleert het model rechtstreeks (eerst $p$, dan onafhankelijke fouten per post, met vaste scheef verdeelde bedragen) en vergelijkt de 95%-grens met die van de samengestelde FFT.
 
@@ -512,33 +506,26 @@ print(f"95%-grens, directe simulatie: {grens_simulatie:.4f}")
 print(f"95%-grens, samengestelde FFT: {grens_fft:.4f}")
 ```
 
-In dit voorbeeld (CV ongeveer 2, dus scheef verdeelde bedragen) ligt de FFT-grens iets onder de simulatie, ongeveer 1%.
+In dit voorbeeld (CV ongeveer 2, dus scheef verdeelde bedragen) ligt de FFT-grens iets boven de simulatie, ongeveer 0,5%.
 
-**Grens van de methode.** We hebben dit verschil nader onderzocht, door de FFT-grens met een simulatie van het model te vergelijken voor lognormale bedragen, bij $N = 200$ en verschillende $CV$ en steekproeven $(n, k)$. De simulatie is het model zelf: eerst $p$ uit de posterior, dan onafhankelijke fouten per post. Het verschil is het relatieve verschil van de FFT-grens met de simulatiegrens, bij 95% zekerheid.
+**Grens van de methode.** We hebben de FFT-grens vergeleken met een simulatie van het model zelf: eerst $p$ uit de posterior, dan een steekproef zonder teruglegging van $x$ posten uit de vaste verzameling van $N$ bedragen. Dat deden we voor $N = 200$, $1.000$ en $3.000$, $(n, k) = (50, 2)$, $(120, 1)$ en $(400, 5)$, en zes verzamelingen per combinatie (lognormaal en Pareto, $CV$ van ongeveer 0,4 tot 5), bij 95% zekerheid en het binomiale model. Voor 51 van de 54 gevallen (de rest was nog niet klaar) lag het verschil tussen de FFT-grens en de simulatiegrens tussen −1,6% en +1,5%, gemiddeld +0,15%. De simulatiegrens zelf heeft bij 40.000 herhalingen een onzekerheid van ongeveer 0,5 tot 1%, dus de meeste verschillen liggen binnen de ruis. Bij de gevallen waar de afwijking het zwaarst kon zijn ($N = 200$, $(50, 2)$, 600.000 herhalingen) was het verschil:
 
-| $CV$ | $(n, k)$ | verschil FFT t.o.v. simulatie |
-|---|---|---|
-| 0,5 | (50, 2) | 0,0% |
-| 1,0 | (50, 2) | −0,1% |
-| 1,7 | (50, 2) | −0,2% |
-| 2,5 | (50, 2) | −1,5% |
-| 3,4 | (50, 2) | −4,1% |
-| 3,5 | (50, 2) | −2,5% |
-| 2,5 | (400, 5) | −0,6% |
-| 3,4 | (400, 5) | −0,4% |
-
-(De simulatiegrens zelf heeft een onzekerheid van 0,1 tot 0,3%. Elke regel gebruikt een eigen trekking van de postbedragen, dus de regels zijn niet strikt vergelijkbaar.)
+| $CV$ (lognormaal) | verschil FFT t.o.v. simulatie |
+|---|---|
+| 2,1 | +1,4% |
+| 2,2 | +0,2% |
+| 3,6 | 0,0% |
+| 5,0 | −0,5% |
 
 Wat we hieruit afleiden:
 
-- Tot een $CV$ van ongeveer 1 komt de FFT-grens binnen de onzekerheid van de simulatie overeen met het model.
-- Bij weinig foute posten ten opzichte van $N$ (hier $(50, 2)$), een kleine $N$ en een $CV$ boven ongeveer 2 ligt de FFT-grens **te laag**, met enkele procenten (tot 4% in onze voorbeelden). Dat is niet-conservatief.
-- Bij meer foute posten, zoals $(400, 5)$, is de afwijking kleiner (tot ongeveer 1%). Dat geldt ook bij een grotere $N$: bij $N = 1.000$ lagen de verschillen binnen ongeveer 1%, ook bij $CV \approx 4{,}5$, en vaak binnen de onzekerheid van de simulatie.
-- Een betere correctie van de variantie voor het trekken zonder teruglegging verhelpt dit niet. De afwijking zit in de vorm van de verdeling, vooral in de staart, en niet in de variantie. Rekenen met de som van onafhankelijke, met kans $p$ aanwezige bedragen (dus zonder het aantal foute posten $K$ als tussenstap) komt wel binnen ongeveer 0,5% van de simulatie, maar is te rekenintensief voor klanten met veel posten.
+- In geen enkel geval lag de FFT-grens meer dan 1,6% onder de simulatie. Dat is binnen de onzekerheid van de simulatie, maar geen garantie.
+- Een eerdere variant van de methode, met een krimp van de bedragen zodat de variantie precies klopte, gaf bij dezelfde gevallen tot −4,9%. Die is daarom verwijderd. Een krimp per $x$ gaf tot −3,3%.
+- Rekenen met de som van onafhankelijke, met kans $p$ aanwezige bedragen (dus zonder het aantal foute posten $K$ als tussenstap) komt ook binnen ongeveer 0,5% van de simulatie, maar is te rekenintensief voor klanten met veel posten.
 
-Voor de praktijk betekent dit: gebruik de FFT-grens met postbedragen met voorzichtigheid als $CV$ boven ongeveer 2 ligt en er weinig fouten worden verwacht bij een kleine $N$. Het gammamodel van niveau 2 is daar vaak voorzichtiger (zie hieronder). We claimen geen dekkingsgarantie. Het onderzoek met lognormale bedragen beperkt zich tot 95% zekerheid, het binomiale model en één trekking van de bedragen per geval; het is dus indicatief.
+Voor de praktijk betekent dit: de FFT-grens met postbedragen is een benadering zonder dekkingsgarantie; bij een kleine $N$ en een $CV$ boven ongeveer 2 is voorzichtigheid op zijn plaats. Het onderzoek beperkt zich tot 95% zekerheid, het binomiale model, twee verdelingsfamilies en een enkele trekking van de bedragen per geval; het is dus indicatief.
 
-**Gammaverdeelde bedragen.** We hebben dezelfde vergelijking ook gedaan voor gammaverdeelde bedragen, de verdeling die het model van niveau 2 aanneemt. Daarbij zijn twee vragen te onderscheiden.
+**Gammaverdeelde bedragen.** We hebben dezelfde vergelijking ook gedaan voor gammaverdeelde bedragen, de verdeling die het model van niveau 2 aanneemt. Daarbij zijn twee vragen te onderscheiden. (De cijfers in dit onderdeel en in "Vergelijking met niveau 2" zijn gemeten met de eerdere variant met krimp. Zonder krimp is de grens voor zware staarten iets hoger, gemiddeld ongeveer 0,4%, hooguit ongeveer 3%; ze zijn niet opnieuw bepaald.)
 
 Ten eerste: klopt de FFT-berekening met het model zelf? Daarvoor simuleerden we het model met bedragen die bij elke herhaling opnieuw uit de gamma met de gegeven $CV$ worden getrokken. We deden dat voor $N = 200$ en $N = 1.000$, $CV$ van 0,5 tot 4 en $(n, k) = (50, 2)$ en $(400, 5)$ (20 gevallen, 95% zekerheid, binomiaal). De FFT-grens ligt in 19 van de 20 gevallen binnen 0,8% van de simulatie, en meestal binnen enkele standaardfouten van de simulatie (0,1 tot 0,5%). Het grootste verschil is −1,5% ($N = 200$, $CV = 4$, $(400, 5)$). Als de bedragen werkelijk gammaverdeeld zijn, is de benadering dus goed.
 
@@ -583,7 +570,7 @@ Hoe groot is het verschil? Bij vergelijkbare $n$ en $k$ ligt de 95%-grens voor d
 
 Voor grote $n$ en kleine $k/n$ zijn de twee modellen praktisch gelijk. Bij kleine $n$ is het Poisson-model voorzichtiger. Kies het Poisson-model als je fouten als zeldzame, onafhankelijke gebeurtenissen wilt modelleren; kies het binomiale model als je elke post als helemaal goed of helemaal fout ziet (Aanname 3).
 
-Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En de correctie voor trekken zonder teruglegging in 5.4 geldt alleen voor het binomiale model. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is het Poisson-equivalent van de variantie uit 5.3, die $p(1-p)(1+CV^2)/N$ is: dezelfde uitdrukking zonder de factor $1-p$. Een correctie voor trekken zonder teruglegging is hier niet nodig: gegeven $\sum_j C_j = x$ is de verdeling van $(C_1, \dots, C_N)$ multinomiaal met gelijke kansen, en dat is precies trekken met teruglegging. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
+Twee kanttekeningen. Bij het Poisson-model kan de foutfractie van een klant boven 1 uitkomen; in de exacte methode wordt zo'n waarde per type post op de laatste cel van het euro-rooster gezet. En 5.4 rekent met onafhankelijke trekkingen (met teruglegging), dus ook voor het binomiale model zonder correctie voor trekken zonder teruglegging. Bij Poisson heeft elke klantpost $j$ een eigen aantal fouten $C_j$, Poisson-verdeeld met verwachting $p$ (gegeven $p$ onafhankelijk), en is de euro-fout $\sum_j C_j\, y_j$. De variantie daarvan is $p \sum_j y_j^2 = p\,N\mu^2(1+CV^2)$, zodat de foutfractie variantie $p(1+CV^2)/N$ heeft. Dat is het Poisson-equivalent van de variantie uit 5.3, die $p(1-p)(1+CV^2)/N$ is: dezelfde uitdrukking zonder de factor $1-p$. Een correctie voor trekken zonder teruglegging is hier niet aan de orde: gegeven $\sum_j C_j = x$ is de verdeling van $(C_1, \dots, C_N)$ multinomiaal met gelijke kansen, en dat is precies trekken met teruglegging. Het ontbreken van een bovengrens $N$ op het aantal fouten is dus een kenmerk van het model en geen vereenvoudiging. Een controle met een simulatie van dit model ($n = 400$, $k = 4$, $N = 1.000$ lognormale bedragen met $CV \approx 1$) gaf voor de exacte methode gemiddelde en variantie van de foutfractie binnen 0,5% van de theorie en een 95%-grens van 0,0267 tegen 0,0266 in de simulatie.
 
 ### 5.6 Risicocorrectie op de SSO-steekproef: IHR, IBR, CAR en materialiteit
 
@@ -735,7 +722,7 @@ De SSO-steekproef is een *daadwerkelijk getrokken* steekproef met geldgewogen se
 
 **Overlap tussen gecontroleerde SSO-posten en klantposten.** Elke gecontroleerde SSO-post hoort bij één klant, dus bij een concrete klant zijn er mogelijk gecontroleerde posten bekend. Ons model behandelt de klantposten, gegeven $p$, als volledig nieuwe en onafhankelijke posten en gebruikt die informatie niet. Een exacte conditionele verdeling zou de al gecontroleerde klantposten als bekende bijdragen vastzetten en alleen de resterende foutmassa voorspellen. Is de overlap klein, dan kan de onafhankelijke benadering bruikbaar zijn. Hoe goed dat is, hebben we niet onderzocht.
 
-**Eindige populatie en ontwerpgebaseerde analyse.** De formules veronderstellen onafhankelijke fouten bij gegeven $p$, dus een superpopulatiemodel. Beschouwt men de fouten in de eindige SSO-massa als vaste, onbekende waarden, dan is een ontwerpgebaseerde analyse nodig, met correcties voor trekken zonder teruglegging en met covarianties. Een extra $CV^2$-term corrigeert dat niet. De correctie voor trekken zonder teruglegging in 5.4 betreft het aantal foute posten bij de klant en geen ontwerpgebaseerde analyse.
+**Eindige populatie en ontwerpgebaseerde analyse.** De formules veronderstellen onafhankelijke fouten bij gegeven $p$, dus een superpopulatiemodel. Beschouwt men de fouten in de eindige SSO-massa als vaste, onbekende waarden, dan is een ontwerpgebaseerde analyse nodig, met correcties voor trekken zonder teruglegging en met covarianties. Een extra $CV^2$-term corrigeert dat niet. Ook 5.4 is geen ontwerpgebaseerde analyse: het rekent met onafhankelijke trekkingen van de bedragen.
 
 **Foutkans die afhangt van het bedrag.** Als de kans op een fout varieert met de postgrootte $y_i$, kan de foutkans per euro afwijken van de foutkans per post. Dan moet men naar postgrootte stratificeren of de foutkans rechtstreeks geldgewogen modelleren, en geldt ook de variantie $p(1-p)(1+CV^2)/N$ uit 5.3 niet in deze vorm.
 

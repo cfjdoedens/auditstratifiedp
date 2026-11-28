@@ -234,8 +234,14 @@ def test_te_groot_venster_geeft_value_error_met_limiet():
 
 
 @pytest.mark.parametrize("cv", [0.5, 1.5])
-def test_compound_variantie_sluit_aan_op_momentmatching_binomiaal(cv):
-    """Var(foutfractie) = Var(p) + (1+cv^2)/N * E[p(1-p)] (theorie 4.1a)."""
+def test_compound_variantie_is_die_van_trekken_met_teruglegging(cv):
+    """Met teruglegging is de variantie die van theorie 4.1a plus cv^2/N * E[p^2].
+
+    Theorie 4.1a: Var(foutfractie) = Var(p) + (1+cv^2)/N * E[p(1-p)] (trekken
+    zonder teruglegging). De krimp die dat precies liet aansluiten is
+    verwijderd (zie de docstring van ``compound_postwaarden``); het verschil
+    met teruglegging is cv^2/N * E[p^2] en de afwijking is dus conservatief.
+    """
     n, k, N, waarde = 40, 6, 60, 1000.0
     dx = waarde / 40_000
     massa = kansmassa_compound("binomiaal", n, k, N, waarde, ("gamma", cv), dx)
@@ -245,5 +251,7 @@ def test_compound_variantie_sluit_aan_op_momentmatching_binomiaal(cv):
     s = a + b
     var_p = a * b / (s**2 * (s + 1))
     e_pq = a * b / (s * (s + 1))
+    e_p2 = a * (a + 1) / (s * (s + 1))
     doel = var_p + (1 + cv**2) / N * e_pq
-    assert var_model == pytest.approx(doel, rel=0.01)
+    assert var_model >= doel
+    assert var_model == pytest.approx(doel + cv**2 / N * e_p2, rel=0.01)
